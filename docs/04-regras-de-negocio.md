@@ -236,6 +236,6 @@
 | ID | Regra | Sev. | Origem |
 |---|---|---|---|
 | RN-COB-01 | Os valores cobrados pelos serviços RENAVE respeitam a **faixa mínima e máxima** da SENATRAN. O sistema impede configurar preço fora da faixa vigente. | 🔴 | RES art. 32 |
-| RN-COB-02 | O acesso ao RENAVE **não pode** ser condicionado à contratação de outros serviços. A ViaAuto não tem planos, mensalidade nem add-ons: cobra **por registro RENAVE confirmado**. | 🔴 | RES art. 32 §3º, PROD |
+| RN-COB-02 | O acesso ao RENAVE **não pode** ser condicionado à contratação de outros serviços. O Seu Renave não tem planos, mensalidade nem add-ons: cobra **por registro RENAVE confirmado**. | 🔴 | RES art. 32 §3º, PROD |
 | RN-COB-03 | A tabela de preços vigente fica **publicada** e acessível antes da contratação. | 🔴 | RES art. 32 §4º |
 | RN-COB-04 | O uso é medido por operação, estabelecimento e mês, com relatório para o cliente. Os repasses ao SERPRO/SENATRAN, quando houver, são conciliados. | 🔵 | PROD |

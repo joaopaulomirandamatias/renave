@@ -1,8 +1,8 @@
 # 11 — Modelo SaaS: operação da plataforma, clientes e cobrança por registro
 
-> O ViaAuto é um **SaaS B2B multi-tenant**. **Nós somos o operador da plataforma** (a integradora). Concessionárias, revendas, grupos, montadoras, ITEs e instituições credoras são **clientes (tenants)** e assinam o serviço, cada um com seus estabelecimentos (matriz e filiais) e usuários.
+> O Seu Renave é um **SaaS B2B multi-tenant**. **Nós somos o operador da plataforma** (a integradora). Concessionárias, revendas, grupos, montadoras, ITEs e instituições credoras são **clientes (tenants)** e assinam o serviço, cada um com seus estabelecimentos (matriz e filiais) e usuários.
 > Este documento especifica a camada SaaS: backoffice do operador, ciclo de vida do cliente, cobrança por registro RENAVE, parceiros e a conta do cliente.
-> **Escopo:** a ViaAuto é **exclusivamente um sistema RENAVE** (sistema de integração da Res. CONTRAN 1.026/2026). Não é, nem terá módulos de, gestão de veículos, de loja ou comercial (DMS), atividade vedada à integradora.
+> **Escopo:** o Seu Renave é **exclusivamente um sistema RENAVE** (sistema de integração da Res. CONTRAN 1.026/2026). Não é, nem terá módulos de, gestão de veículos, de loja ou comercial (DMS), atividade vedada à integradora.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```mermaid
 flowchart TD
-  P[Plataforma — ViaAuto<br/>equipe interna: Super admin, Operações, Suporte, Financeiro, CS, Compliance]
+  P[Plataforma — Seu Renave<br/>equipe interna: Super admin, Operações, Suporte, Financeiro, CS, Compliance]
   PA[Parceiro DMS/ERP<br/>opcional · white-label · revenue share]
   T1[Tenant: Grupo Auto Prime<br/>contrato · faturamento por registro]
   T2[Tenant: Revenda Bom Negócio]
@@ -83,7 +83,7 @@ stateDiagram-v2
 
 ## 11.4 Modelo de cobrança: **por registro RENAVE realizado**
 
-> **Decisão do patrocinador:** a ViaAuto **não cobra mensalidade da plataforma** e **não tem planos nem add-ons**. O cliente paga **por registro RENAVE realizado** (confirmado), com **valores definidos pela autoridade**. Todas as funcionalidades da plataforma ficam incluídas para todos os clientes, conforme o tipo de estabelecimento.
+> **Decisão do patrocinador:** o Seu Renave **não cobra mensalidade da plataforma** e **não tem planos nem add-ons**. O cliente paga **por registro RENAVE realizado** (confirmado), com **valores definidos pela autoridade**. Todas as funcionalidades da plataforma ficam incluídas para todos os clientes, conforme o tipo de estabelecimento.
 
 ### Base regulatória
 
@@ -303,7 +303,7 @@ As telas estão no mesmo canvas do protótipo, nas páginas **"Gestão do SaaS (
 
 ### Matriz de reuso — camada SaaS
 
-| Tema | Origem | Classe | Como usar no ViaAuto |
+| Tema | Origem | Classe | Como usar no Seu Renave |
 |---|---|---|---|
 | Escopo obrigatório de tenant na aplicação (extensão Prisma que injeta e confere o tenant; falha se a consulta vier sem escopo) | `baconian/packages/db/src/scoped.ts` | 🟢 | Primeira barreira; **RLS por cima** (doc 02, `withTenantTransaction`) |
 | FKs compostas `(tenant_id, id)` + check de CI de colunas de tenant | `baconian/packages/db` (convenções do schema), `scripts/check-tenant-columns.ts` | 🟢 | Integridade cross-tenant no banco |

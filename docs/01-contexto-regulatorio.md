@@ -107,7 +107,7 @@ O **Registro Nacional de Veículos em Estoque (Renave)** é o sistema eletrônic
 - É **vedado** cobrar fora da faixa ou **condicionar o acesso ao Renave à contratação de outros serviços**.
 - Os preços cobrados devem ter **ampla publicidade**, com acesso prévio pelos estabelecimentos.
 
-> **Implicação de produto:** a ViaAuto é **exclusivamente RENAVE** e cobra **por registro RENAVE confirmado**, no valor oficial, sem mensalidade, planos ou serviços acoplados. A tabela de preços é pública. Não haverá módulos de gestão (DMS, CRM, pátio), por causa da vedação do Anexo (seção 1.10).
+> **Implicação de produto:** o Seu Renave é **exclusivamente RENAVE** e cobra **por registro RENAVE confirmado**, no valor oficial, sem mensalidade, planos ou serviços acoplados. A tabela de preços é pública. Não haverá módulos de gestão (DMS, CRM, pátio), por causa da vedação do Anexo (seção 1.10).
 
 ## 1.10 Requisitos para ser **integradora autorizada** (Anexo)
 

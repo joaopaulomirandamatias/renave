@@ -1,7 +1,7 @@
-# ViaAuto — Especificação do produto
+# Seu Renave — Especificação do produto
 
 > Plataforma de **integração, operação, compliance e auditoria** do RENAVE (Registro Nacional de Veículos em Estoque) para concessionárias, revendas, montadoras, ITEs e instituições credoras.
-> *ViaAuto — O caminho simples para sua operação veicular.*
+> *Seu Renave — O RENAVE da sua empresa, do seu jeito.*
 
 **Status:** especificação v1.0 (23/11/2026), antes do desenvolvimento.
 **Base normativa:** Resolução CONTRAN nº 1.026/2026 · Manual e Swagger RENAVE-WS (SERPRO).
@@ -22,7 +22,7 @@
 | 09 | [Roadmap e riscos](docs/09-roadmap-riscos.md) | Fases, homologação, checklist de go-live, riscos, decisões |
 | 10 | [Glossário e referências](docs/10-glossario-e-referencias.md) | Termos e fontes oficiais |
 | 11 | [Modelo SaaS](docs/11-modelo-saas.md) | Operador da plataforma, ciclo de vida do cliente, cobrança por registro RENAVE, parceiros, reuso dos projetos SaaS |
-| 12 | [Marca e storytelling](docs/12-marca-e-storytelling.md) | História ViaAuto, plataforma de marca, tom de voz, mensagens, diretrizes de posicionamento |
+| 12 | [Marca e storytelling](docs/12-marca-e-storytelling.md) | História do Seu Renave, plataforma de marca, tom de voz, mensagens, diretrizes de posicionamento |
 
 ## 🎨 Protótipo
 
@@ -30,7 +30,7 @@ Mockups navegáveis — 34 telas + componentes, em 6 páginas (operação do cli
 
 ## 🧭 Marca
 
-Identidade visual ViaAuto (logo em vários estilos, sistema visual, storytelling e aplicações): https://claude.ai/artifact/HTS8j4iXxAz8RbqX5eU3nZ
+Identidade visual Seu Renave (logo em vários estilos, sistema visual, storytelling e aplicações): https://claude.ai/artifact/HTS8j4iXxAz8RbqX5eU3nZ
 
 ## ⚠️ Aviso
 

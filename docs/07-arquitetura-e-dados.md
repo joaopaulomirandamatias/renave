@@ -9,7 +9,7 @@ flowchart LR
     ERP[ERP / DMS / CRM<br/>API + Webhooks]
     CON[Consignante / Vendedor<br/>link de assinatura]
   end
-  subgraph Plataforma["ViaAuto (datacenter no Brasil)"]
+  subgraph Plataforma["Seu Renave (datacenter no Brasil)"]
     BFF[BFF / Web]
     API[API de domínio]
     WK[Workers<br/>envio · reconciliação · webhooks · alertas]

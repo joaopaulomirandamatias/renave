@@ -2,7 +2,7 @@
 
 ## 3.1 Declaração de visão
 
-> **Para** concessionárias, revendas, montadoras, ITEs e instituições credoras **que** precisam escriturar no RENAVE cada entrada e saída de veículo sem atraso nem erro, **a ViaAuto** **é** uma plataforma de integração e compliance **que** transforma regras regulatórias em tarefas simples, executa as chamadas ao RENAVE com segurança e guarda a prova de tudo. **Diferente** de integrações "chama-API", ela **orquestra** pré-condições, documentos, assinaturas e pendências, **reconcilia** o estado com o RENAVE e entrega um **dossiê auditável** de cada operação.
+> **Para** concessionárias, revendas, montadoras, ITEs e instituições credoras **que** precisam escriturar no RENAVE cada entrada e saída de veículo sem atraso nem erro, **o Seu Renave** **é** uma plataforma de integração e compliance **que** transforma regras regulatórias em tarefas simples, executa as chamadas ao RENAVE com segurança e guarda a prova de tudo. **Diferente** de integrações "chama-API", ele **orquestra** pré-condições, documentos, assinaturas e pendências, **reconcilia** o estado com o RENAVE e entrega um **dossiê auditável** de cada operação.
 
 ### Princípios de produto
 
@@ -70,7 +70,7 @@
 ## 3.5 Mapa de módulos
 
 ```text
-┌─────────────────────────────────── ViaAuto ───────────────────────────────────┐
+┌───────────────────────────────── Seu Renave ──────────────────────────────────┐
 │  M1 Onboarding & Adesão     M2 Estabelecimentos & Certificados   M3 Usuários  │
 │  M4 Veículos & Consulta     M5 Estoque (entrada / saída usados)  M6 Zero km   │
 │  M7 ITE & Inacabados        M8 Transferências                    M9 Consignação│
@@ -88,7 +88,7 @@
 
 ## 3.6 Escopo
 
-> **A ViaAuto é exclusivamente um sistema RENAVE.** É o *sistema de integração* da Res. CONTRAN 1.026/2026 (art. 2º III): escritura no RENAVE as entradas, saídas, transferências e consignações do estabelecimento e cuida de tudo o que esses registros exigem (pré-condições, documentos vinculados, pendências, prova). **Não** é sistema de gestão de veículos, de loja ou de concessionária: a integradora é proibida de prover DMS (Anexo, item "Solicitação de autorização").
+> **O Seu Renave é exclusivamente um sistema RENAVE.** É o *sistema de integração* da Res. CONTRAN 1.026/2026 (art. 2º III): escritura no RENAVE as entradas, saídas, transferências e consignações do estabelecimento e cuida de tudo o que esses registros exigem (pré-condições, documentos vinculados, pendências, prova). **Não** é sistema de gestão de veículos, de loja ou de concessionária: a integradora é proibida de prover DMS (Anexo, item "Solicitação de autorização").
 
 ### Dentro do escopo (produto RENAVE)
 - Todos os registros eletrônicos de estoque previstos na Res. 1.026 e no manual RENAVE-WS: usados, 0 km, ITE, transferências, consignação e retomados.
