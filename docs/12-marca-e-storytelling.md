@@ -76,18 +76,61 @@
      - manter uma marca-mãe ou corporativa distinta, registrável, como plano B.
 4. **Preço transparente.** "Você paga só pelo registro realizado, no valor oficial, sem mensalidade" (doc 11).
 
-## 12.7 Identidade visual (resumo)
+## 12.7 Identidade visual — logo oficial
 
-O detalhamento está no canvas de marca: conceitos de símbolo, versões, área de proteção, tamanhos mínimos, estilos, "não faça", cores, tipografia, iconografia e aplicações.
+> **Logo oficial criado pelo patrocinador.** O canvas de marca traz o **redesenho vetorial (SVG)** fiel a ele e as variações derivadas.
+
+### Anatomia do símbolo
+
+| Elemento | Forma | Significado |
+|---|---|---|
+| **Documento** | Contorno azul-marinho com canto dobrado em verde e duas linhas de texto | O registro, a escrituração |
+| **Selo de check** | Círculo verde com check branco | Registro conferido, conformidade |
+| **Carro** | Sedã de frente, silhueta marinho | O veículo em estoque |
+| **Estrada** | Curva verde com tracejado branco e faixa âmbar | O caminho, a agilidade, seguir em frente |
+
+**Wordmark:** "**Seu**" em azul-marinho + "**Renave**" em verde, numa sans geométrica **arredondada e muito pesada** (referência: Nunito 900 / Baloo 2 800).
+
+### Paleta oficial
+
+| Token | Hex | Uso |
+|---|---|---|
+| Azul-marinho (marca) | `#0B2550` | Logo, títulos de marca, sidebar do backoffice, textos fortes |
+| Verde (marca) | `#0A9B55` | Logo, grafismos, ícones de destaque. **Não** usar para texto pequeno sobre branco (contraste insuficiente) |
+| Verde UI (acessível) | `#067A45` (hover `#05663A`, suave `#E7F6EE`) | Botões primários, links, foco, item ativo (≥ 4,5:1) |
+| Âmbar (acento) | `#F2A90C` | **Somente** detalhes pontuais (faixa da estrada, destaques); nunca texto, nunca grandes áreas ao lado do verde |
+| Neutros | Tinta `#101828`, secundário `#475467`, fundo `#F6F7F9`, borda `#E4E7EC` | Interface |
+| Escuro | `#07162F` | Dark mode / fundos de marca |
+
+**Proporção de uso sugerida:** 50% branco e neutros · 25% marinho · 20% verde · 5% âmbar.
+
+### Atenção à percepção "oficial"
+
+**Marinho + verde + amarelo** lembram as cores nacionais, e o nome contém "Renave". Para evitar que o produto pareça governamental:
+- o âmbar fica **mínimo**;
+- o branco é abundante;
+- nada de brasão, bandeira ou elementos do gov.br;
+- **todas** as peças trazem: *"Plataforma privada de integração com o RENAVE — não é o sistema oficial do governo."*
+
+### Variações (no canvas de marca)
+
+1. Horizontal oficial.
+2. Vertical (empilhada).
+3. Símbolo isolado.
+4. Wordmark isolado.
+5. **Símbolo simplificado** para ≤ 32 px: documento + check (+ estrada), sem as linhas de texto e sem o carro detalhado. É usado em favicon, ícone de app e menu.
+6. Monocromático marinho.
+7. Negativo sobre marinho.
+8. Negativo sobre verde.
+9. Uma cor.
+
+**Tamanhos mínimos:** horizontal ≥ 120 px (30 mm); símbolo simplificado ≥ 16 px.
 
 | Item | Diretriz |
 |---|---|
-| Conceito do símbolo | Refeito para "Seu Renave": selo, letra ou ficha que **se resolve num *check*** (registro feito e conferido). O conceito recomendado está no canvas |
-| Logotipo | "**Seu**" em teal + "**Renave**" em tinta; variante toda em minúsculas em teste |
-| Cor primária | Teal `#0F766E`, a mesma da interface (doc 08). Evita qualquer associação com as cores do governo |
-| Neutros | Tinta `#101828`, secundário `#475467`, fundo `#F6F7F9`; versão escura `#0B1220` |
-| Tipografia | Space Grotesk (display de marca) + Inter (interface e textos) + JetBrains Mono (chaves, hashes, placas) |
-| Estilo | Limpo, próximo, geométrico; selo de check como elemento recorrente |
+| Tipografia | Display arredondada pesada (Nunito 800/900) para títulos de marca + Inter (interface e textos) + JetBrains Mono (chaves, hashes, placas) |
+| Iconografia | Traço marinho com detalhes em verde |
+| Interface | O acento de UI passa do teal para o **verde UI `#067A45`**, com marinho na marca e no backoffice (doc 08) |
 
 ## 12.8 Conteúdo do canvas de marca
 
