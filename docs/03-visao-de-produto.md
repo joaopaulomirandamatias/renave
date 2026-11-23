@@ -79,6 +79,9 @@
 │  M14 Auditoria & Dossiê     M15 Integrações (API, Webhooks, ERP/DMS)          │
 │  M16 Painéis & Relatórios   M17 Notificações   M18 Console da Integradora     │
 │  M19 Gestão Regulatória (Regulatory Watch)     M20 Suporte & Chamados         │
+├────────────────────────── Camada SaaS (ver doc 11) ───────────────────────────┤
+│  M21 Backoffice do operador   M22 Assinaturas & Cobrança                      │
+│  M23 Conta do cliente (autoatendimento)        M24 Parceiros DMS/ERP          │
 └───────────────────────────────────────────────────────────────────────────────┘
           │ Conector RENAVE (mTLS ICP-Brasil) │ Fila/Outbox │ Cofre de certificados │
 ```

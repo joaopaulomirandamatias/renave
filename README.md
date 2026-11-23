@@ -21,6 +21,7 @@
 | 08 | [UX e protótipo](docs/08-ux-e-prototipo.md) | Princípios, design system, inventário de telas, microcopy |
 | 09 | [Roadmap e riscos](docs/09-roadmap-riscos.md) | Fases, homologação, checklist de go-live, riscos, decisões |
 | 10 | [Glossário e referências](docs/10-glossario-e-referencias.md) | Termos e fontes oficiais |
+| 11 | [Modelo SaaS](docs/11-modelo-saas.md) | Operador da plataforma, ciclo de vida do cliente, planos, cobrança, parceiros, reuso dos projetos SaaS |
 
 ## 🎨 Protótipo
 

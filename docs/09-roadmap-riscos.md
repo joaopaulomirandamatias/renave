@@ -148,3 +148,6 @@ gantt
 | D6 | Assinatura do vendedor | Integrar plataforma de assinatura homologada · orientar gov.br (CDT) · P7S próprio do cliente | Oferecer as três; gov.br como padrão para PF |
 | D7 | Escopo de UFs no piloto | Começar por UF(s) com DETRAN mais estável | Definir com dados de piloto |
 | D8 | Portfólio do grupo | Manter produtos de DMS/assinatura no mesmo CNPJ ou grupo? | **Parecer jurídico obrigatório** antes do pedido de autorização (vedação do Anexo) |
+| D9 | Suspensão por inadimplência | Bloquear todas as novas operações · bloquear só novas entradas (mantendo saídas e cancelamentos) · não suspender (só cobrança judicial) | Suspensão **parcial** com régua longa; validar com o jurídico o risco de induzir atraso de escrituração (multa ao cliente, responsabilidade solidária) |
+| D10 | Gateway de pagamento | Asaas (já usado no grupo) · outro | Asaas, pelo reuso (`despachante`, `kitara-ead`), se atender NFS-e e PIX automático |
+| D11 | Canal de parceiros DMS | Lançar na F3 · só após o MVP estabilizado | Começar conversas na F0 e entregar sandbox/API na F3 |
