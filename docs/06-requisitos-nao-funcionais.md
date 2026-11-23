@@ -26,7 +26,7 @@
 |---|---|---|---|
 | SEC-01 **[ANEXO]** | **SGSI ISO/IEC 27001** certificado | Até **27/03/2027**. Escopo: produto, infraestrutura, operação e suporte. Responsável técnico formal por segurança e continuidade. | Auditoria de certificação |
 | SEC-02 | TLS forte | TLS 1.2+ (1.3 preferencial) em todo o tráfego; HSTS; cifras modernas | SSL Labs A+ |
-| SEC-03 **[ANEXO]** | **mTLS ICP-Brasil** com o RENAVE | Certificado e-CNPJ por estabelecimento; truststore com a cadeia da AC SERPRO (produção e homologação, separadas); **verificação de hostname sempre ligada**, com tratamento explícito do CN `estaleiro.serpro.gov.br` | Teste de integração + revisão |
+| SEC-03 **[ANEXO]** | **mTLS ICP-Brasil** com o RENAVE | Certificado e-CNPJ **da integradora** (modo padrão, com cabeçalho `CNPJ-Estabelecimento`) ou do estabelecimento (modo legado); truststore com a cadeia da AC SERPRO (produção e homologação, separadas); **verificação de hostname sempre ligada**, com tratamento explícito do CN `estaleiro.serpro.gov.br` | Teste de integração + revisão |
 | SEC-04 | Chaves privadas em cofre | **KMS/HSM** (FIPS 140-2 nível 3 para produção) ou Vault com auto-unseal em HSM; a chave nunca chega ao disco da aplicação em claro; acesso por *workload identity* | Revisão + pentest |
 | SEC-05 | Isolamento multi-tenant | RLS `FORCE` em todas as tabelas de tenant + filtro na aplicação + testes automatizados de vazamento (matriz rota × papel × tenant) no CI | Suíte de isolamento |
 | SEC-06 | Autenticação | OIDC (Keycloak); **MFA obrigatório** para perfis privilegiados (WebAuthn/TOTP); bloqueio progressivo; senhas com mínimo de 12 caracteres e checagem contra vazamentos | Pentest |

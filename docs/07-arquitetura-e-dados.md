@@ -325,6 +325,10 @@ Base: `https://api.<dominio>/v1` · Auth: OAuth2 client credentials (ou mTLS) ·
 
 ## 7.9 Segurança do certificado (detalhe)
 
+> ⚠️ **Atualização (23/11/2026, doc 14):** no **novo modelo** publicado em homologação, a integradora acessa o RENAVE-WS com **o seu próprio e-CNPJ** (conexão única) e identifica a loja pelo cabeçalho **`CNPJ-Estabelecimento`**. A loja autoriza pelo **vínculo no Credencia** (procuração eletrônica) e **não entrega mais o certificado**. As regras abaixo sobre certificado **por estabelecimento** valem para o **modo legado/fallback** (flag `ESTABELECIMENTO`). No modo padrão (`INTEGRADORA`), aplicam-se ao **certificado da integradora** (RN-INT-SRP-05) e ao **vínculo Credencia** (RN-INT-SRP-02/03).
+
+No modo padrão, o *cert-service* guarda **o certificado da integradora** (2 válidos, rotação escalonada) e o fluxo descrito abaixo vale para ele. A importação de certificados de estabelecimentos fica restrita ao modo legado. Detalhes em `14-integracao-serpro.md` §14.2.
+
 1. O upload do PFX é feito **direto para um serviço isolado** (`cert-service`), que importa a chave para o **KMS/HSM** (A1) ou registra a referência ao HSM de rede (A3).
 2. O PFX original é descartado com eliminação segura; a senha nunca é persistida.
 3. O conector obtém um **handle** da chave em tempo de execução para o handshake TLS. Opções: chave não exportável via `PKCS#11` (HSM) ou *sidecar* de mTLS que termina o TLS de saída com a chave no HSM.

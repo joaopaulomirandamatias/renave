@@ -44,6 +44,8 @@
 
 ## 4.3 Certificados (CER)
 
+> ⚠️ **Atualização (23/11/2026, doc 14):** no **novo modelo** publicado em homologação, a integradora acessa o RENAVE-WS com **o seu próprio e-CNPJ** (conexão única) e identifica a loja pelo cabeçalho **`CNPJ-Estabelecimento`**. A loja autoriza pelo **vínculo no Credencia** (procuração eletrônica) e **não entrega mais o certificado**. As regras abaixo sobre certificado **por estabelecimento** valem para o **modo legado/fallback** (flag `ESTABELECIMENTO`). No modo padrão (`INTEGRADORA`), aplicam-se ao **certificado da integradora** (RN-INT-SRP-05) e ao **vínculo Credencia** (RN-INT-SRP-02/03).
+
 | ID | Regra | Sev. | Origem |
 |---|---|---|---|
 | RN-CER-01 | O certificado é **e-CNPJ ICP-Brasil** e o CNPJ do titular coincide com o do estabelecimento, ou com a raiz da matriz se o manual admitir o uso pela matriz *(validar no MAN)*. | 🔴 | RES art. 10, 30 |
