@@ -30,6 +30,10 @@
 
 Mockups navegáveis — 34 telas + componentes, em 6 páginas (operação do cliente, compliance, gestão do SaaS, conta do cliente e mobile): https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
 
+## 🎤 Pitch deck
+
+Apresentação do Seu Renave (15 slides): https://claude.ai/artifact/Bq6iBgLZpArXxjhPn5aMgV
+
 ## 🧭 Marca
 
 Identidade visual Seu Renave (logo em vários estilos, sistema visual, storytelling e aplicações): https://claude.ai/artifact/HTS8j4iXxAz8RbqX5eU3nZ
