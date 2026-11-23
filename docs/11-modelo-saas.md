@@ -1,6 +1,6 @@
 # 11 — Modelo SaaS: operação da plataforma, clientes, planos e cobrança
 
-> O Renave Integra é um **SaaS B2B multi-tenant**. **Nós somos o operador da plataforma** (a integradora). Concessionárias, revendas, grupos, montadoras, ITEs e instituições credoras são **clientes (tenants)** e assinam o serviço, cada um com seus estabelecimentos (matriz e filiais) e usuários.
+> O ViaAuto é um **SaaS B2B multi-tenant**. **Nós somos o operador da plataforma** (a integradora). Concessionárias, revendas, grupos, montadoras, ITEs e instituições credoras são **clientes (tenants)** e assinam o serviço, cada um com seus estabelecimentos (matriz e filiais) e usuários.
 > Este documento especifica a camada SaaS: backoffice do operador, ciclo de vida do cliente, planos, cobrança, parceiros e a conta do cliente.
 
 ---
@@ -9,7 +9,7 @@
 
 ```mermaid
 flowchart TD
-  P[Plataforma — Renave Integra<br/>equipe interna: Super admin, Operações, Suporte, Financeiro, CS, Compliance]
+  P[Plataforma — ViaAuto<br/>equipe interna: Super admin, Operações, Suporte, Financeiro, CS, Compliance]
   PA[Parceiro DMS/ERP<br/>opcional · white-label · revenue share]
   T1[Tenant: Grupo Auto Prime<br/>contrato · plano · faturamento]
   T2[Tenant: Revenda Bom Negócio]
@@ -296,7 +296,7 @@ As telas estão no mesmo canvas do protótipo, nas páginas **"Gestão do SaaS (
 
 ### Matriz de reuso — camada SaaS
 
-| Tema | Origem | Classe | Como usar no Renave Integra |
+| Tema | Origem | Classe | Como usar no ViaAuto |
 |---|---|---|---|
 | Escopo obrigatório de tenant na aplicação (extensão Prisma que injeta e confere o tenant; falha se a consulta vier sem escopo) | `baconian/packages/db/src/scoped.ts` | 🟢 | Primeira barreira; **RLS por cima** (doc 02, `withTenantTransaction`) |
 | FKs compostas `(tenant_id, id)` + check de CI de colunas de tenant | `baconian/packages/db` (convenções do schema), `scripts/check-tenant-columns.ts` | 🟢 | Integridade cross-tenant no banco |

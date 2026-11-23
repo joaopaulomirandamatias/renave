@@ -2,7 +2,7 @@
 
 ## 3.1 Declaração de visão
 
-> **Para** concessionárias, revendas, montadoras, ITEs e instituições credoras **que** precisam escriturar no RENAVE cada entrada e saída de veículo sem atraso nem erro, **o Renave Integra** *(nome provisório)* **é** uma plataforma de integração e compliance **que** transforma regras regulatórias em tarefas simples, executa as chamadas ao RENAVE com segurança e guarda a prova de tudo. **Diferente** de integrações "chama-API", ele **orquestra** pré-condições, documentos, assinaturas e pendências, **reconcilia** o estado com o RENAVE e entrega um **dossiê auditável** de cada operação.
+> **Para** concessionárias, revendas, montadoras, ITEs e instituições credoras **que** precisam escriturar no RENAVE cada entrada e saída de veículo sem atraso nem erro, **a ViaAuto** **é** uma plataforma de integração e compliance **que** transforma regras regulatórias em tarefas simples, executa as chamadas ao RENAVE com segurança e guarda a prova de tudo. **Diferente** de integrações "chama-API", ela **orquestra** pré-condições, documentos, assinaturas e pendências, **reconcilia** o estado com o RENAVE e entrega um **dossiê auditável** de cada operação.
 
 ### Princípios de produto
 
@@ -70,7 +70,7 @@
 ## 3.5 Mapa de módulos
 
 ```text
-┌─────────────────────────────── Renave Integra ────────────────────────────────┐
+┌─────────────────────────────────── ViaAuto ───────────────────────────────────┐
 │  M1 Onboarding & Adesão     M2 Estabelecimentos & Certificados   M3 Usuários  │
 │  M4 Veículos & Consulta     M5 Estoque (entrada / saída usados)  M6 Zero km   │
 │  M7 ITE & Inacabados        M8 Transferências                    M9 Consignação│

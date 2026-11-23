@@ -1,6 +1,6 @@
 # 00 — Sumário executivo
 
-**Projeto:** Renave Integra *(nome provisório)*, plataforma de integração, operação, compliance e auditoria do RENAVE
+**Projeto:** **ViaAuto** — *O caminho simples para sua operação veicular.* Plataforma SaaS de integração, operação, compliance e auditoria do RENAVE
 **Versão do documento:** 1.0 · **Data:** 23/11/2026
 **Base:** Res. CONTRAN nº 1.026/2026 (leitura integral), manual e Swagger do RENAVE-WS (produção e homologação), Central de Ajuda SERPRO, Guia RENAVE 2026 e análise de 6 projetos internos.
 
