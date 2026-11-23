@@ -28,6 +28,10 @@
 
 Mockups navegáveis — 34 telas + componentes, em 6 páginas (operação do cliente, compliance, gestão do SaaS, conta do cliente e mobile): https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
 
+## 🧭 Marca
+
+Identidade visual ViaAuto (logo em vários estilos, sistema visual, storytelling e aplicações): https://claude.ai/artifact/HTS8j4iXxAz8RbqX5eU3nZ
+
 ## ⚠️ Aviso
 
 O RENAVE é um domínio regulatório em evolução. Antes de cada release, revisar a Resolução vigente, os atos da SENATRAN e o Swagger do RENAVE-WS. Esta especificação não substitui análise jurídica.

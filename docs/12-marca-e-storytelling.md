@@ -1,7 +1,7 @@
 # 12 — Marca e storytelling: ViaAuto
 
 > **ViaAuto. O caminho simples para sua operação veicular.**
-> Identidade visual completa (logo em vários estilos, cores, tipografia, iconografia, storytelling e aplicações): **canvas "ViaAuto — Marca e Storytelling"** (link no README após a publicação).
+> Identidade visual completa (logo em vários estilos, cores, tipografia, iconografia, storytelling e aplicações): **canvas "ViaAuto — Marca e Storytelling"**: https://claude.ai/artifact/HTS8j4iXxAz8RbqX5eU3nZ
 
 ---
 
@@ -79,8 +79,19 @@ O detalhamento (conceitos de símbolo, versões, área de proteção, tamanhos m
 
 | Item | Diretriz |
 |---|---|
-| Conceito do símbolo | **Via/caminho**: estrada ou rota que se resolve num *check* ("cada operação no caminho certo") |
+| Conceito do símbolo | **"Via-check" (recomendado):** estrada em perspectiva, com faixa central tracejada, que termina num *check*. Une caminho e segurança num só traço e funciona em 16 px sem o tracejado. Alternativas exploradas: "V de via" e "Rota contínua" |
+| Logotipo | "**Via**" em teal + "**Auto**" em tinta, peso 700 (alternativa: tudo em tinta, 700/500) |
+| Taglines secundárias | "Cada operação no caminho certo." · "RENAVE sem complicação." · "Tudo em um só lugar. Tudo em dia." · "Controle para seguir em frente." |
 | Cor primária | Teal `#0F766E`, a mesma da interface (doc 08), para coerência marca–produto |
 | Neutros | Tinta `#101828`, secundário `#475467`, fundo `#F6F7F9`; versão escura `#0B1220` |
-| Tipografia | Display de marca (Space Grotesk) + Inter na interface e nos textos |
+| Tipografia | Space Grotesk (display de marca) + Inter (interface e textos) + JetBrains Mono (chaves, hashes, placas) |
 | Estilo | Limpo, espaçoso, geométrico; grafismos de "trilhas" e "marcos de rota" |
+
+## 12.8 Conteúdo do canvas de marca
+
+| Página | Boards |
+|---|---|
+| **Logo** | Capa · Conceitos (3) · Versões (9: horizontal, vertical, símbolo, wordmark, mono claro/escuro, negativos, uma cor) · Uso (construção, área de proteção, tamanhos mínimos, favicon, ícone de app, "não faça") · Estilos (sólido, linear, duotone, gradiente, selo de conformidade, animação) |
+| **Sistema visual** | Cores (com contraste AA) · Tipografia · Iconografia (16 ícones de domínio, grafismos "Trilhas" e "Convergência", direção fotográfica) |
+| **Storytelling** | Manifesto (história oficial + propósito, missão, visão, valores, personalidade) · Narrativa (storyboard em 6 quadros) · Voz (tom, taglines, mensagens por público) · Pilares |
+| **Aplicações** | Ícone de app / splash / login · Landing page · Papelaria (cartão, assinatura de e-mail, proposta, crachá) · Social (4 posts + capa LinkedIn) · Pitch deck |
