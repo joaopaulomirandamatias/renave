@@ -126,7 +126,9 @@ gantt
 | R2 | **Requisito de capital (R$ 1 mi)** / vedações societárias | Média | Crítico | Estruturação societária; rota B; parecer jurídico sobre a vedação de DMS e de assinatura eletrônica, considerando o portfólio atual do grupo (despachante, pátio, ERP) |
 | R3 | API RENAVE **atrás da norma** (sem endpoints para identificação prévia, vinculado, retomados, consignação) | Certa | Alto | Adapters + feature flags; capturar evidências localmente; Regulatory Watch |
 | R4 | Mudanças de API **sem versionamento e sem aviso** | Alta | Alto | Testes de contrato diários contra o Swagger; alerta de diff; catálogo versionado |
-| R5 | Cronograma regulatório (Circular 2/2026) **já em curso**; conformidade a partir de 20/11/2026 | Alta | Alto | F0 imediata; foco no MVP de usados; parcerias |
+| R5 | Cronograma regulatório (**Circular SENATRAN 2/2026**, confirmada) **já concluído**: controle de conformidade a partir de 20/11/2026; lojas indicaram integradoras entre 9 e 20/10 | Certa | Alto | F0 imediata; foco no MVP de usados; captar lojas que ainda não têm integradora ou querem migrar (portabilidade em até 60 dias) |
+| R14 | **Ato de preço público da integradora (art. 32) não publicado**; incerteza sobre quem contrata o SERPRO (tarifa de R$ 5,48) | Alta | Alto | `price_table` com dois componentes; contratação em produção condicionada ao ato; consulta formal à SENATRAN e ao SERPRO na F0 |
+| R15 | Vedações cruzadas das **Res. 1.027 e 1.032** (transferência, assinatura, vistoria) | Média | Crítico | Não operar essas atividades; parecer societário sobre o grupo; integrar-se apenas como cliente das plataformas homologadas |
 | R6 | Indisponibilidade do SERPRO/DETRAN gerando atraso de escrituração (multa com responsabilidade solidária) | Média | Alto | Evidência automática da causa externa; fila com reenvio seguro; comunicação proativa ao cliente |
 | R7 | Duplicidade ou inconsistência por retry | Média | Alto | Idempotência + reconciliação obrigatória; bloqueio de repetição cega |
 | R8 | Vazamento de chave privada / certificado | Baixa | Crítico | HSM/KMS; chave não exportável; revogação emergencial; monitoramento |

@@ -123,6 +123,11 @@ O **Registro Nacional de Veículos em Estoque (Renave)** é o sistema eletrônic
 - operadoras de plataforma de **transferência eletrônica** homologadas;
 - operadoras de plataforma de **assinatura eletrônica** homologadas.
 
+**Vedações cruzadas posteriores** (ver doc 13):
+- **Res. CONTRAN 1.027/2026**, Anexos I e II, item 1.2.1.5: integradoras Renave **não podem** ser plataformas de transferência eletrônica nem de assinatura eletrônica.
+- **Res. CONTRAN 1.032/2026**, item 1.3.2.7: integradoras Renave **não podem** ser integradoras de vistoria veicular.
+- O Seu Renave **integra-se** a essas plataformas (comunicação de venda automática, art. 6º da Res. 1.027), mas **não as opera**.
+
 A vedação alcança também quem tenha **participação societária ou controle** nessas empresas.
 
 ### Requisitos jurídicos, fiscais e econômico-financeiros

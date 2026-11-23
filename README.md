@@ -23,6 +23,7 @@
 | 10 | [Glossário e referências](docs/10-glossario-e-referencias.md) | Termos e fontes oficiais |
 | 11 | [Modelo SaaS](docs/11-modelo-saas.md) | Operador da plataforma, ciclo de vida do cliente, cobrança por registro RENAVE, parceiros, reuso dos projetos SaaS |
 | 12 | [Marca e storytelling](docs/12-marca-e-storytelling.md) | História do Seu Renave, plataforma de marca, tom de voz, mensagens, diretrizes de posicionamento |
+| 13 | [Legislação consolidada](docs/13-legislacao-consolidada.md) | Base normativa vigente (Res. 1.026, 1.027, 1.032, Circular 2/2026, Portaria 417/2026), cronograma, cobrança, vedações |
 
 ## 🎨 Protótipo
 

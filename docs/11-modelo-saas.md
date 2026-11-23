@@ -118,7 +118,19 @@ stateDiagram-v2
 
 ## 11.4a Quem define os valores (pesquisa legislativa)
 
-*(Preenchido com o resultado da pesquisa: ato da SENATRAN sobre o preço público, tarifa SERPRO e relação entre os dois.)*
+A pesquisa legislativa (doc 13 §13.4) mostra **dois componentes**, ambos regulados pela SENATRAN:
+
+| Componente | Quem define | Quem recebe | Valor em 23/11/2026 | Base |
+|---|---|---|---|---|
+| **Tarifa SERPRO** do "Registro de Entrada ou Saída de Veículo do Estoque" | SENATRAN (portaria de preços) | **SERPRO**, com pagamento direto | **R$ 5,48 por registro** (reajuste anual pelo IPCA) | Portaria SENATRAN 417/2026 |
+| **Preço de integração** da integradora | SENATRAN fixa **mínimo e máximo** | **Integradora** (Seu Renave) | **Ato ainda não publicado** | Res. 1.026 art. 32 |
+
+**Consequências para o modelo:**
+- A cobrança **por registro** é coerente com a norma. A SENATRAN indicou, na consulta pública, que a faixa terá "regras específicas de acordo com a operação".
+- "Quem define os valores" é a **SENATRAN**: ela fixa a tarifa paga ao SERPRO e a faixa da integradora. O **SERPRO** é quem **recebe a tarifa** e **opera** o sistema.
+- **A confirmar na Fase 0:** quem é o contratante do SERPRO no novo modelo (loja ou integradora), se a tarifa é por movimento ou por veículo, e quais operações são faturáveis.
+- O extrato e a fatura **discriminam** os dois componentes. Se o contratante do SERPRO for a loja, a fatura do Seu Renave traz apenas o preço de integração.
+- Enquanto o ato do art. 32 não sair, o preço de integração fica `[A DEFINIR — aguardando ato SENATRAN]`, e a **contratação em produção** depende dessa publicação.
 
 ## 11.5 Medição e faturamento
 
@@ -255,7 +267,7 @@ stateDiagram-v2
 |---|---|
 | `platform_user` / `platform_role_grant` | Usuário interno, papel, escopo, expira_em (JIT), aprovado_por |
 | `tenant` (estendido) | estado do ciclo de vida, dados de faturamento, csm_id, parceiro_id, health_score, datas (trial, ativação, suspensão, encerramento) |
-| `price_table` / `price_table_item` | Ato normativo, publicação, vigência; item: tipo de registro, valor unitário (ou mínimo/máximo) |
+| `price_table` / `price_table_item` | Ato normativo, publicação, vigência; item: componente (`TARIFA_SERPRO` / `PRECO_INTEGRACAO`), tipo de registro, valor unitário (ou mínimo/máximo) |
 | `billing_account` | tenant, responsável financeiro, e-mail de cobrança, forma de pagamento, gateway_ref |
 | `tenant_module` | Módulo RENAVE habilitado (usados, 0 km, ITE, consignação, retomados), conforme o tipo de estabelecimento e a vigência regulatória |
 | `billable_record` | tenant, estabelecimento, operation_id (unique), id do estoque RENAVE, tipo de registro, valor unitário, price_table_item, competência |

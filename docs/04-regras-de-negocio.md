@@ -79,12 +79,12 @@
 | RN-ENT-01e | O RENAVE pede **consentimento ao DETRAN**. Se a comunicação com o DETRAN falhar (`comunicacaoComDetranFalhou`), a operação fica **"Aguardando DETRAN"** e é refeita automaticamente mais tarde. | 🟠 | MAN |
 | RN-ENT-02 | Na compra de usado, o estabelecimento deve **emitir NF-e de compra** e **assinar a ATPV-e**. | 🔴 | RES art. 14 |
 | RN-ENT-03 | **Entrada de veículo próprio** exige: estabelecimento proprietário, identificação prévia, data, valor e título "entrada em estoque de veículo próprio". Não exige vendedor. | 🔴 | RES art. 16 |
-| RN-ENT-04 | A identificação prévia pode ser **substituída por vistoria veicular**, a critério do estabelecimento. A escolha e as evidências são registradas. | 🔵 | RES art. 15 par. único, 16 |
+| RN-ENT-04 | A identificação prévia pode ser **substituída por vistoria veicular**, a critério do estabelecimento (Res. 1.032 art. 35 §§2º–3º). A **vistoria de transferência é dispensada** quando a transferência se destina à entrada em estoque Renave (Res. 1.032 art. 35 §1º II). A escolha e as evidências são registradas. O Seu Renave **não realiza vistoria**: só registra a evidência ou o resultado vindo de empresa de vistoria, por causa da vedação cruzada. | 🔵 | RES 1.026 art. 15; RES 1.032 art. 35 |
 | RN-ENT-05 | A **data de entrada** não pode ser futura e não pode ser anterior à data da ATPV-e/assinatura do vendedor. | 🔴 | PROD |
 | RN-ENT-06 | O **valor** deve ser maior que zero e **coerente com a NF-e** (tolerância zero, salvo regra MAN diferente). | 🔴 | RES art. 5º VI, PROD |
 | RN-ENT-07 | O CNPJ do **destinatário/emitente da NF-e** deve coincidir com o estabelecimento da operação, e o veículo da NF-e (chassi) com o veículo da operação. | 🔴 | GUIA |
 | RN-ENT-08 | Se o **termo de entrega para entrada** for usado, ele só é válido com **assinatura eletrônica do proprietário**. O sistema acompanha o status. | 🔴 | RES art. 2º XI |
-| RN-ENT-09 | O **prazo interno** para concluir a entrada após o recebimento físico é configurável e gera pendência ao vencer *(padrão: D+1 útil; ajustar ao prazo do MAN/DETRAN)*, porque atraso na escrituração é infração gravíssima. | 🟠 | RES art. 25 |
+| RN-ENT-09 | A entrada e a saída devem ser registradas **no mesmo dia** em que ocorrem (CTB art. 330 §3º). O sistema abre uma pendência de **prazo de escrituração** no recebimento ou na entrega física, com alertas intradiários (ex.: 4h, 2h, 1h antes do fim do dia). O atraso sujeita o estabelecimento a multa gravíssima (R$ 293,47), e a integradora responde solidariamente quando a causa for dela. | 🔴 | CTB art. 330 §3º/§5º, RES art. 25 |
 
 ## 4.6 Saída de usado (SAI)
 
