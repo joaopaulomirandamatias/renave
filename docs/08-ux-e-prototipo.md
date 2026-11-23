@@ -1,7 +1,7 @@
 # 08 — UX, design system e protótipo
 
 > **Protótipo navegável (mockups):** https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
-> Canvas com todas as telas organizadas em páginas. Use **Play** nas telas marcadas como interativas para navegar pelo menu lateral.
+> Canvas "ViaAuto — Mockups": 34 telas + componentes compartilhados (Sidebar, Topbar, SidebarSaas), em 6 páginas. Use **Play** nas telas marcadas como interativas para navegar pelo menu lateral.
 > O link é privado por padrão; compartilhe pelo menu *Share* da página.
 
 ## 8.1 Princípios de UX

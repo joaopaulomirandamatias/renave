@@ -26,7 +26,7 @@
 
 ## 🎨 Protótipo
 
-Mockups navegáveis (19+ telas): https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
+Mockups navegáveis — 34 telas + componentes, em 6 páginas (operação do cliente, compliance, gestão do SaaS, conta do cliente e mobile): https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
 
 ## ⚠️ Aviso
 

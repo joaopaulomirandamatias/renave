@@ -47,7 +47,7 @@ Cerca de **50% do esforço de engenharia** pode ser economizado reaproveitando:
 - **146 regras de negócio** com origem normativa (artigo da Resolução ou seção do manual) e severidade (`04`).
 - **69 requisitos não funcionais**, incluindo todos os do Anexo da Resolução (`06`).
 - Catálogo de **todas as operações do RENAVE-WS** mapeadas para ações de negócio (`07`).
-- **Protótipo com 19+ telas** em design "Clean Operacional" (`08`): https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
+- **Protótipo com 34 telas** (incluindo backoffice do SaaS e conta do cliente) em design "Clean Operacional" (`08`): https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
 
 ## Roadmap resumido
 
