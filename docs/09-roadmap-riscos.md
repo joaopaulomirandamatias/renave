@@ -115,7 +115,7 @@ gantt
 | Continuidade | DR testado com RTO ≤ 4 h; backup restaurado | ☐ |
 | Operação | Suporte em horário ampliado, SLA, incidentes e mudanças definidos | ☐ |
 | LGPD | RoPA, retenção, minimização, DPA e política publicada | ☐ |
-| Comercial | Tabela de preços pública dentro da faixa SENATRAN; plano RENAVE isolado | ☐ |
+| Comercial | Tabela pública de preço por registro com o valor oficial vigente; sem mensalidade | ☐ |
 | Usabilidade | Teste com usuários; SUS ≥ 80 | ☐ |
 
 ## 9.4 Riscos

@@ -69,6 +69,7 @@
 ## 12.6 Diretrizes de posicionamento (regulatório)
 
 1. **Integração e conformidade RENAVE, não gestão comercial.** A Res. 1.026 proíbe que fornecedores de sistemas de gestão de lojas e concessionárias (DMS) sejam integradoras. A expressão "controlar suas operações veiculares", presente na história, deve ser lida e comunicada como **controle das operações de estoque, documentos e obrigações do RENAVE**, nunca como CRM, financeiro, precificação ou gestão comercial de loja.
+   - **Sugestão de ajuste no texto oficial** (para eliminar a ambiguidade): trocar *"empresas que precisam controlar suas operações veiculares e utilizar o RENAVE"* por *"empresas que precisam registrar suas operações no RENAVE"*, e *"Porque administrar veículos não precisa ser complicado"* por *"Porque cumprir o RENAVE não precisa ser complicado"*. A decisão é do patrocinador; o texto da seção 12.1 está mantido como recebido.
 2. **Produto independente.** Sem brasões, sem as cores ou o estilo do gov.br e sem logos de SENATRAN, SERPRO ou DETRAN. Em materiais públicos: *"A ViaAuto é uma plataforma privada de integração com o RENAVE."*
 3. **Preço transparente.** A comunicação comercial menciona a tabela pública de preços (Res. 1.026, art. 32).
 4. **Propriedade da marca.** Fazer busca de anterioridade e depósito no **INPI** (classes 9 — software; 35 — gestão de negócios; 42 — SaaS/TI) e verificar domínios e perfis sociais antes do lançamento público.

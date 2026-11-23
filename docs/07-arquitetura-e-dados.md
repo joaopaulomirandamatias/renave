@@ -274,7 +274,7 @@ erDiagram
 
 | Entidade | Campos principais | Observações |
 |---|---|---|
-| **tenant** | id, nome, status (ACTIVE / SUSPENDED / CLOSED), plano, região | Cliente lógico |
+| **tenant** | id, nome, status (ACTIVE / SUSPENDED / CLOSED), conta de faturamento, região | Cliente lógico |
 | **organization** | id, tenant_id, razão social, raiz CNPJ | Grupo econômico |
 | **establishment** | id, tenant_id, organization_id, cnpj (alfanumérico), tipo (REVENDA / CONCESSIONARIA / MONTADORA / ITE / CREDORA), matriz_id, uf, cod_municipio_renave, email_renave, cnae_principal, adesao_status, adesao_protocolo, adesao_datas, ambiente_ativo, bloqueio_motivo | Trigger de DV e raiz |
 | **certificate** | id, tenant_id, establishment_id, ambiente, kms_key_ref, serial, subject_cn, issuer_cn, thumbprint_sha256, not_before, not_after, status, revocation_checked_at | **Nunca** a chave |

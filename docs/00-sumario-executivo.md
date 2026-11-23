@@ -28,7 +28,7 @@ Uma plataforma SaaS multi-tenant que:
 | 3 | O prazo de adequação de 90 dias **venceu em 28/09/2026**. Fontes de terceiros indicam controle de conformidade a partir de **20/11/2026** | Urgência comercial; Fase 0 imediata |
 | 4 | A **API do RENAVE ainda não implementa** identificação prévia, estoque vinculado, retomados, termos de entrega e o contrato de consignação (este último só em homologação) | Arquitetura com adapters e feature flags por vigência |
 | 5 | A API **não tem versionamento** e campos podem ser removidos "sem aviso" | Testes de contrato diários contra o Swagger |
-| 6 | O preço será limitado a uma **faixa definida pela SENATRAN** e o acesso não pode ser condicionado a outros serviços | Módulo RENAVE contratável isoladamente, com preço público |
+| 6 | O preço será limitado a uma **faixa definida pela SENATRAN** e o acesso não pode ser condicionado a outros serviços | Cobrança **por registro RENAVE confirmado**, no valor oficial; sem mensalidade nem planos; tabela pública |
 
 ## Reuso dos projetos existentes
 

@@ -88,6 +88,8 @@
 
 ## 3.6 Escopo
 
+> **A ViaAuto é exclusivamente um sistema RENAVE.** É o *sistema de integração* da Res. CONTRAN 1.026/2026 (art. 2º III): escritura no RENAVE as entradas, saídas, transferências e consignações do estabelecimento e cuida de tudo o que esses registros exigem (pré-condições, documentos vinculados, pendências, prova). **Não** é sistema de gestão de veículos, de loja ou de concessionária: a integradora é proibida de prover DMS (Anexo, item "Solicitação de autorização").
+
 ### Dentro do escopo (produto RENAVE)
 - Todos os registros eletrônicos de estoque previstos na Res. 1.026 e no manual RENAVE-WS: usados, 0 km, ITE, transferências, consignação e retomados.
 - Gestão de documentos vinculados às operações (NF-e, ATPV-e, CRLV-e, termos, contratos de consignação, identificação prévia/vistoria).

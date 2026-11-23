@@ -45,7 +45,7 @@
 |---|---|---|---|---|
 | RF-M3-01 | Gerenciar usuários: convite por e-mail, ativação, bloqueio, desligamento e reset de MFA. | M | F1 | — |
 | RF-M3-02 | Atribuir **perfis** (ver 3.4) com **escopo por estabelecimento**. | M | F1 | GER-01 |
-| RF-M3-03 | Exibir uma **matriz de permissões** por ação de domínio, com perfis customizáveis pelo admin do tenant dentro do teto do plano. | S | F1 | — |
+| RF-M3-03 | Exibir uma **matriz de permissões** por ação de domínio, com perfis customizáveis pelo admin do tenant. | S | F1 | — |
 | RF-M3-04 | Exigir **MFA** (TOTP/WebAuthn) para perfis privilegiados; MFA opcional ou obrigatório configurável para os demais. | M | F1 | — |
 | RF-M3-05 | Suportar **SSO** (OIDC/SAML) corporativo por tenant. | S | F3 | — |
 | RF-M3-06 | Fazer **revisão periódica de acessos** (trimestral): relatório de quem tem acesso a quê, com aprovação registrada. | S | F3 | — |
@@ -247,7 +247,7 @@
 
 | ID | Requisito | Prio | Fase | RN |
 |---|---|---|---|---|
-| RF-M18-01 | Gerenciar **tenants**: criar, suspender, ver plano, estabelecimentos e ambientes. | M | F1 | — |
+| RF-M18-01 | Gerenciar **tenants**: criar, suspender, ver consumo de registros, estabelecimentos e ambientes. | M | F1 | — |
 | RF-M18-02 | Mostrar a **saúde do conector RENAVE**: disponibilidade, latência p50/p95/p99, taxa de sucesso por operação, erros por código. | M | F2 | — |
 | RF-M18-03 | Exibir uma **fila global** de resultados incertos, divergências e webhooks falhos. | M | F2 | — |
 | RF-M18-04 | Mostrar uma **visão global de certificados** a vencer em todos os clientes. | M | F2 | — |

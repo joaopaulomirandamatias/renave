@@ -89,7 +89,7 @@ PWA do pátio (consulta rápida + identificação prévia/vistoria)
 | 18 | **Console da integradora** (`Console`) | Saúde por tenant, conector, incertos, certificados, Regulatory Watch | RF-M18, RF-M19 |
 | 19 | **PWA do pátio** (`MobileConsulta`, `MobileVistoria`) | Consulta por placa e identificação prévia com fotos | RF-M5-03, UX-02 |
 | — | Componentes compartilhados (`Sidebar`, `Topbar`, `SidebarSaas`) | Navegação do protótipo, seletor de estabelecimento e ambiente, busca | RF-M0 |
-| 20–33 | **Gestão do SaaS e Conta do cliente** | Backoffice do operador, planos, cobrança, parceiros, equipe, auditoria da plataforma, minha assinatura, cadastro | Ver `11-modelo-saas.md` §11.13 |
+| 20–33 | **Gestão do SaaS e Conta do cliente** | Backoffice do operador, preço por registro, faturamento, parceiros, equipe, auditoria da plataforma, consumo e faturas, cadastro | Ver `11-modelo-saas.md` §11.13 |
 
 ## 8.5 Padrões de interação-chave
 
