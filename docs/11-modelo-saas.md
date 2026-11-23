@@ -282,4 +282,72 @@ As telas estão no mesmo canvas do protótipo, nas páginas **"Gestão do SaaS (
 
 ## 11.14 Reuso dos projetos com modelo SaaS
 
-*(Seção preenchida com a análise de `incentivatech`, `baconian`, `kitara-ead` e `despachante`. Ver 11.15.)*
+> Projetos analisados (somente leitura): **baconian**, **kitara-ead**, **incentivatech** e **despachante**. `mirandaserp` (fork do ERPNext) e `vestigio-lab` (laboratório Python) foram descartados como base SaaS.
+> Legenda: 🟢 COPIAR · 🟡 ADAPTAR · 🔵 IDEIA · ⚪ NÃO SERVE.
+
+### Panorama
+
+| Projeto | Stack | Maturidade SaaS | Melhor contribuição |
+|---|---|---|---|
+| **baconian** | Next 16 + pacotes TS independentes (`packages/{db,identity,billing,observability,storage}`), Prisma 7, BullMQ | **Alta no núcleo**: isolamento verificável, billing Asaas robusto, ledger idempotente, auditoria append-only, LGPD | **Base de pacotes** da camada SaaS (portáveis para Fastify) |
+| **kitara-ead** | Next 16 monolítico, Prisma 7, Tailwind 4 | **Alta no backoffice**: sessão de suporte auditada, régua de cobrança, métricas MRR/NRR/churn, entitlements por módulo, contratos com hash, saúde do tenant | **Regras puras de operação do SaaS** e fluxos das telas |
+| **incentivatech** | Fastify 5 + React 19/Vite 8/Tailwind 4 (**mesma stack-alvo**) | Média: portal admin SaaS, trial, assentos, gate 402, cobrança Asaas | **UI do backoffice e da tela de cobrança do cliente** |
+| **despachante** | Fastify 5 + Prisma 6 + Next | Média: `PLATFORM_ADMIN`, escopos concedidos por organização, Asaas com webhook idempotente, termos versionados | **Esqueleto da API**, cliente e webhook Asaas, escopos concedidos |
+
+### Matriz de reuso — camada SaaS
+
+| Tema | Origem | Classe | Como usar no Renave Integra |
+|---|---|---|---|
+| Escopo obrigatório de tenant na aplicação (extensão Prisma que injeta e confere o tenant; falha se a consulta vier sem escopo) | `baconian/packages/db/src/scoped.ts` | 🟢 | Primeira barreira; **RLS por cima** (doc 02, `withTenantTransaction`) |
+| FKs compostas `(tenant_id, id)` + check de CI de colunas de tenant | `baconian/packages/db` (convenções do schema), `scripts/check-tenant-columns.ts` | 🟢 | Integridade cross-tenant no banco |
+| Rotas declaradas com escopo (`public / user / tenant / platform`) + manifesto + build que quebra se faltar teste | `baconian` (`defineRoute`, `tests/security/rotas-sem-workspace.ts`) | 🟡 | Reescrever como plugin Fastify |
+| Suíte de segurança cross-tenant contra **Postgres real** com dois tenants; negar com **404** | `baconian/apps/web/tests/security/helpers/two-workspaces.ts`, `identity/src/acesso.ts` | 🟡 | Gate de CI (SEC-05) |
+| Papéis do tenant mapeados para permissões | `baconian/packages/identity/src/papeis.ts` | 🟡 | Perfis do doc 03 com escopo por estabelecimento |
+| Convites com token hash, expiração, revogação, reenvio e limite de plano | `baconian/packages/identity/src/convites.ts` | 🟢 | Convite do admin do cliente e da equipe |
+| Admin de plataforma com MFA obrigatória | `baconian/.../platform-admin.ts`, `mfa.ts` | 🟡 | Virar claims do Keycloak + papéis de plataforma (11.2) |
+| **Delegação de suporte** concedida pelo cliente (escopo + expiração) | `baconian` (`SupportDelegation`, `ActorType SUPPORT`) | 🟡 | Consentimento do "Acessar como" |
+| **Sessão de suporte auditada** (motivo, 15/30/60 min, token de uso único, **somente leitura imposto no servidor**, log de páginas, encerramento remoto) | `kitara-ead/src/lib/sessao-suporte*.ts` + modelos `SessaoSuporte*` | 🟢 (regras) | "Acessar como" (11.7) como hook `onRequest` no Fastify + claim `act` no token |
+| `Plan` **versionado** + `Subscription` (próximo plano, cancelar no fim do ciclo, carência, chave idempotente) + entitlements | `baconian/packages/billing` (`catalog.ts`, `entitlements.ts`, `assinaturas.ts`) | 🟢 | Planos, add-ons e entitlements (11.4) |
+| Entitlement por módulo com override por tenant | `kitara-ead/src/lib/modulos-ga*.ts` | 🟡 | `tenant_entitlement` |
+| Escopos de integração concedidos pela plataforma, com diff e `grantedBy` | `despachante/apps/api/src/routes/v1/platform-detran-scopes.ts` | 🟢 | Habilitar módulos regulatórios (0 km, ITE, consignação) por cliente |
+| **Ledger idempotente** (reserva, captura, estorno, unicidade por chave, débito condicional, teste de concorrência) | `baconian/packages/billing/src/ledger.ts` + testes | 🟢 | `usage_record` por operação RENAVE confirmada (RN-SAAS-04) |
+| Billing Asaas: evento persistido **antes** de processar, correlação de webhook, `CheckoutAttempt` com estado incerto, reconciliação diária, gateway simulado | `baconian/packages/billing` (`asaas/*`, `eventos.ts`, `correlacao-webhook.ts`) | 🟢 | Núcleo de cobrança (11.5) |
+| Cliente Asaas com modo mock + webhook com comparação em tempo constante e upsert idempotente | `despachante/apps/api/src/lib/asaas/*`, `routes/v1/webhooks-asaas.ts` | 🟢 | Complementa o anterior no esqueleto Fastify |
+| **Régua de cobrança** pura e testada (D+3/7/10/15) e suspensão/reativação com auditoria | `kitara-ead/src/lib/dunning-regua.ts` (+ teste), `dunning.ts` | 🟢 / 🟡 | Régua (11.5) com **suspensão parcial** (11.3), via fila |
+| Fechamento de ciclo (carência → bloqueio) | `baconian` (`fecharCiclosDeAssinatura`) | 🟡 | Inadimplência bloqueia novas operações, não "volta para o free" |
+| Dupla aprovação para reembolso e ajuste | `baconian` (`reembolsos.ts`, `ajustes-de-credito.ts`) | 🟢 | Controle financeiro do operador |
+| **Métricas de receita** (ponte de MRR: nova, expansão, redução, churn; NRR, ARPU, aging) | `kitara-ead/src/lib/metricas-receita-saas.ts` (+ teste) | 🟢 | Visão geral do SaaS (11.9) |
+| Saúde e onboarding do tenant; caixa de trabalho priorizada do backoffice | `kitara-ead/src/lib/tenant-admin-lista.ts`, `caixa-trabalho-saas.ts` | 🟡 | Health score e fila do CS |
+| Confirmação de configuração crítica (frase + diff) | `kitara-ead/src/lib/configuracoes-criticas.ts` | 🟢 | Faixa de preço, flags globais, suspensão |
+| Self-service: tenant criado inativo até a 1ª etapa concluída; trial prorrogável | `kitara-ead/src/lib/onboarding-saas.ts`, `tenant-contract-trial.ts`; `incentivatech` (signup em TRIAL) | 🟡 | Cadastro → homologação (11.6) |
+| Contratos SaaS com modelo e **aceite com hash** | `kitara-ead` (`ModeloContratoSaaS`, `TenantContrato`) | 🟡 | Contrato eletrônico do cliente |
+| Termos versionados com aceite, IP e data | `despachante` (`TermsVersion`, `TermsAcceptance`, `platform-terms.ts`) | 🟢 | RF-M1-08 |
+| Auditoria append-only com severidade e delegação; logger com redação; métricas Prometheus | `baconian/packages/observability` | 🟢 | Auditoria da plataforma; somar cadeia de hash (doc 02) |
+| Exportar tudo + exclusão de conta com carência e purga | `baconian` (`AccountDeletion`, export) | 🟡 | Portabilidade e encerramento, com retenção legal de 5 anos |
+| Storage S3 agnóstico | `baconian/packages/storage` | 🟢 | Região Brasil, SHA-256 |
+| Kit UI do admin (DataTable, Drawer, KpiCard, PageHeader, StatusPill, Tabs, Toast, Pagination, Skeleton, ExportButton) | `incentivatech/apps/web/src/components/admin/*` | 🟡 | Backoffice (já em React/Vite/Tailwind 4) |
+| Telas Empresas/Financeiro do admin; tela de cobrança do cliente (`BillingPage`, `ChangePlanModal`, `PlanComparison`, `PaymentMethodSection`) | `incentivatech/apps/web/src/pages/admin-platform/*`, `BillingPage` | 🟡 | `SaasClientes`, `SaasFaturamento`, `MinhaAssinatura` |
+| Fluxos das telas do super-admin (tenants com saúde, planos, faturas, métricas, logs, suporte, comunicação em massa, pipeline comercial) | `kitara-ead/src/app/dashboard/*` | 🔵 | Referência de fluxo; **reescrever** em componentes pequenos |
+| Gate de assinatura com HTTP 402 | `incentivatech/apps/api/src/plugins/subscription-gate.ts` | 🔵 | Contrato 402 bom; cache precisa ser distribuído |
+| Tipo de organização (empresa / publicador / órgão) | `incentivatech` (`OrganizationType`) | 🔵 | Tipos: revenda, concessionária, montadora, ITE, credora, parceiro |
+| Branding por organização / white-label | `kitara-ead` (cores, logo, domínio), `incentivatech` (branding de publicador) | 🔵 | Parceiros DMS (11.8) |
+| Resolução de tenant por host no proxy do Next; tenant com dezenas de colunas de domínio; hard delete de tenant; plano como texto livre; MRR "estimado" por valor fixo | vários | ⚪ | Substituídos pelas decisões deste documento |
+
+### Lacunas comuns (construir do zero)
+
+- **RLS no Postgres.** Nenhum dos quatro tem; o padrão vem da `plataforma-harmonizacao-normativa` (doc 02).
+- **Hierarquia matriz/filial** com estabelecimentos por CNPJ. Base: `organization_establishment` da harmonização.
+- **Papéis de plataforma granulares** (suporte, financeiro, CS, compliance) e acesso JIT.
+- **NFS-e** (avaliar a emissão nativa do gateway).
+- **Faixa de preço regulatória** e o validador.
+
+### Ordem de porte recomendada
+
+1. `baconian/packages/db` (escopo + FKs compostas + check de CI) **+ RLS** (harmonização) + `organization`/`establishment` com matriz/filial.
+2. `baconian/packages/observability` (auditoria append-only, logger com redação, métricas) **+ cadeia de hash** e NTP do Observatório Nacional.
+3. `baconian/packages/identity` (papéis, acesso 404, convites, MFA) sobre **Keycloak**, com papéis de plataforma e delegação de suporte + regras da sessão de suporte do `kitara-ead`.
+4. `baconian/packages/billing` (planos versionados, assinaturas, ledger, Asaas, eventos, reconciliação, dupla aprovação) + régua do `kitara-ead` + cliente e webhook do `despachante` + **NFS-e** + validador de faixa SENATRAN.
+5. Padrão `defineRoute` + suíte cross-tenant (dois tenants em Postgres real) como plugin Fastify.
+6. UI: kit admin e telas de cobrança do `incentivatech`, fluxos do `kitara-ead`, design system "Clean Operacional" (doc 08) e métricas de receita do `kitara-ead`.
+
+> **Importante:** este repositório é **público**. O código portado de repositórios privados só deve entrar depois de decidir a visibilidade do repositório e de uma **revisão de segurança** de cada arquivo, sem segredos, sem dados de clientes e com as dívidas listadas no doc 02 §2.5 corrigidas. Registrar a proveniência num `NOTICE.md`, como o `baconian` já faz.
