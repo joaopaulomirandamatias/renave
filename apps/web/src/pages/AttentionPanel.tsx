@@ -307,7 +307,7 @@ export function deriveAttentionItems(
       impact:
         "Consultas RENAVE permanecem bloqueadas até a identidade ser confirmada.",
       nextStep: state.preflightAvailable
-        ? "Use o controle “Verificar vínculo” na seção de vínculo do estabelecimento."
+        ? "Abra Compliance e use o controle “Verificar vínculo”."
         : "Conclua a configuração segura antes de verificar o vínculo.",
       tone: "blocked",
     });
@@ -351,7 +351,7 @@ export function deriveAttentionItems(
         impact:
           "Os controles conhecidos permitem usar as consultas disponíveis neste painel.",
         nextStep:
-          "Consulte a aptidão ou localize um veículo em estoque quando necessário.",
+          "Use a área Estoque para consultar aptidão ou localizar um veículo quando necessário.",
         tone: "complete",
       },
     ];
@@ -363,7 +363,8 @@ export function deriveAttentionItems(
       id: "unknown-blocker",
       impact:
         "Os estados carregados não são suficientes para afirmar que as consultas estão disponíveis.",
-      nextStep: "Revise o checklist de prontidão e o vínculo acima.",
+      nextStep:
+        "Abra Compliance e revise o checklist de prontidão e o vínculo.",
       tone: "attention",
     },
   ];
@@ -415,11 +416,17 @@ export function AttentionPanel({
               </p>
             </div>
             {item.action === "create-establishment" ? (
-              <Button href="#establishment-creation" variant="secondary">
+              <Button
+                href="/configuracoes/estabelecimentos"
+                variant="secondary"
+              >
                 Cadastrar estabelecimento
               </Button>
             ) : item.action === "confirm-access" ? (
-              <Button href="#establishment-creation" variant="secondary">
+              <Button
+                href="/configuracoes/estabelecimentos"
+                variant="secondary"
+              >
                 Ir para confirmação de acesso
               </Button>
             ) : item.action === "reload-link" && onReloadLinkStatus ? (

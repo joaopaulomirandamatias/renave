@@ -11,6 +11,7 @@ import {
 } from "./features/platform-console/index.js";
 import type { ReadonlyCanaryPort } from "./features/homologation-canary/index.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import { resolveWorkspaceRoute } from "./workspace-routes.js";
 
 interface AnonymousSession {
   authenticated: false;
@@ -1124,6 +1125,26 @@ type CredentialLinkQueueView =
   | { status: "idle" | "loading" | "error" }
   | { queue: BrowserCredentialLinkQueue; status: "ready" };
 
+function RouteNotFound() {
+  return (
+    <main className="session-state">
+      <section
+        className="session-error"
+        aria-labelledby="route-not-found-title"
+      >
+        <AlertCircle size={24} aria-hidden="true" />
+        <div>
+          <h1 id="route-not-found-title">Página não encontrada</h1>
+          <p>O endereço informado não está disponível neste ambiente.</p>
+          <Button href="/painel" variant="secondary">
+            Ir para o início
+          </Button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export function App({
   client = browserSessionClient,
   locationPathname = window.location.pathname,
@@ -1138,6 +1159,11 @@ export function App({
     locationPathname === PLATFORM_CONSOLE_PATH;
   const platformConsoleRequested =
     platformConsoleEnabled && platformConsolePathRequested;
+  const workspaceRoute = resolveWorkspaceRoute(locationPathname);
+  const unknownWorkspacePath =
+    !platformConsolePathRequested && workspaceRoute === undefined;
+  const disabledStockEntryPath =
+    workspaceRoute === "stock-entry" && !stockEntryOperationsEnabled;
   const [authFeedback] = useState(() => authFeedbackFromSearch(locationSearch));
   const [view, setView] = useState<ViewState>({ status: "loading" });
   const [logoutPending, setLogoutPending] = useState(false);
@@ -1167,6 +1193,10 @@ export function App({
   >([]);
   const [selectedEstablishmentByTenant, setSelectedEstablishmentByTenant] =
     useState<Record<string, string>>({});
+  const administrativeRouteDenied =
+    workspaceRoute === "establishments" && establishmentManagement === "denied";
+  const renaveOperationalContextRequested =
+    workspaceRoute !== undefined && workspaceRoute !== "establishments";
   const tenantRequestVersion = useRef(0);
   const loadRequestVersion = useRef(0);
   const linkLoadVersion = useRef(0);
@@ -1183,7 +1213,11 @@ export function App({
   const load = useCallback(async () => {
     const requestVersion = ++loadRequestVersion.current;
     tenantRequestVersion.current += 1;
-    if (platformConsolePathRequested && !platformConsoleEnabled) {
+    if (
+      unknownWorkspacePath ||
+      disabledStockEntryPath ||
+      (platformConsolePathRequested && !platformConsoleEnabled)
+    ) {
       setView({ status: "not_found" });
       return;
     }
@@ -1247,9 +1281,11 @@ export function App({
     }
   }, [
     client,
+    disabledStockEntryPath,
     platformConsoleEnabled,
     platformConsolePathRequested,
     platformConsoleRequested,
+    unknownWorkspacePath,
   ]);
 
   useEffect(() => {
@@ -1260,7 +1296,13 @@ export function App({
   activeSelectionKeyRef.current = `${selectedTenantId}:${activeEstablishmentId ?? ""}`;
   useEffect(() => {
     const authenticated = view.status === "ready" && view.session.authenticated;
-    if (!authenticated || !selectedTenantId || !activeEstablishmentId) {
+    if (
+      !authenticated ||
+      !renaveOperationalContextRequested ||
+      administrativeRouteDenied ||
+      !selectedTenantId ||
+      !activeEstablishmentId
+    ) {
       linkLoadVersion.current += 1;
       setRenaveLinkView({ status: "idle" });
       return;
@@ -1281,8 +1323,10 @@ export function App({
       });
   }, [
     activeEstablishmentId,
+    administrativeRouteDenied,
     client,
     linkReloadVersion,
+    renaveOperationalContextRequested,
     selectedTenantId,
     view,
   ]);
@@ -1291,6 +1335,7 @@ export function App({
     const authenticated = view.status === "ready" && view.session.authenticated;
     if (
       !authenticated ||
+      workspaceRoute !== "compliance" ||
       !selectedTenantId ||
       establishmentManagement !== "available"
     ) {
@@ -1325,11 +1370,18 @@ export function App({
     establishmentManagement,
     selectedTenantId,
     view,
+    workspaceRoute,
   ]);
 
   useEffect(() => {
     const authenticated = view.status === "ready" && view.session.authenticated;
-    if (!authenticated || !selectedTenantId || !activeEstablishmentId) {
+    if (
+      !authenticated ||
+      !renaveOperationalContextRequested ||
+      administrativeRouteDenied ||
+      !selectedTenantId ||
+      !activeEstablishmentId
+    ) {
       readinessLoadVersion.current += 1;
       setRenaveReadinessView({ status: "idle" });
       return;
@@ -1357,11 +1409,21 @@ export function App({
       });
   }, [
     activeEstablishmentId,
+    administrativeRouteDenied,
     client,
     readinessReloadVersion,
+    renaveOperationalContextRequested,
     selectedTenantId,
     view,
   ]);
+
+  if (
+    unknownWorkspacePath ||
+    disabledStockEntryPath ||
+    (platformConsolePathRequested && !platformConsoleEnabled)
+  ) {
+    return <RouteNotFound />;
+  }
 
   if (view.status === "loading") {
     return (
@@ -1372,23 +1434,7 @@ export function App({
   }
 
   if (view.status === "not_found") {
-    return (
-      <main className="session-state">
-        <section
-          className="session-error"
-          aria-labelledby="route-not-found-title"
-        >
-          <AlertCircle size={24} aria-hidden="true" />
-          <div>
-            <h1 id="route-not-found-title">Página não encontrada</h1>
-            <p>O endereço informado não está disponível neste ambiente.</p>
-            <Button href="/" variant="secondary">
-              Ir para o início
-            </Button>
-          </div>
-        </section>
-      </main>
-    );
+    return <RouteNotFound />;
   }
 
   if (view.status === "error") {
@@ -1566,6 +1612,10 @@ export function App({
     );
   }
 
+  if (administrativeRouteDenied) {
+    return <RouteNotFound />;
+  }
+
   const selectedTenant =
     tenants.find((tenant) => tenant.tenantId === selectedTenantId) ??
     tenants[0];
@@ -1717,6 +1767,7 @@ export function App({
 
   return (
     <DashboardPage
+      route={workspaceRoute ?? "dashboard"}
       establishmentManagement={establishmentManagement}
       credentialLinkQueueError={credentialLinkQueueView.status === "error"}
       credentialLinkQueueLoading={credentialLinkQueueView.status === "loading"}

@@ -6,11 +6,15 @@ import {
   type RenaveStockState,
 } from "@seu-renave/ui";
 import {
+  ArrowDownToLine,
+  Building2,
+  CarFront,
   LayoutDashboard,
   LogOut,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import type {
   AuthFeedback,
   BrowserCrvType,
@@ -37,6 +41,10 @@ import { HomologationReadinessPanel } from "./HomologationReadinessPanel.js";
 import { EligibilityPanel } from "./EligibilityPanel.js";
 import { StockSearchPanel } from "./StockSearchPanel.js";
 import { UsedStockEntryPanel } from "./UsedStockEntryPanel.js";
+import {
+  type WorkspaceRoute,
+  workspaceNavigation,
+} from "../workspace-routes.js";
 
 export interface DashboardPageProps {
   authFeedback?: AuthFeedback;
@@ -85,20 +93,45 @@ export interface DashboardPageProps {
   readiness?: BrowserRenaveReadiness;
   readinessError?: boolean;
   readinessLoading?: boolean;
+  route?: WorkspaceRoute;
   stockEntryOperationsEnabled?: boolean;
   tenants?: readonly { id: string; label: string }[];
   userDisplayName: string;
 }
 
-const navigation = [
-  {
-    id: "dashboard",
-    label: "Painel",
-    href: "/",
-    current: true,
-    icon: <LayoutDashboard size={19} />,
+const navigationIcons: Record<WorkspaceRoute, ReactNode> = {
+  dashboard: <LayoutDashboard size={19} />,
+  stock: <CarFront size={19} />,
+  "stock-entry": <ArrowDownToLine size={19} />,
+  compliance: <ShieldCheck size={19} />,
+  establishments: <Building2 size={19} />,
+};
+
+const routeHeadings: Record<
+  WorkspaceRoute,
+  { eyebrow: string; title: (userDisplayName: string) => string }
+> = {
+  dashboard: {
+    eyebrow: "Visão operacional",
+    title: (userDisplayName) => `Olá, ${userDisplayName}`,
   },
-] as const;
+  stock: {
+    eyebrow: "Operação de estoque",
+    title: () => "Estoque RENAVE",
+  },
+  "stock-entry": {
+    eyebrow: "Operação de estoque",
+    title: () => "Dar entrada — veículo usado",
+  },
+  compliance: {
+    eyebrow: "Compliance",
+    title: () => "Conformidade e integração",
+  },
+  establishments: {
+    eyebrow: "Configurações",
+    title: () => "Estabelecimentos e certificados",
+  },
+};
 
 const linkStatusLabels: Record<BrowserRenaveLinkStatus, string> = {
   not_started: "Não iniciado",
@@ -145,10 +178,23 @@ export function DashboardPage({
   readiness,
   readinessError = false,
   readinessLoading = false,
+  route = "dashboard",
   stockEntryOperationsEnabled = false,
   tenants = [],
   userDisplayName,
 }: DashboardPageProps) {
+  const navigation = workspaceNavigation
+    .filter(
+      (item) =>
+        (item.id !== "stock-entry" || stockEntryOperationsEnabled) &&
+        (item.id !== "establishments" || establishmentManagement !== "denied"),
+    )
+    .map((item) => ({
+      ...item,
+      current: item.id === route,
+      icon: navigationIcons[item.id],
+    }));
+  const routeHeading = routeHeadings[route];
   const activeTenant =
     tenants.find((tenant) => tenant.id === selectedTenantId) ?? tenants[0];
   const readinessAllowsPreflight =
@@ -217,8 +263,8 @@ export function DashboardPage({
 
         <header className="dashboard-page__heading">
           <div>
-            <p>Visão operacional</p>
-            <h1>Olá, {userDisplayName}</h1>
+            <p>{routeHeading.eyebrow}</p>
+            <h1>{routeHeading.title(userDisplayName)}</h1>
           </div>
           {tenants.length > 1 ? (
             <div className="dashboard-page__tenant">
@@ -240,130 +286,142 @@ export function DashboardPage({
           ) : null}
         </header>
 
-        <section
-          className="dashboard-page__alert"
-          aria-labelledby="integration-alert-title"
-        >
-          <ShieldAlert size={22} aria-hidden="true" />
-          <div>
-            {linkStatus === "confirmed" || linkStatus === "enabled" ? (
-              <>
-                <h2 id="integration-alert-title">
-                  Identidade do vínculo confirmada
-                </h2>
-                <p>
-                  A identidade foi confirmada. Mutações permanecem bloqueadas
-                  até a conclusão dos controles operacionais no ambiente
-                  configurado.
-                </p>
-              </>
-            ) : (
-              <>
-                <h2 id="integration-alert-title">Integração ainda protegida</h2>
-                <p>
-                  As operações permanecem bloqueadas até o RENAVE confirmar o
-                  CNPJ do estabelecimento e o vínculo da integradora no ambiente
-                  configurado.
-                </p>
-              </>
-            )}
-          </div>
-        </section>
-
-        <section
-          className="dashboard-page__link"
-          aria-labelledby="renave-link-title"
-          aria-busy={linkStatusLoading}
-        >
-          <ShieldCheck size={22} aria-hidden="true" />
-          <div>
-            <p>Credencia / RENAVE</p>
-            <h2 id="renave-link-title">Vínculo do estabelecimento</h2>
-            <strong aria-live="polite">
-              {linkStatusLoading
-                ? "Carregando vínculo…"
-                : linkStatusError
-                  ? "Não foi possível carregar"
-                  : linkStatus
-                    ? linkStatusLabels[linkStatus]
-                    : "Selecione um estabelecimento"}
-            </strong>
-            {preflightError ? (
-              <p role="alert">
-                A verificação não foi concluída. O estado anterior foi
-                preservado; tente novamente.
-              </p>
-            ) : null}
-          </div>
-          <Button
-            variant="secondary"
-            loading={preflightPending}
-            loadingLabel="Verificando vínculo…"
-            disabled={
-              linkStatusLoading ||
-              (linkStatusError
-                ? !onReloadLinkStatus
-                : !readinessAllowsPreflight ||
-                  !preflightAvailable ||
-                  !onRunPreflight)
-            }
-            aria-describedby={
-              !linkStatusError &&
-              (!preflightAvailable || !readinessAllowsPreflight)
-                ? "preflight-unavailable-reason"
-                : undefined
-            }
-            onClick={linkStatusError ? onReloadLinkStatus : onRunPreflight}
+        {route === "dashboard" ? (
+          <section
+            className="dashboard-page__alert"
+            aria-labelledby="integration-alert-title"
           >
-            {linkStatusError ? "Tentar carregar vínculo" : "Verificar vínculo"}
-          </Button>
-          {!linkStatusError &&
-          (!preflightAvailable || !readinessAllowsPreflight) ? (
-            <p id="preflight-unavailable-reason" className="sr-only">
-              A verificação exige configuração segura da integração RENAVE no
-              ambiente configurado.
-            </p>
-          ) : null}
-        </section>
-
-        <ActivationPage
-          hasEstablishment={Boolean(selectedEstablishmentId)}
-          {...(linkStatus ? { linkStatus } : {})}
-          linkStatusError={linkStatusError}
-          linkStatusLoading={linkStatusLoading}
-        />
-
-        {establishmentManagement === "available" ? (
-          <CredenciaLinkQueuePanel
-            error={credentialLinkQueueError}
-            loading={credentialLinkQueueLoading}
-            truncated={credentialLinkQueueTruncated}
-            {...(credentialLinkQueue ? { items: credentialLinkQueue } : {})}
-            {...(onReloadCredentialLinkQueue
-              ? { onReload: onReloadCredentialLinkQueue }
-              : {})}
-          />
+            <ShieldAlert size={22} aria-hidden="true" />
+            <div>
+              {linkStatus === "confirmed" || linkStatus === "enabled" ? (
+                <>
+                  <h2 id="integration-alert-title">
+                    Identidade do vínculo confirmada
+                  </h2>
+                  <p>
+                    A identidade foi confirmada. Mutações permanecem bloqueadas
+                    até a conclusão dos controles operacionais no ambiente
+                    configurado.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 id="integration-alert-title">
+                    Integração ainda protegida
+                  </h2>
+                  <p>
+                    As operações permanecem bloqueadas até o RENAVE confirmar o
+                    CNPJ do estabelecimento e o vínculo da integradora no
+                    ambiente configurado.
+                  </p>
+                </>
+              )}
+            </div>
+          </section>
         ) : null}
 
-        <HomologationReadinessPanel
-          error={readinessError}
-          loading={readinessLoading}
-          {...(readiness ? { readiness } : {})}
-        />
+        {route === "compliance" ? (
+          <>
+            <section
+              className="dashboard-page__link"
+              aria-labelledby="renave-link-title"
+              aria-busy={linkStatusLoading}
+            >
+              <ShieldCheck size={22} aria-hidden="true" />
+              <div>
+                <p>Credencia / RENAVE</p>
+                <h2 id="renave-link-title">Vínculo do estabelecimento</h2>
+                <strong aria-live="polite">
+                  {linkStatusLoading
+                    ? "Carregando vínculo…"
+                    : linkStatusError
+                      ? "Não foi possível carregar"
+                      : linkStatus
+                        ? linkStatusLabels[linkStatus]
+                        : "Selecione um estabelecimento"}
+                </strong>
+                {preflightError ? (
+                  <p role="alert">
+                    A verificação não foi concluída. O estado anterior foi
+                    preservado; tente novamente.
+                  </p>
+                ) : null}
+              </div>
+              <Button
+                variant="secondary"
+                loading={preflightPending}
+                loadingLabel="Verificando vínculo…"
+                disabled={
+                  linkStatusLoading ||
+                  (linkStatusError
+                    ? !onReloadLinkStatus
+                    : !readinessAllowsPreflight ||
+                      !preflightAvailable ||
+                      !onRunPreflight)
+                }
+                aria-describedby={
+                  !linkStatusError &&
+                  (!preflightAvailable || !readinessAllowsPreflight)
+                    ? "preflight-unavailable-reason"
+                    : undefined
+                }
+                onClick={linkStatusError ? onReloadLinkStatus : onRunPreflight}
+              >
+                {linkStatusError
+                  ? "Tentar carregar vínculo"
+                  : "Verificar vínculo"}
+              </Button>
+              {!linkStatusError &&
+              (!preflightAvailable || !readinessAllowsPreflight) ? (
+                <p id="preflight-unavailable-reason" className="sr-only">
+                  A verificação exige configuração segura da integração RENAVE
+                  no ambiente configurado.
+                </p>
+              ) : null}
+            </section>
 
-        {environment === "homologation" &&
-        establishmentManagement === "available" &&
-        homologationCanaryPort &&
-        selectedTenantId &&
-        selectedEstablishmentId ? (
-          <HomologationCanaryPanel
-            key={`${selectedTenantId}:${selectedEstablishmentId}`}
-            port={homologationCanaryPort}
-            selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
-          />
+            <ActivationPage
+              hasEstablishment={Boolean(selectedEstablishmentId)}
+              {...(linkStatus ? { linkStatus } : {})}
+              linkStatusError={linkStatusError}
+              linkStatusLoading={linkStatusLoading}
+            />
+
+            {establishmentManagement === "available" ? (
+              <CredenciaLinkQueuePanel
+                error={credentialLinkQueueError}
+                loading={credentialLinkQueueLoading}
+                truncated={credentialLinkQueueTruncated}
+                {...(credentialLinkQueue ? { items: credentialLinkQueue } : {})}
+                {...(onReloadCredentialLinkQueue
+                  ? { onReload: onReloadCredentialLinkQueue }
+                  : {})}
+              />
+            ) : null}
+
+            <HomologationReadinessPanel
+              error={readinessError}
+              loading={readinessLoading}
+              {...(readiness ? { readiness } : {})}
+            />
+
+            {environment === "homologation" &&
+            establishmentManagement === "available" &&
+            homologationCanaryPort &&
+            selectedTenantId &&
+            selectedEstablishmentId ? (
+              <HomologationCanaryPanel
+                key={`${selectedTenantId}:${selectedEstablishmentId}`}
+                port={homologationCanaryPort}
+                selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
+              />
+            ) : null}
+          </>
         ) : null}
 
-        {onCreateEstablishment && selectedTenantId ? (
+        {route === "establishments" &&
+        onCreateEstablishment &&
+        selectedTenantId ? (
           <div id="establishment-creation">
             <EstablishmentCreationPanel
               capability={establishmentManagement}
@@ -373,7 +431,10 @@ export function DashboardPage({
           </div>
         ) : null}
 
-        {onCreateStockEntry && selectedTenantId && selectedEstablishmentId ? (
+        {route === "stock-entry" &&
+        onCreateStockEntry &&
+        selectedTenantId &&
+        selectedEstablishmentId ? (
           <UsedStockEntryPanel
             available={stockEntryAvailable}
             onCreate={onCreateStockEntry}
@@ -381,7 +442,8 @@ export function DashboardPage({
           />
         ) : null}
 
-        {(linkStatus === "confirmed" || linkStatus === "enabled") &&
+        {route === "stock" &&
+        (linkStatus === "confirmed" || linkStatus === "enabled") &&
         queriesReady &&
         selectedTenantId &&
         selectedEstablishmentId &&
@@ -393,7 +455,8 @@ export function DashboardPage({
           />
         ) : null}
 
-        {(linkStatus === "confirmed" || linkStatus === "enabled") &&
+        {route === "stock" &&
+        (linkStatus === "confirmed" || linkStatus === "enabled") &&
         queriesReady &&
         selectedTenantId &&
         selectedEstablishmentId &&
@@ -406,34 +469,38 @@ export function DashboardPage({
           />
         ) : null}
 
-        <section aria-labelledby="daily-summary-title">
-          <div className="dashboard-page__section-heading">
-            <div>
-              <p>Dados operacionais</p>
-              <h2 id="daily-summary-title">Resumo do estabelecimento</h2>
-            </div>
-            <span>Indisponível nesta etapa</span>
-          </div>
-        </section>
+        {route === "dashboard" ? (
+          <>
+            <section aria-labelledby="daily-summary-title">
+              <div className="dashboard-page__section-heading">
+                <div>
+                  <p>Dados operacionais</p>
+                  <h2 id="daily-summary-title">Resumo do estabelecimento</h2>
+                </div>
+                <span>Indisponível nesta etapa</span>
+              </div>
+            </section>
 
-        <AttentionPanel
-          canCreateEstablishment={Boolean(
-            onCreateEstablishment && selectedTenantId,
-          )}
-          canReloadLinkStatus={Boolean(onReloadLinkStatus)}
-          contextError={contextError}
-          contextLoading={contextLoading}
-          establishmentManagement={establishmentManagement}
-          hasEstablishment={Boolean(selectedEstablishmentId)}
-          linkStatusError={linkStatusError}
-          linkStatusLoading={linkStatusLoading}
-          preflightAvailable={preflightAvailable}
-          readinessError={readinessError}
-          readinessLoading={readinessLoading}
-          {...(linkStatus ? { linkStatus } : {})}
-          {...(onReloadLinkStatus ? { onReloadLinkStatus } : {})}
-          {...(readiness ? { readiness } : {})}
-        />
+            <AttentionPanel
+              canCreateEstablishment={Boolean(
+                onCreateEstablishment && selectedTenantId,
+              )}
+              canReloadLinkStatus={Boolean(onReloadLinkStatus)}
+              contextError={contextError}
+              contextLoading={contextLoading}
+              establishmentManagement={establishmentManagement}
+              hasEstablishment={Boolean(selectedEstablishmentId)}
+              linkStatusError={linkStatusError}
+              linkStatusLoading={linkStatusLoading}
+              preflightAvailable={preflightAvailable}
+              readinessError={readinessError}
+              readinessLoading={readinessLoading}
+              {...(linkStatus ? { linkStatus } : {})}
+              {...(onReloadLinkStatus ? { onReloadLinkStatus } : {})}
+              {...(readiness ? { readiness } : {})}
+            />
+          </>
+        ) : null}
       </div>
     </AppShell>
   );

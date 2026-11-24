@@ -72,6 +72,7 @@ describe("fronteira web do console global", () => {
         name: "Fila nacional de vínculos RENAVE",
       }),
     ).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Voltar ao painel" })).toBeNull();
     expect(client.load).toHaveBeenCalledOnce();
     expect(client.loadTenants).not.toHaveBeenCalled();
     expect(platformClient.loadQueue).not.toHaveBeenCalled();

@@ -1,11 +1,5 @@
 import { type AppEnvironment, BrandLogo, Button } from "@seu-renave/ui";
-import {
-  ArrowLeft,
-  ChevronDown,
-  LogOut,
-  RefreshCw,
-  ShieldCheck,
-} from "lucide-react";
+import { ChevronDown, LogOut, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
@@ -277,16 +271,6 @@ export function PlatformConsolePage({
       </header>
 
       <main id="platform-console-content" tabIndex={-1}>
-        <div className="platform-console__back">
-          <Button
-            href="/"
-            variant="quiet"
-            leadingIcon={<ArrowLeft size={18} />}
-          >
-            Voltar ao painel
-          </Button>
-        </div>
-
         <header className="platform-console__heading">
           <div>
             <p>Privilégio global · somente leitura</p>

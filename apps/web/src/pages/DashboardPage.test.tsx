@@ -72,13 +72,15 @@ describe("DashboardPage", () => {
 
   it("expõe navegação acessível e comunica a troca pelo identificador interno", () => {
     const onEstablishmentChange = vi.fn();
-    render(
+    const view = render(
       <DashboardPage
         environment="development"
+        establishmentManagement="mfa_required"
         establishments={establishments}
         onEstablishmentChange={onEstablishmentChange}
         onLogout={vi.fn()}
         selectedEstablishmentId="store-belem"
+        stockEntryOperationsEnabled
         userDisplayName="Operador"
       />,
     );
@@ -89,10 +91,10 @@ describe("DashboardPage", () => {
     expect(
       within(navigation).getByRole("link", { name: "Painel" }),
     ).toHaveAttribute("aria-current", "page");
-    expect(within(navigation).getAllByRole("link")).toHaveLength(1);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(5);
     expect(
-      within(navigation).queryByRole("link", { name: "Estoque" }),
-    ).toBeNull();
+      within(navigation).getByRole("link", { name: "Estoque" }),
+    ).toHaveAttribute("href", "/estoque");
     expect(
       within(navigation).queryByRole("link", { name: "Pendências" }),
     ).toBeNull();
@@ -100,8 +102,10 @@ describe("DashboardPage", () => {
       within(navigation).queryByRole("link", { name: "Auditoria" }),
     ).toBeNull();
     expect(
-      within(navigation).queryByRole("link", { name: "Configurações" }),
-    ).toBeNull();
+      within(navigation).getByRole("link", {
+        name: "Estabelecimentos & Certificados",
+      }),
+    ).toHaveAttribute("href", "/configuracoes/estabelecimentos");
     expect(screen.getByRole("button", { name: "Sair" })).toHaveAttribute(
       "type",
       "button",
@@ -112,6 +116,51 @@ describe("DashboardPage", () => {
       { target: { value: "store-ananindeua" } },
     );
     expect(onEstablishmentChange).toHaveBeenCalledWith("store-ananindeua");
+
+    view.rerender(
+      <DashboardPage
+        environment="development"
+        establishmentManagement="mfa_required"
+        establishments={establishments}
+        onEstablishmentChange={onEstablishmentChange}
+        onLogout={vi.fn()}
+        route="stock"
+        selectedEstablishmentId="store-belem"
+        stockEntryOperationsEnabled
+        userDisplayName="Operador"
+      />,
+    );
+    expect(
+      within(navigation).getByRole("link", { name: "Estoque" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(navigation).getByRole("link", { name: "Painel" }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("não expõe rotas sem capability ou feature flag", () => {
+    render(
+      <DashboardPage
+        environment="development"
+        establishmentManagement="denied"
+        establishments={establishments}
+        onLogout={vi.fn()}
+        userDisplayName="Operador"
+      />,
+    );
+
+    const navigation = screen.getByRole("navigation", {
+      name: "Seções da aplicação",
+    });
+    expect(
+      within(navigation).queryByRole("link", { name: "Entradas" }),
+    ).toBeNull();
+    expect(
+      within(navigation).queryByRole("link", {
+        name: "Estabelecimentos & Certificados",
+      }),
+    ).toBeNull();
+    expect(within(navigation).getAllByRole("link")).toHaveLength(3);
   });
 
   it("cai para o primeiro estabelecimento quando o selecionado não existe", () => {
@@ -157,6 +206,7 @@ describe("DashboardPage", () => {
         onLogout={vi.fn()}
         onRunPreflight={onRunPreflight}
         preflightAvailable
+        route="compliance"
         selectedEstablishmentId="store-belem"
         userDisplayName="Operador"
       />,
@@ -165,10 +215,14 @@ describe("DashboardPage", () => {
     expect(
       screen.getByRole("region", { name: "Vínculo do estabelecimento" }),
     ).toHaveTextContent("Confirmado");
-    const integration = screen.getByRole("region", {
-      name: "Identidade do vínculo confirmada",
-    });
-    expect(integration).not.toHaveTextContent(/homologaç/i);
+    expect(
+      screen.getByRole("heading", { name: "Conformidade e integração" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", {
+        name: "Identidade do vínculo confirmada",
+      }),
+    ).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
     expect(onRunPreflight).toHaveBeenCalledOnce();
   });
@@ -188,6 +242,7 @@ describe("DashboardPage", () => {
         onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
         onSearchStocks={onSearchStocks}
+        route="stock"
         selectedEstablishmentId="store-belem"
         selectedTenantId="tenant-a"
         userDisplayName="Operador"
@@ -208,6 +263,7 @@ describe("DashboardPage", () => {
         onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
         onSearchStocks={onSearchStocks}
+        route="stock"
         readiness={{
           certificate: "blocked",
           environment: "homologation",
@@ -238,6 +294,7 @@ describe("DashboardPage", () => {
         onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
         onSearchStocks={onSearchStocks}
+        route="stock"
         readiness={{
           certificate: "ready",
           environment: "homologation",
@@ -280,8 +337,8 @@ describe("DashboardPage", () => {
     expect(summary).not.toHaveTextContent("Pendências abertas");
     expect(summary).not.toHaveTextContent("Resultados incertos");
     expect(
-      screen.getByRole("region", { name: "Ativação do estabelecimento" }),
-    ).toBeVisible();
+      screen.queryByRole("region", { name: "Ativação do estabelecimento" }),
+    ).toBeNull();
   });
 
   it("mantém o painel e anuncia falhas de contexto e logout", () => {
@@ -330,6 +387,7 @@ describe("DashboardPage", () => {
         establishments={establishments}
         linkStatus="confirmed"
         onLogout={vi.fn()}
+        route="compliance"
         readiness={{
           certificate: "warning",
           environment: "homologation",
@@ -370,6 +428,7 @@ describe("DashboardPage", () => {
         onLogout={vi.fn()}
         onRunPreflight={onRunPreflight}
         preflightAvailable
+        route="compliance"
         readiness={{
           certificate: "unavailable",
           environment: "homologation",
@@ -397,6 +456,7 @@ describe("DashboardPage", () => {
         onLogout={vi.fn()}
         onRunPreflight={onRunPreflight}
         preflightAvailable
+        route="compliance"
         readiness={{
           certificate: "warning",
           environment: "homologation",
@@ -423,6 +483,7 @@ describe("DashboardPage", () => {
         linkStatus="confirmed"
         onLogout={vi.fn()}
         readinessError
+        route="compliance"
         selectedEstablishmentId="store-belem"
         userDisplayName="Operador"
       />,
@@ -444,6 +505,7 @@ describe("DashboardPage", () => {
         onRunPreflight={vi.fn()}
         preflightAvailable
         readinessLoading
+        route="compliance"
         selectedEstablishmentId="store-belem"
         userDisplayName="Operador"
       />,
@@ -467,6 +529,7 @@ describe("DashboardPage", () => {
         onLogout={vi.fn()}
         onReloadLinkStatus={onReloadLinkStatus}
         readinessError
+        route="compliance"
         selectedEstablishmentId="store-belem"
         userDisplayName="Operador"
       />,
@@ -489,6 +552,7 @@ describe("DashboardPage", () => {
         linkStatus="enabled"
         onCreateStockEntry={onCreateStockEntry}
         onLogout={vi.fn()}
+        route="stock-entry"
         readiness={{
           certificate: "ready",
           environment: "homologation",
@@ -528,6 +592,7 @@ describe("DashboardPage", () => {
           status: "HELD_LOCAL" as const,
         }))}
         onLogout={vi.fn()}
+        route="stock-entry"
         readiness={{
           certificate: "warning",
           environment: "homologation",
@@ -555,38 +620,42 @@ describe("DashboardPage", () => {
   });
 
   it.each(["missing", "pending", "suspended", "unavailable"] as const)(
-    "mantém entrada bloqueada com perfil %s sem ocultar consultas read-only",
+    "mantém entrada bloqueada com perfil %s e preserva consultas na rota própria",
     (profileStatus) => {
-      render(
-        <DashboardPage
-          environment="homologation"
-          establishments={establishments}
-          linkStatus="enabled"
-          onCheckEligibility={vi.fn()}
-          onCreateStockEntry={vi.fn()}
-          onLogout={vi.fn()}
-          onSearchStocks={vi.fn()}
-          readiness={{
-            certificate: "ready",
-            environment: "homologation",
-            establishmentContact: "verified",
-            integration: "configured",
-            link: "enabled",
-            mutations: "blocked",
-            operatorIdentity: profileStatus,
-            queries: "ready",
-          }}
-          selectedEstablishmentId="store-belem"
-          selectedTenantId="tenant-a"
-          stockEntryOperationsEnabled
-          tenants={[{ id: "tenant-a", label: "Organização A" }]}
-          userDisplayName="Operador"
-        />,
-      );
+      const props = {
+        environment: "homologation" as const,
+        establishments,
+        linkStatus: "enabled" as const,
+        onCheckEligibility: vi.fn(),
+        onCreateStockEntry: vi.fn(),
+        onLogout: vi.fn(),
+        onSearchStocks: vi.fn(),
+        readiness: {
+          certificate: "ready" as const,
+          environment: "homologation" as const,
+          establishmentContact: "verified" as const,
+          integration: "configured" as const,
+          link: "enabled" as const,
+          mutations: "blocked" as const,
+          operatorIdentity: profileStatus,
+          queries: "ready" as const,
+        },
+        selectedEstablishmentId: "store-belem",
+        selectedTenantId: "tenant-a",
+        stockEntryOperationsEnabled: true,
+        tenants: [{ id: "tenant-a", label: "Organização A" }],
+        userDisplayName: "Operador",
+      };
+      const view = render(<DashboardPage {...props} route="stock-entry" />);
 
       expect(
         screen.queryByRole("button", { name: "Registrar solicitação local" }),
       ).toBeNull();
+      expect(
+        screen.queryByRole("heading", { name: "Localizar estoque por placa" }),
+      ).toBeNull();
+
+      view.rerender(<DashboardPage {...props} route="stock" />);
       expect(
         screen.getByRole("heading", { name: "Localizar estoque por placa" }),
       ).toBeVisible();
@@ -606,6 +675,7 @@ describe("DashboardPage", () => {
         linkStatus="enabled"
         onCreateStockEntry={vi.fn()}
         onLogout={vi.fn()}
+        route="stock-entry"
         readiness={{
           certificate: "ready",
           environment: "homologation",
@@ -639,6 +709,7 @@ describe("DashboardPage", () => {
         establishments={establishments}
         homologationCanaryPort={port}
         onLogout={vi.fn()}
+        route="compliance"
         selectedEstablishmentId="store-belem"
         selectedTenantId="tenant-a"
         userDisplayName="Operador"
@@ -656,6 +727,7 @@ describe("DashboardPage", () => {
         establishments={establishments}
         homologationCanaryPort={port}
         onLogout={vi.fn()}
+        route="compliance"
         selectedEstablishmentId="store-belem"
         selectedTenantId="tenant-a"
         userDisplayName="Operador"
@@ -672,6 +744,7 @@ describe("DashboardPage", () => {
         establishments={establishments}
         homologationCanaryPort={port}
         onLogout={vi.fn()}
+        route="compliance"
         selectedEstablishmentId="store-belem"
         selectedTenantId="tenant-a"
         userDisplayName="Operador"
@@ -691,6 +764,7 @@ describe("DashboardPage", () => {
         establishments={establishments}
         homologationCanaryPort={port}
         onLogout={vi.fn()}
+        route="compliance"
         selectedEstablishmentId="store-belem"
         selectedTenantId="tenant-a"
         userDisplayName="Operador"
@@ -711,6 +785,7 @@ describe("DashboardPage", () => {
         establishments={establishments}
         homologationCanaryPort={port}
         onLogout={vi.fn()}
+        route="compliance"
         selectedEstablishmentId="store-ananindeua"
         selectedTenantId="tenant-a"
         userDisplayName="Operador"

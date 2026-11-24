@@ -743,7 +743,7 @@ describe("App session boundary", () => {
     vi.mocked(client.searchStocks).mockResolvedValue([
       { estado: "CONFIRMADO", id: 1, placa: "ABC1D23" },
     ]);
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     fireEvent.change(
       await screen.findByRole("textbox", { name: "Placa sintética" }),
@@ -865,6 +865,134 @@ describe("App session boundary", () => {
     );
     expect(screen.queryByText("Entrar na sua conta")).toBeNull();
     expect(screen.queryByText("Visão operacional")).toBeNull();
+  });
+
+  it("recusa rota fora da allowlist sem carregar contratos operacionais", async () => {
+    const client = clientFor({
+      authenticated: true,
+      authMode: "oidc",
+      environment: "homologation",
+      expiresAt: "2026-11-24T00:00:00.000Z",
+      user: { name: "Operadora" },
+    });
+
+    render(<App client={client} locationPathname="/rota-desconhecida" />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Página não encontrada" }),
+    ).toBeVisible();
+    expect(client.load).not.toHaveBeenCalled();
+    expect(client.loadTenants).not.toHaveBeenCalled();
+    expect(client.loadRenaveReadiness).not.toHaveBeenCalled();
+  });
+
+  it("recusa sincronamente uma rota desconhecida após navegação no mesmo componente", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    const view = render(<App client={client} locationPathname="/painel" />);
+    expect(
+      await screen.findByRole("heading", { name: "Olá, Operadora" }),
+    ).toBeVisible();
+
+    view.rerender(
+      <App client={client} locationPathname="/rota-desconhecida" />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Página não encontrada" }),
+    ).toBeVisible();
+    expect(screen.queryByText("Visão operacional")).toBeNull();
+  });
+
+  it("não revela a entrada por acesso direto quando a feature flag está desligada", async () => {
+    const client = clientFor({
+      authenticated: true,
+      authMode: "oidc",
+      environment: "homologation",
+      expiresAt: "2026-11-24T00:00:00.000Z",
+      user: { name: "Operadora" },
+    });
+
+    render(<App client={client} locationPathname="/estoque/entrada" />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Página não encontrada" }),
+    ).toBeVisible();
+    expect(client.load).not.toHaveBeenCalled();
+    expect(client.createStockEntry).not.toHaveBeenCalled();
+    expect(screen.queryByRole("link", { name: "Entradas" })).toBeNull();
+  });
+
+  it("não revela configurações por acesso direto sem capability administrativa", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }], "denied"),
+    );
+
+    render(
+      <App
+        client={client}
+        locationPathname="/configuracoes/estabelecimentos"
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Página não encontrada" }),
+    ).toBeVisible();
+    expect(client.loadTenants).toHaveBeenCalledOnce();
+    expect(client.createEstablishment).not.toHaveBeenCalled();
+    expect(client.loadRenaveLinkStatus).not.toHaveBeenCalled();
+    expect(client.loadRenaveReadiness).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("CNPJ")).toBeNull();
+  });
+
+  it("não carrega dados operacionais na configuração administrativa autorizada", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Administradora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }], "available"),
+    );
+
+    render(
+      <App
+        client={client}
+        locationPathname="/configuracoes/estabelecimentos"
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Estabelecimentos e certificados",
+      }),
+    ).toBeVisible();
+    expect(client.loadRenaveLinkStatus).not.toHaveBeenCalled();
+    expect(client.loadRenaveReadiness).not.toHaveBeenCalled();
+    expect(client.loadCredentialLinkQueue).not.toHaveBeenCalled();
   });
 
   it("mostra login somente quando a sessão não está autenticada", async () => {
@@ -1023,6 +1151,54 @@ describe("App session boundary", () => {
     );
   });
 
+  it("resolve a rota de estoque sem recombinar os painéis do dashboard", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }]),
+    );
+    vi.mocked(client.loadRenaveLinkStatus).mockResolvedValue({
+      preflightAvailable: false,
+      status: "confirmed",
+    });
+    vi.mocked(client.loadRenaveReadiness).mockResolvedValue({
+      certificate: "ready",
+      environment: "homologation",
+      establishmentContact: "verified",
+      integration: "configured",
+      link: "confirmed",
+      mutations: "blocked",
+      operatorIdentity: "verified",
+      queries: "ready",
+    });
+
+    render(<App client={client} locationPathname="/estoque" />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Estoque RENAVE" }),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Estoque" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Consultar aptidão do veículo",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Resumo do estabelecimento" }),
+    ).toBeNull();
+  });
+
   it("explica acesso ainda não vinculado sem mostrar navegação operacional", async () => {
     render(
       <App
@@ -1129,7 +1305,12 @@ describe("App session boundary", () => {
       establishment: { id: "store-created", tradeName: "Loja Centro" },
       renaveLink: { status: "not_started" },
     });
-    render(<App client={client} />);
+    const view = render(
+      <App
+        client={client}
+        locationPathname="/configuracoes/estabelecimentos"
+      />,
+    );
 
     await screen.findByRole("heading", { name: "Cadastrar estabelecimento" });
     fireEvent.change(screen.getByLabelText("CNPJ"), {
@@ -1153,6 +1334,7 @@ describe("App session boundary", () => {
       idempotencyKey: "11111111-1111-4111-8111-111111111111",
       tradeName: "Loja Centro",
     });
+    view.rerender(<App client={client} locationPathname="/compliance" />);
     expect(await screen.findByText("Não iniciado")).toBeVisible();
   });
 
@@ -1170,7 +1352,12 @@ describe("App session boundary", () => {
     vi.mocked(client.loadEstablishments).mockResolvedValue(
       collection([], "mfa_required"),
     );
-    render(<App client={client} />);
+    render(
+      <App
+        client={client}
+        locationPathname="/configuracoes/estabelecimentos"
+      />,
+    );
 
     expect(
       await screen.findByRole("link", { name: "Confirmar acesso corporativo" }),
@@ -1256,7 +1443,12 @@ describe("App session boundary", () => {
         : collection([{ id: "store-b", tradeName: "Loja Sul" }], "available"),
     );
     vi.mocked(client.createEstablishment).mockReturnValue(creation.promise);
-    render(<App client={client} />);
+    render(
+      <App
+        client={client}
+        locationPathname="/configuracoes/estabelecimentos"
+      />,
+    );
 
     await screen.findByRole("heading", { name: "Cadastrar estabelecimento" });
     fireEvent.change(screen.getByLabelText("CNPJ"), {
@@ -1340,7 +1532,7 @@ describe("App session boundary", () => {
         preflightAvailable: true,
         status: "enabled",
       });
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     expect(await screen.findByText("Pendente")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
@@ -1380,7 +1572,7 @@ describe("App session boundary", () => {
           ? oldLink.promise
           : { preflightAvailable: true, status: "confirmed" },
     );
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     const establishment = await screen.findByRole("combobox", {
       name: "Estabelecimento ativo",
@@ -1429,7 +1621,7 @@ describe("App session boundary", () => {
               queries: "ready",
             },
     );
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     const establishment = await screen.findByRole("combobox", {
       name: "Estabelecimento ativo",
@@ -1488,7 +1680,7 @@ describe("App session boundary", () => {
     vi.mocked(client.runRenaveLinkPreflight)
       .mockRejectedValueOnce(new Error("indisponível"))
       .mockResolvedValueOnce(undefined);
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     expect(await screen.findByText("Pendente")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
@@ -1528,7 +1720,7 @@ describe("App session boundary", () => {
     vi.mocked(client.runRenaveLinkPreflight).mockRejectedValueOnce(
       new Error("identity mismatch"),
     );
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     expect(await screen.findByText("Confirmado")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
@@ -1558,7 +1750,7 @@ describe("App session boundary", () => {
         preflightAvailable: true,
         status: "confirmed",
       });
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     const retry = await screen.findByRole("button", {
       name: "Tentar carregar vínculo",
@@ -1594,7 +1786,7 @@ describe("App session boundary", () => {
     vi.mocked(client.runRenaveLinkPreflight).mockReturnValue(
       pendingPreflight.promise,
     );
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     expect(await screen.findByText("Pendente")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
@@ -1640,10 +1832,18 @@ describe("App session boundary", () => {
       queries: "ready",
     });
 
-    render(<App client={client} stockEntryOperationsEnabled />);
+    render(
+      <App
+        client={client}
+        locationPathname="/estoque/entrada"
+        stockEntryOperationsEnabled
+      />,
+    );
 
     expect(
-      await screen.findByRole("heading", { name: "Olá, Operadora" }),
+      await screen.findByRole("heading", {
+        name: "Dar entrada — veículo usado",
+      }),
     ).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "Registrar solicitação local" }),
@@ -1675,14 +1875,16 @@ describe("App session boundary", () => {
       truncated: false,
     });
 
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     expect(
       await screen.findByRole("heading", {
         name: "Fila de vínculos Credencia",
       }),
     ).toBeVisible();
-    expect(client.loadCredentialLinkQueue).toHaveBeenCalledWith("tenant-a");
+    await waitFor(() =>
+      expect(client.loadCredentialLinkQueue).toHaveBeenCalledWith("tenant-a"),
+    );
     expect(await screen.findByText("Pendente de verificação")).toBeVisible();
   });
 
@@ -1701,10 +1903,12 @@ describe("App session boundary", () => {
       collection([{ id: "store-a", tradeName: "Loja Norte" }], "denied"),
     );
 
-    render(<App client={client} />);
+    render(<App client={client} locationPathname="/compliance" />);
 
     expect(
-      await screen.findByRole("heading", { name: "Olá, Operadora" }),
+      await screen.findByRole("heading", {
+        name: "Conformidade e integração",
+      }),
     ).toBeVisible();
     expect(client.loadCredentialLinkQueue).not.toHaveBeenCalled();
     expect(

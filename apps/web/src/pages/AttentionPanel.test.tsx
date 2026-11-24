@@ -289,11 +289,11 @@ describe("AttentionPanel", () => {
       screen.queryByRole("button", { name: "Verificar vínculo" }),
     ).toBeNull();
     expect(
-      screen.getByText(/use o controle.*verificar vínculo/i),
+      screen.getByText(/abra compliance.*verificar vínculo/i),
     ).toBeVisible();
   });
 
-  it("oferece âncoras para cadastro e confirmação sem duplicar a ação de login", () => {
+  it("navega para a configuração no cadastro e no step-up", () => {
     const view = render(
       <AttentionPanel
         {...state({
@@ -305,7 +305,7 @@ describe("AttentionPanel", () => {
     );
     expect(
       screen.getByRole("link", { name: "Cadastrar estabelecimento" }),
-    ).toHaveAttribute("href", "#establishment-creation");
+    ).toHaveAttribute("href", "/configuracoes/estabelecimentos");
 
     view.rerender(
       <AttentionPanel
@@ -318,6 +318,6 @@ describe("AttentionPanel", () => {
     );
     expect(
       screen.getByRole("link", { name: "Ir para confirmação de acesso" }),
-    ).toHaveAttribute("href", "#establishment-creation");
+    ).toHaveAttribute("href", "/configuracoes/estabelecimentos");
   });
 });
