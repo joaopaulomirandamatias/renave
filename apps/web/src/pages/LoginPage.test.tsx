@@ -65,6 +65,27 @@ describe("LoginPage", () => {
     expect(badge).toHaveAttribute("data-environment", "homologation");
     expect(screen.queryByRole("combobox")).toBeNull();
   });
+
+  it("anuncia feedback seguro do retorno OIDC sem alterar o início do login", () => {
+    render(
+      <LoginPage
+        authFeedback={{
+          title: "Não foi possível concluir o acesso",
+          message: "Tente entrar novamente com sua conta corporativa.",
+        }}
+        environment="homologation"
+      />,
+    );
+
+    const feedback = screen.getByRole("alert");
+    expect(feedback).toHaveTextContent("Não foi possível concluir o acesso");
+    expect(feedback).toHaveTextContent(
+      "Tente entrar novamente com sua conta corporativa.",
+    );
+    expect(
+      screen.getByRole("link", { name: /continuar com acesso seguro/i }),
+    ).toHaveAttribute("href", "/api/auth/login");
+  });
 });
 
 describe("@seu-renave/ui acessibilidade e semântica", () => {

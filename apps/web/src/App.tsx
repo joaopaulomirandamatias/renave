@@ -449,12 +449,73 @@ export const browserSessionClient: SessionClient = {
 
 export interface AppProps {
   client?: SessionClient;
+  locationSearch?: string;
+  onAuthErrorConsumed?: () => void;
   redirect?: (url: string) => void;
+}
+
+export interface AuthFeedback {
+  message: string;
+  title: string;
+}
+
+const expiredLoginFeedback: AuthFeedback = {
+  message:
+    "Por segurança, essa tentativa de acesso expirou ou não pertence a este navegador. Inicie uma nova tentativa.",
+  title: "Tentativa de acesso expirada",
+};
+
+/** Converte apenas códigos internos conhecidos em texto; nunca reflete a URL. */
+export function authFeedbackFromSearch(
+  search: string,
+): AuthFeedback | undefined {
+  const parameters = new URLSearchParams(search);
+  if (!parameters.has("auth_error")) return undefined;
+  switch (parameters.get("auth_error")) {
+    case "provider_error":
+      return {
+        message:
+          "O provedor corporativo não concluiu o acesso. Você pode tentar novamente quando estiver pronto.",
+        title: "Acesso não concluído",
+      };
+    case "exchange_failed":
+      return {
+        message:
+          "O provedor corporativo está temporariamente indisponível. Sua sessão anterior, se existir, foi preservada.",
+        title: "Não foi possível concluir o acesso",
+      };
+    case "invalid_request":
+    case "invalid_state":
+    case "binding_mismatch":
+    case "nonce_mismatch":
+      return expiredLoginFeedback;
+    default:
+      return {
+        message:
+          "Não foi possível concluir o acesso. Nenhum detalhe recebido pela URL foi exibido.",
+        title: "Acesso não concluído",
+      };
+  }
+}
+
+function clearCurrentAuthError(): void {
+  const current = new URL(window.location.href);
+  current.searchParams.delete("auth_error");
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${current.pathname}${current.search}${current.hash}`,
+  );
 }
 
 type ViewState =
   | { status: "loading" }
-  | { status: "error" }
+  | { resource: "session"; status: "error" }
+  | {
+      resource: "directory";
+      session: AuthenticatedSession;
+      status: "error";
+    }
   | {
       status: "ready";
       session: BrowserSession;
@@ -467,10 +528,16 @@ type RenaveLinkView =
 
 export function App({
   client = browserSessionClient,
+  locationSearch = window.location.search,
+  onAuthErrorConsumed = clearCurrentAuthError,
   redirect = (url) => window.location.assign(url),
 }: AppProps) {
+  const [authFeedback] = useState(() => authFeedbackFromSearch(locationSearch));
   const [view, setView] = useState<ViewState>({ status: "loading" });
   const [logoutPending, setLogoutPending] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+  const [contextLoading, setContextLoading] = useState(false);
+  const [contextError, setContextError] = useState(false);
   const [preflightPendingKey, setPreflightPendingKey] = useState<string>();
   const [preflightErrorKey, setPreflightErrorKey] = useState<string>();
   const [renaveLinkView, setRenaveLinkView] = useState<RenaveLinkView>({
@@ -488,12 +555,34 @@ export function App({
   const linkLoadVersion = useRef(0);
   const activeSelectionKeyRef = useRef("");
 
+  useEffect(() => {
+    if (authFeedback) onAuthErrorConsumed();
+  }, [authFeedback, onAuthErrorConsumed]);
+
   const load = useCallback(async () => {
     const requestVersion = ++loadRequestVersion.current;
     tenantRequestVersion.current += 1;
     setView({ status: "loading" });
+    let session: BrowserSession;
     try {
-      const session = await client.load();
+      session = await client.load();
+    } catch {
+      if (loadRequestVersion.current === requestVersion) {
+        setView({ resource: "session", status: "error" });
+      }
+      return;
+    }
+
+    if (!session.authenticated) {
+      if (loadRequestVersion.current !== requestVersion) return;
+      setSelectedTenantId("");
+      setEstablishments([]);
+      setSelectedEstablishmentByTenant({});
+      setView({ status: "ready", session, tenants: [] });
+      return;
+    }
+
+    try {
       const tenants = session.authenticated ? await client.loadTenants() : [];
       const initialTenantId = tenants[0]?.tenantId ?? "";
       const initialEstablishments = initialTenantId
@@ -510,7 +599,7 @@ export function App({
       setView({ status: "ready", session, tenants });
     } catch {
       if (loadRequestVersion.current === requestVersion) {
-        setView({ status: "error" });
+        setView({ resource: "directory", session, status: "error" });
       }
     }
   }, [client]);
@@ -559,20 +648,25 @@ export function App({
   }
 
   if (view.status === "error") {
+    const directoryUnavailable = view.resource === "directory";
     return (
       <main className="session-state">
         <section
           className="session-error"
           aria-labelledby="session-error-title"
+          role="alert"
         >
           <AlertCircle size={24} aria-hidden="true" />
           <div>
             <h1 id="session-error-title">
-              Não foi possível verificar o acesso
+              {directoryUnavailable
+                ? "Não foi possível carregar sua organização"
+                : "Não foi possível verificar o acesso"}
             </h1>
             <p>
-              A sessão não foi alterada. Tente novamente antes de iniciar uma
-              operação.
+              {directoryUnavailable
+                ? "Sua sessão continua ativa, mas o diretório de organizações ou estabelecimentos está indisponível. Nenhuma operação foi liberada."
+                : "A sessão não foi alterada. Tente novamente antes de iniciar uma operação."}
             </p>
             <Button
               variant="secondary"
@@ -590,11 +684,17 @@ export function App({
   const { session, tenants } = view;
   const environment = resolveAppEnvironment(session.environment);
   if (!session.authenticated) {
-    return <LoginPage environment={environment} />;
+    return (
+      <LoginPage
+        environment={environment}
+        {...(authFeedback ? { authFeedback } : {})}
+      />
+    );
   }
 
   async function logout() {
     setLogoutPending(true);
+    setLogoutError(false);
     try {
       const result = await client.logout();
       setView({
@@ -613,6 +713,8 @@ export function App({
       loadRequestVersion.current += 1;
       linkLoadVersion.current += 1;
       if (result.endSessionUrl) redirect(result.endSessionUrl);
+    } catch {
+      setLogoutError(true);
     } finally {
       setLogoutPending(false);
     }
@@ -675,6 +777,12 @@ export function App({
               Peça ao administrador da sua empresa para liberar seu acesso.
               Nenhuma operação RENAVE foi disponibilizada para esta conta.
             </p>
+            {logoutError ? (
+              <p role="alert">
+                Não foi possível encerrar a sessão. Você continua conectado e
+                pode tentar novamente.
+              </p>
+            ) : null}
             <Button
               variant="secondary"
               loading={logoutPending}
@@ -695,6 +803,10 @@ export function App({
 
   async function selectTenant(tenantId: string) {
     const requestVersion = ++tenantRequestVersion.current;
+    const previousTenantId = selectedTenantId;
+    const previousEstablishments = establishments;
+    setContextError(false);
+    setContextLoading(true);
     setSelectedTenantId(tenantId);
     setEstablishments([]);
     try {
@@ -718,7 +830,13 @@ export function App({
       }
     } catch {
       if (tenantRequestVersion.current === requestVersion) {
-        setView({ status: "error" });
+        setSelectedTenantId(previousTenantId);
+        setEstablishments(previousEstablishments);
+        setContextError(true);
+      }
+    } finally {
+      if (tenantRequestVersion.current === requestVersion) {
+        setContextLoading(false);
       }
     }
   }
@@ -730,7 +848,11 @@ export function App({
         id: establishment.id,
         label: establishment.tradeName,
       }))}
+      contextError={contextError}
+      contextLoading={contextLoading}
       logoutPending={logoutPending}
+      logoutError={logoutError}
+      {...(authFeedback ? { authFeedback } : {})}
       {...(renaveLinkView.status === "ready"
         ? { linkStatus: renaveLinkView.link.status }
         : {})}

@@ -63,6 +63,19 @@ describe("DashboardPage", () => {
     expect(
       within(navigation).getByRole("link", { name: "Painel" }),
     ).toHaveAttribute("aria-current", "page");
+    expect(within(navigation).getAllByRole("link")).toHaveLength(1);
+    expect(
+      within(navigation).queryByRole("link", { name: "Estoque" }),
+    ).toBeNull();
+    expect(
+      within(navigation).queryByRole("link", { name: "Pendências" }),
+    ).toBeNull();
+    expect(
+      within(navigation).queryByRole("link", { name: "Auditoria" }),
+    ).toBeNull();
+    expect(
+      within(navigation).queryByRole("link", { name: "Configurações" }),
+    ).toBeNull();
     expect(screen.getByRole("button", { name: "Sair" })).toHaveAttribute(
       "type",
       "button",
@@ -126,6 +139,10 @@ describe("DashboardPage", () => {
     expect(
       screen.getByRole("region", { name: "Vínculo do estabelecimento" }),
     ).toHaveTextContent("Confirmado");
+    const integration = screen.getByRole("region", {
+      name: "Identidade do vínculo confirmada",
+    });
+    expect(integration).not.toHaveTextContent(/homologaç/i);
     fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
     expect(onRunPreflight).toHaveBeenCalledOnce();
   });
@@ -176,5 +193,67 @@ describe("DashboardPage", () => {
     expect(
       screen.getByRole("heading", { name: "Consultar aptidão do veículo" }),
     ).toBeVisible();
+  });
+
+  it("não apresenta zeros fictícios antes de existir uma fonte agregada", () => {
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        onLogout={vi.fn()}
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+
+    const summary = screen.getByRole("region", {
+      name: "Resumo do estabelecimento",
+    });
+    expect(summary).toHaveTextContent("Indisponível nesta etapa");
+    expect(summary).not.toHaveTextContent("Operações confirmadas");
+    expect(summary).not.toHaveTextContent("Pendências abertas");
+    expect(summary).not.toHaveTextContent("Resultados incertos");
+    expect(
+      screen.getByRole("region", { name: "Ativação do estabelecimento" }),
+    ).toBeVisible();
+  });
+
+  it("mantém o painel e anuncia falhas de contexto e logout", () => {
+    render(
+      <DashboardPage
+        contextError
+        environment="homologation"
+        establishments={establishments}
+        logoutError
+        onLogout={vi.fn()}
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Olá, Operador" }),
+    ).toBeVisible();
+    const alerts = screen.getAllByRole("alert");
+    expect(alerts).toHaveLength(2);
+    expect(alerts[0]).toHaveTextContent("O contexto anterior foi preservado");
+    expect(alerts[1]).toHaveTextContent("Você continua conectado");
+  });
+
+  it("anuncia carregamento de contexto sem exibir um vazio definitivo", () => {
+    render(
+      <DashboardPage
+        contextLoading
+        environment="homologation"
+        establishments={[]}
+        onLogout={vi.fn()}
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(screen.getByText(/carregando estabelecimentos/i)).toHaveAttribute(
+      "role",
+      "status",
+    );
   });
 });

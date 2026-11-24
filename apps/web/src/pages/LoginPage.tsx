@@ -14,10 +14,14 @@ import {
 } from "lucide-react";
 
 export interface LoginPageProps {
+  authFeedback?: {
+    message: string;
+    title: string;
+  };
   environment?: AppEnvironment;
 }
 
-export function LoginPage({ environment }: LoginPageProps = {}) {
+export function LoginPage({ authFeedback, environment }: LoginPageProps = {}) {
   const activeEnvironment =
     environment ?? resolveAppEnvironment(import.meta.env.VITE_APP_ENVIRONMENT);
 
@@ -37,6 +41,13 @@ export function LoginPage({ environment }: LoginPageProps = {}) {
             segurança.
           </p>
         </div>
+
+        {authFeedback ? (
+          <section className="auth-feedback" role="alert">
+            <h2>{authFeedback.title}</h2>
+            <p>{authFeedback.message}</p>
+          </section>
+        ) : null}
 
         <div className="identity-panel">
           <div className="identity-panel__icon" aria-hidden="true">
@@ -69,7 +80,7 @@ export function LoginPage({ environment }: LoginPageProps = {}) {
             {
               id: "mfa-privileged",
               icon: <ShieldCheck size={18} />,
-              text: "Perfis privilegiados exigem autenticação multifator.",
+              text: "A sessão é validada pelo provedor corporativo antes de liberar o acesso.",
             },
           ]}
         />

@@ -18,7 +18,9 @@ import {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  window.history.replaceState({}, "", "/");
 });
 
 function clientFor(
@@ -277,6 +279,116 @@ describe("App session boundary", () => {
     );
   });
 
+  it("traduz erro OIDC conhecido, consome a query e mantém o login disponível", async () => {
+    const onAuthErrorConsumed = vi.fn();
+    render(
+      <App
+        client={clientFor({
+          authenticated: false,
+          authMode: "oidc",
+          environment: "homologation",
+        })}
+        locationSearch="?auth_error=provider_error&returnTo=%2Festoque"
+        onAuthErrorConsumed={onAuthErrorConsumed}
+      />,
+    );
+
+    const feedback = await screen.findByRole("alert");
+    expect(feedback).toHaveTextContent("Acesso não concluído");
+    expect(feedback).toHaveTextContent(
+      "O provedor corporativo não concluiu o acesso",
+    );
+    expect(feedback).not.toHaveTextContent("provider_error");
+    expect(onAuthErrorConsumed).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole("link", { name: /continuar com acesso seguro/i }),
+    ).toHaveAttribute("href", "/api/auth/login");
+  });
+
+  it("nunca reflete um auth_error desconhecido recebido pela URL", async () => {
+    render(
+      <App
+        client={clientFor({
+          authenticated: false,
+          authMode: "oidc",
+          environment: "development",
+        })}
+        locationSearch="?auth_error=%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E"
+        onAuthErrorConsumed={vi.fn()}
+      />,
+    );
+
+    const feedback = await screen.findByRole("alert");
+    expect(feedback).toHaveTextContent(
+      "Nenhum detalhe recebido pela URL foi exibido",
+    );
+    expect(feedback).not.toHaveTextContent("<img");
+    expect(feedback).not.toHaveTextContent("onerror");
+  });
+
+  it("remove somente auth_error da URL depois de consumir o retorno", async () => {
+    window.history.replaceState(
+      { navigation: "preserved" },
+      "",
+      "/?auth_error=invalid_state&keep=1#activation",
+    );
+    const replaceState = vi.spyOn(window.history, "replaceState");
+
+    render(
+      <App
+        client={clientFor({
+          authenticated: false,
+          authMode: "oidc",
+          environment: "development",
+        })}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Tentativa de acesso expirada",
+    );
+    await waitFor(() =>
+      expect(replaceState).toHaveBeenCalledWith(
+        { navigation: "preserved" },
+        "",
+        "/?keep=1#activation",
+      ),
+    );
+    expect(window.location.search).toBe("?keep=1");
+    expect(window.location.hash).toBe("#activation");
+  });
+
+  it("preserva a sessão autenticada quando o callback OIDC é rejeitado", async () => {
+    const onAuthErrorConsumed = vi.fn();
+    render(
+      <App
+        client={clientFor(
+          {
+            authenticated: true,
+            authMode: "oidc",
+            environment: "homologation",
+            expiresAt: "2026-11-24T00:00:00.000Z",
+            user: { name: "Operadora" },
+          },
+          [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+        )}
+        locationSearch="?auth_error=exchange_failed"
+        onAuthErrorConsumed={onAuthErrorConsumed}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Olá, Operadora" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Entrar na sua conta" }),
+    ).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Sua sessão anterior, se existir, foi preservada",
+    );
+    expect(onAuthErrorConsumed).toHaveBeenCalledOnce();
+  });
+
   it("abre painel protegido sem conceder estabelecimento por claim do IdP", async () => {
     render(
       <App
@@ -323,6 +435,34 @@ describe("App session boundary", () => {
       }),
     ).toBeVisible();
     expect(screen.queryByText("Visão operacional")).toBeNull();
+  });
+
+  it("anuncia falha de logout mesmo quando o usuário ainda não possui tenant", async () => {
+    const client = clientFor({
+      authenticated: true,
+      authMode: "oidc",
+      environment: "homologation",
+      expiresAt: "2026-11-24T00:00:00.000Z",
+      user: { name: "Operadora" },
+    });
+    vi.mocked(client.logout).mockRejectedValueOnce(
+      new Error("sessão indisponível"),
+    );
+    render(<App client={client} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sair" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível encerrar a sessão",
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Você continua conectado",
+    );
+    expect(
+      screen.getByRole("heading", {
+        name: "Seu acesso ainda não está vinculado a uma organização",
+      }),
+    ).toBeVisible();
   });
 
   it("permite alternar explicitamente entre várias organizações", async () => {
@@ -675,11 +815,39 @@ describe("App session boundary", () => {
         name: "Não foi possível verificar o acesso",
       }),
     ).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveAccessibleName(
+      "Não foi possível verificar o acesso",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
 
     expect(
       await screen.findByRole("heading", { name: "Entrar na sua conta" }),
     ).toBeVisible();
     expect(client.load).toHaveBeenCalledTimes(2);
+  });
+
+  it("distingue falha do diretório e informa que a sessão segue ativa", async () => {
+    const client = clientFor({
+      authenticated: true,
+      authMode: "oidc",
+      environment: "homologation",
+      expiresAt: "2026-11-24T00:00:00.000Z",
+      user: { name: "Operadora" },
+    });
+    vi.mocked(client.loadTenants).mockRejectedValueOnce(
+      new Error("diretório indisponível"),
+    );
+    render(<App client={client} />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Não foi possível carregar sua organização",
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveAccessibleName(
+      "Não foi possível carregar sua organização",
+    );
+    expect(screen.getByText(/sua sessão continua ativa/i)).toBeVisible();
+    expect(screen.queryByText(/a sessão não foi alterada/i)).toBeNull();
   });
 });

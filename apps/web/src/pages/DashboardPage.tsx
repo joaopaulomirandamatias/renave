@@ -6,30 +6,30 @@ import {
   type RenaveStockState,
 } from "@seu-renave/ui";
 import {
-  AlertTriangle,
-  Boxes,
   ClipboardCheck,
-  FileClock,
-  Gauge,
-  History,
   LayoutDashboard,
   LogOut,
-  Settings,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
 import type {
+  AuthFeedback,
   BrowserCrvType,
   BrowserEligibilitySummary,
   BrowserRenaveLinkStatus,
 } from "../App.js";
+import { ActivationPage } from "./ActivationPage.js";
 import { EligibilityPanel } from "./EligibilityPanel.js";
 import { StockSearchPanel } from "./StockSearchPanel.js";
 
 export interface DashboardPageProps {
+  authFeedback?: AuthFeedback;
+  contextError?: boolean;
+  contextLoading?: boolean;
   environment: AppEnvironment;
   establishments: readonly AppShellEstablishment[];
   logoutPending?: boolean;
+  logoutError?: boolean;
   linkStatus?: BrowserRenaveLinkStatus;
   linkStatusError?: boolean;
   linkStatusLoading?: boolean;
@@ -64,30 +64,6 @@ const navigation = [
     current: true,
     icon: <LayoutDashboard size={19} />,
   },
-  {
-    id: "inventory",
-    label: "Estoque",
-    href: "/estoque",
-    icon: <Boxes size={19} />,
-  },
-  {
-    id: "pending",
-    label: "Pendências",
-    href: "/pendencias",
-    icon: <FileClock size={19} />,
-  },
-  {
-    id: "audit",
-    label: "Auditoria",
-    href: "/auditoria",
-    icon: <History size={19} />,
-  },
-  {
-    id: "settings",
-    label: "Configurações",
-    href: "/configuracoes",
-    icon: <Settings size={19} />,
-  },
 ] as const;
 
 const linkStatusLabels: Record<BrowserRenaveLinkStatus, string> = {
@@ -100,9 +76,13 @@ const linkStatusLabels: Record<BrowserRenaveLinkStatus, string> = {
 };
 
 export function DashboardPage({
+  authFeedback,
+  contextError = false,
+  contextLoading = false,
   environment,
   establishments,
   logoutPending = false,
+  logoutError = false,
   linkStatus,
   linkStatusError = false,
   linkStatusLoading = false,
@@ -145,6 +125,31 @@ export function DashboardPage({
       }
     >
       <div className="dashboard-page">
+        {authFeedback ? (
+          <section className="auth-feedback" role="alert">
+            <h2>{authFeedback.title}</h2>
+            <p>{authFeedback.message}</p>
+          </section>
+        ) : null}
+
+        {contextLoading ? (
+          <p className="context-feedback" role="status">
+            Carregando estabelecimentos da organização selecionada…
+          </p>
+        ) : null}
+        {contextError ? (
+          <p className="context-feedback context-feedback--error" role="alert">
+            Não foi possível trocar de organização. O contexto anterior foi
+            preservado.
+          </p>
+        ) : null}
+        {logoutError ? (
+          <p className="context-feedback context-feedback--error" role="alert">
+            Não foi possível encerrar a sessão. Você continua conectado e pode
+            tentar novamente.
+          </p>
+        ) : null}
+
         <header className="dashboard-page__heading">
           <div>
             <p>Visão operacional</p>
@@ -179,11 +184,12 @@ export function DashboardPage({
             {linkStatus === "confirmed" || linkStatus === "enabled" ? (
               <>
                 <h2 id="integration-alert-title">
-                  Vínculo confirmado em homologação
+                  Identidade do vínculo confirmada
                 </h2>
                 <p>
                   A identidade foi confirmada. Mutações permanecem bloqueadas
-                  até a conclusão dos controles operacionais e da homologação.
+                  até a conclusão dos controles operacionais no ambiente
+                  configurado.
                 </p>
               </>
             ) : (
@@ -191,8 +197,8 @@ export function DashboardPage({
                 <h2 id="integration-alert-title">Integração ainda protegida</h2>
                 <p>
                   As operações permanecem bloqueadas até o RENAVE confirmar o
-                  CNPJ do estabelecimento e o vínculo da integradora em
-                  homologação.
+                  CNPJ do estabelecimento e o vínculo da integradora no ambiente
+                  configurado.
                 </p>
               </>
             )}
@@ -245,11 +251,18 @@ export function DashboardPage({
           </Button>
           {!linkStatusError && !preflightAvailable ? (
             <p id="preflight-unavailable-reason" className="sr-only">
-              A verificação exige configuração segura da integração RENAVE em
-              homologação.
+              A verificação exige configuração segura da integração RENAVE no
+              ambiente configurado.
             </p>
           ) : null}
         </section>
+
+        <ActivationPage
+          hasEstablishment={Boolean(selectedEstablishmentId)}
+          {...(linkStatus ? { linkStatus } : {})}
+          linkStatusError={linkStatusError}
+          linkStatusLoading={linkStatusLoading}
+        />
 
         {(linkStatus === "confirmed" || linkStatus === "enabled") &&
         selectedTenantId &&
@@ -276,28 +289,10 @@ export function DashboardPage({
         <section aria-labelledby="daily-summary-title">
           <div className="dashboard-page__section-heading">
             <div>
-              <p>Hoje</p>
+              <p>Dados operacionais</p>
               <h2 id="daily-summary-title">Resumo do estabelecimento</h2>
             </div>
-            <span>Sem dados operacionais até a primeira sincronização</span>
-          </div>
-
-          <div className="dashboard-page__stats">
-            <article>
-              <Gauge size={21} aria-hidden="true" />
-              <p>Operações confirmadas</p>
-              <strong aria-label="Nenhuma operação confirmada">0</strong>
-            </article>
-            <article>
-              <FileClock size={21} aria-hidden="true" />
-              <p>Pendências abertas</p>
-              <strong aria-label="Nenhuma pendência aberta">0</strong>
-            </article>
-            <article>
-              <AlertTriangle size={21} aria-hidden="true" />
-              <p>Resultados incertos</p>
-              <strong aria-label="Nenhum resultado incerto">0</strong>
-            </article>
+            <span>Indisponível nesta etapa</span>
           </div>
         </section>
 
