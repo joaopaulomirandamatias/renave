@@ -80,8 +80,11 @@ Não imprima o conteúdo, o caminho completo ou a impressão digital do material
 em evidências de mudança. Registre somente a versão lógica do Secret e o
 resultado do gate.
 
-O console global permanece desligado com `PLATFORM_CONSOLE_ENABLED=false`. Para
-ativá-lo, configure `OIDC_MFA_ACCEPTED_ACR_VALUES`, force autenticação recente
+O console global permanece desligado com `PLATFORM_CONSOLE_ENABLED=false` na
+API e `VITE_PLATFORM_CONSOLE_ENABLED=false` no build web. As duas flags aceitam
+somente `true` canônico e falham fechadas. Para ativá-lo, publique primeiro a
+API com a capability e depois o bundle web com a apresentação; para desativar,
+faça a ordem inversa. Configure `OIDC_MFA_ACCEPTED_ACR_VALUES`, force autenticação recente
 com `OIDC_MAX_AUTHENTICATION_AGE_SECONDS` e limite a janela com
 `PLATFORM_OPERATOR_MFA_MAX_AGE_SECONDS` (60–900 s). A API valida `auth_time` e
 o issuer do ID token; criação ou toque da sessão não renovam essa prova. O

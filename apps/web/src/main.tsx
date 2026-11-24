@@ -10,6 +10,9 @@ const features = loadWebFeatures(import.meta.env);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App stockEntryOperationsEnabled={features.stockEntryOperationsEnabled} />
+    <App
+      platformConsoleEnabled={features.platformConsoleEnabled}
+      stockEntryOperationsEnabled={features.stockEntryOperationsEnabled}
+    />
   </StrictMode>,
 );

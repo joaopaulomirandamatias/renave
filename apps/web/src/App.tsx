@@ -3,6 +3,12 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DashboardPage } from "./pages/DashboardPage.js";
+import {
+  browserPlatformConsoleClient,
+  PLATFORM_CONSOLE_PATH,
+  PlatformConsolePage,
+  type PlatformConsoleClient,
+} from "./features/platform-console/index.js";
 import type { ReadonlyCanaryPort } from "./features/homologation-canary/index.js";
 import { LoginPage } from "./pages/LoginPage.js";
 
@@ -1028,8 +1034,11 @@ export const browserSessionClient: SessionClient = {
 
 export interface AppProps {
   client?: SessionClient;
+  locationPathname?: string;
   locationSearch?: string;
   onAuthErrorConsumed?: () => void;
+  platformConsoleClient?: PlatformConsoleClient;
+  platformConsoleEnabled?: boolean;
   redirect?: (url: string) => void;
   stockEntryOperationsEnabled?: boolean;
 }
@@ -1090,6 +1099,7 @@ function clearCurrentAuthError(): void {
 
 type ViewState =
   | { status: "loading" }
+  | { status: "not_found" }
   | { resource: "session"; status: "error" }
   | {
       resource: "directory";
@@ -1116,11 +1126,18 @@ type CredentialLinkQueueView =
 
 export function App({
   client = browserSessionClient,
+  locationPathname = window.location.pathname,
   locationSearch = window.location.search,
   onAuthErrorConsumed = clearCurrentAuthError,
+  platformConsoleClient = browserPlatformConsoleClient,
+  platformConsoleEnabled = false,
   redirect = (url) => window.location.assign(url),
   stockEntryOperationsEnabled = false,
 }: AppProps) {
+  const platformConsolePathRequested =
+    locationPathname === PLATFORM_CONSOLE_PATH;
+  const platformConsoleRequested =
+    platformConsoleEnabled && platformConsolePathRequested;
   const [authFeedback] = useState(() => authFeedbackFromSearch(locationSearch));
   const [view, setView] = useState<ViewState>({ status: "loading" });
   const [logoutPending, setLogoutPending] = useState(false);
@@ -1166,6 +1183,10 @@ export function App({
   const load = useCallback(async () => {
     const requestVersion = ++loadRequestVersion.current;
     tenantRequestVersion.current += 1;
+    if (platformConsolePathRequested && !platformConsoleEnabled) {
+      setView({ status: "not_found" });
+      return;
+    }
     setView({ status: "loading" });
     let session: BrowserSession;
     try {
@@ -1178,6 +1199,16 @@ export function App({
     }
 
     if (!session.authenticated) {
+      if (loadRequestVersion.current !== requestVersion) return;
+      setSelectedTenantId("");
+      setEstablishmentManagement("denied");
+      setEstablishments([]);
+      setSelectedEstablishmentByTenant({});
+      setView({ status: "ready", session, tenants: [] });
+      return;
+    }
+
+    if (platformConsoleRequested) {
       if (loadRequestVersion.current !== requestVersion) return;
       setSelectedTenantId("");
       setEstablishmentManagement("denied");
@@ -1214,7 +1245,12 @@ export function App({
         setView({ resource: "directory", session, status: "error" });
       }
     }
-  }, [client]);
+  }, [
+    client,
+    platformConsoleEnabled,
+    platformConsolePathRequested,
+    platformConsoleRequested,
+  ]);
 
   useEffect(() => {
     void load();
@@ -1335,6 +1371,26 @@ export function App({
     );
   }
 
+  if (view.status === "not_found") {
+    return (
+      <main className="session-state">
+        <section
+          className="session-error"
+          aria-labelledby="route-not-found-title"
+        >
+          <AlertCircle size={24} aria-hidden="true" />
+          <div>
+            <h1 id="route-not-found-title">Página não encontrada</h1>
+            <p>O endereço informado não está disponível neste ambiente.</p>
+            <Button href="/" variant="secondary">
+              Ir para o início
+            </Button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   if (view.status === "error") {
     const directoryUnavailable = view.resource === "directory";
     return (
@@ -1375,6 +1431,11 @@ export function App({
     return (
       <LoginPage
         environment={environment}
+        loginHref={
+          platformConsoleRequested
+            ? `/api/auth/login?returnTo=${encodeURIComponent(PLATFORM_CONSOLE_PATH)}`
+            : "/api/auth/login"
+        }
         {...(authFeedback ? { authFeedback } : {})}
       />
     );
@@ -1455,6 +1516,21 @@ export function App({
         current === selectionKey ? undefined : current,
       );
     }
+  }
+
+  if (platformConsoleRequested) {
+    return (
+      <PlatformConsolePage
+        client={platformConsoleClient}
+        environment={environment}
+        logoutError={logoutError}
+        logoutPending={logoutPending}
+        onLogout={logout}
+        userDisplayName={
+          session.user.name ?? session.user.email ?? "Operador autenticado"
+        }
+      />
+    );
   }
 
   if (tenants.length === 0) {

@@ -19,9 +19,14 @@ export interface LoginPageProps {
     title: string;
   };
   environment?: AppEnvironment;
+  loginHref?: string;
 }
 
-export function LoginPage({ authFeedback, environment }: LoginPageProps = {}) {
+export function LoginPage({
+  authFeedback,
+  environment,
+  loginHref = "/api/auth/login",
+}: LoginPageProps = {}) {
   const activeEnvironment =
     environment ?? resolveAppEnvironment(import.meta.env.VITE_APP_ENVIRONMENT);
 
@@ -60,7 +65,7 @@ export function LoginPage({ authFeedback, environment }: LoginPageProps = {}) {
         </div>
 
         <Button
-          href="/api/auth/login"
+          href={loginHref}
           variant="primary"
           size="lg"
           fullWidth

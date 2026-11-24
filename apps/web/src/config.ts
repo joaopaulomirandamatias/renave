@@ -1,4 +1,5 @@
 export interface WebFeatures {
+  readonly platformConsoleEnabled: boolean;
   readonly stockEntryOperationsEnabled: boolean;
 }
 
@@ -10,6 +11,8 @@ export function loadWebFeatures(
   environment: Readonly<Record<string, unknown>>,
 ): WebFeatures {
   return Object.freeze({
+    platformConsoleEnabled:
+      environment.VITE_PLATFORM_CONSOLE_ENABLED === "true",
     stockEntryOperationsEnabled:
       environment.VITE_RENAVE_STOCK_ENTRY_LOCAL_ENABLED === "true",
   });
