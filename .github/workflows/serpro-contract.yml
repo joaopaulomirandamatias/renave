@@ -30,3 +30,6 @@ jobs:
 
       - name: Verify first-slice semantics
         run: node scripts/check-serpro-first-slice.mjs
+
+      - name: Compare official guidance and diagrams
+        run: node scripts/check-serpro-guidance.mjs

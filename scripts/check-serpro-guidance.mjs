@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
 const baselineUrl = new URL(
   "../contracts/serpro/guidance-baseline.json",
   import.meta.url,
 );
-const baseline = JSON.parse(await readFile(baselineUrl, "utf8"));
 
-function htmlToText(html) {
+export const MAX_GUIDANCE_RESPONSE_BYTES = 10 * 1024 * 1024;
+
+export function htmlToText(html) {
   return html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
@@ -20,47 +22,109 @@ function htmlToText(html) {
     .trim();
 }
 
-async function fetchOfficial(source, accept) {
-  const response = await fetch(source, {
+export async function readBoundedBody(
+  response,
+  maxBytes = MAX_GUIDANCE_RESPONSE_BYTES,
+) {
+  const declaredLength = response.headers.get("content-length");
+  if (
+    declaredLength !== null &&
+    Number.isFinite(Number(declaredLength)) &&
+    Number(declaredLength) > maxBytes
+  ) {
+    throw new Error(`resposta excede limite de ${maxBytes} bytes`);
+  }
+  if (!response.body) return Buffer.alloc(0);
+
+  const chunks = [];
+  let receivedBytes = 0;
+  for await (const chunk of response.body) {
+    const bytes = Buffer.from(chunk);
+    receivedBytes += bytes.byteLength;
+    if (receivedBytes > maxBytes) {
+      throw new Error(`resposta excede limite de ${maxBytes} bytes`);
+    }
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks, receivedBytes);
+}
+
+export async function fetchOfficial(
+  source,
+  accept,
+  {
+    fetchImpl = globalThis.fetch,
+    maxBytes = MAX_GUIDANCE_RESPONSE_BYTES,
+    timeoutMs = 30_000,
+  } = {},
+) {
+  const response = await fetchImpl(source, {
     headers: { accept },
-    redirect: "follow",
-    signal: AbortSignal.timeout(30_000),
+    redirect: "error",
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) {
     throw new Error(`${source}: respondeu HTTP ${response.status}`);
   }
-  return response;
+  return readBoundedBody(response, maxBytes);
 }
 
-let changed = false;
+export async function checkSerproGuidance({
+  baseline,
+  fetchImpl = globalThis.fetch,
+  maxBytes = MAX_GUIDANCE_RESPONSE_BYTES,
+  output = console,
+}) {
+  let changed = false;
 
-for (const page of baseline.pages) {
-  const response = await fetchOfficial(page.source, "text/html");
-  const text = htmlToText(await response.text());
-  const missing = page.requiredText.filter((marker) => !text.includes(marker));
-  if (missing.length === 0) {
-    console.log(`${page.name}: orientação semântica compatível`);
-    continue;
+  for (const page of baseline.pages) {
+    const bytes = await fetchOfficial(page.source, "text/html", {
+      fetchImpl,
+      maxBytes,
+    });
+    const text = htmlToText(bytes.toString("utf8"));
+    const missing = page.requiredText.filter(
+      (marker) => !text.includes(marker),
+    );
+    if (missing.length === 0) {
+      output.log(`${page.name}: orientação semântica compatível`);
+      continue;
+    }
+
+    changed = true;
+    output.error(`${page.name}: orientação oficial mudou`);
+    for (const marker of missing) output.error(`  texto ausente: ${marker}`);
   }
 
-  changed = true;
-  console.error(`${page.name}: orientação oficial mudou`);
-  for (const marker of missing) console.error(`  texto ausente: ${marker}`);
-}
+  for (const asset of baseline.assets) {
+    const bytes = await fetchOfficial(asset.source, "image/png", {
+      fetchImpl,
+      maxBytes,
+    });
+    const actual = createHash("sha256").update(bytes).digest("hex");
+    if (actual === asset.sha256) {
+      output.log(`${asset.name}: diagrama sem mudanças`);
+      continue;
+    }
 
-for (const asset of baseline.assets) {
-  const response = await fetchOfficial(asset.source, "image/png");
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const actual = createHash("sha256").update(bytes).digest("hex");
-  if (actual === asset.sha256) {
-    console.log(`${asset.name}: diagrama sem mudanças`);
-    continue;
+    changed = true;
+    output.error(`${asset.name}: diagrama oficial mudou`);
+    output.error(`  sha256 esperado=${asset.sha256}`);
+    output.error(`  sha256 atual=${actual}`);
   }
 
-  changed = true;
-  console.error(`${asset.name}: diagrama oficial mudou`);
-  console.error(`  sha256 esperado=${asset.sha256}`);
-  console.error(`  sha256 atual=${actual}`);
+  return { changed };
 }
 
-if (changed) process.exitCode = 1;
+export async function runGuidanceCli() {
+  const baseline = JSON.parse(await readFile(baselineUrl, "utf8"));
+  const { changed } = await checkSerproGuidance({ baseline });
+  if (changed) process.exitCode = 1;
+}
+
+const entrypoint = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href
+  : undefined;
+if (entrypoint === import.meta.url) {
+  await runGuidanceCli();
+}
