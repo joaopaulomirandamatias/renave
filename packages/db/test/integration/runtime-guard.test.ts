@@ -203,6 +203,28 @@ describe("guard do banco de runtime", () => {
     await expectAppContractReady();
   });
 
+  it("recusa checksum divergente da migration beginDispatch", async () => {
+    const original = await adminPool.query<{ checksum: string }>(
+      `select checksum from renave.schema_migrations
+        where version = '0029_operation_begin_dispatch'`,
+    );
+    await adminPool.query(
+      `update renave.schema_migrations set checksum = $1
+        where version = '0029_operation_begin_dispatch'`,
+      ["0".repeat(64)],
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `update renave.schema_migrations set checksum = $1
+          where version = '0029_operation_begin_dispatch'`,
+        [original.rows[0]!.checksum],
+      );
+    }
+    await expectAppContractReady();
+  });
+
   it("recusa RLS desabilitada nas tabelas do outbox", async () => {
     await adminPool.query(
       "alter table renave.operation_outbox disable row level security",
@@ -579,6 +601,79 @@ describe("guard do banco de runtime", () => {
          from operation_lease_acl_probe`,
       );
       await adminPool.query("drop role operation_lease_acl_probe");
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa beginDispatch adulterado ou sem SECURITY DEFINER", async () => {
+    const original = await adminPool.query<{ definition: string }>(
+      `select pg_catalog.pg_get_functiondef(
+         'renave.begin_operation_send_dispatch(uuid,uuid,uuid)'::regprocedure
+       ) as definition`,
+    );
+    await adminPool.query(
+      `create or replace function renave.begin_operation_send_dispatch(
+         p_outbox_id uuid, p_lease_owner uuid, p_lease_token uuid
+       )
+       returns table (
+         outbox_id uuid, operation_id uuid, tenant_id uuid,
+         establishment_id uuid, correlation_id uuid, kind text,
+         mutation_family text, operation_version bigint,
+         sent_at timestamptz, attempt_count integer, lease_owner uuid,
+         lease_token uuid, lease_expires_at timestamptz,
+         idempotency_key_digest bytea, vehicle_key_digest bytea,
+         actor_subject_hash bytea, request_sha256 bytea,
+         request_size integer, request_schema_version integer,
+         request_key_id text, request_nonce bytea,
+         request_auth_tag bytea, request_ciphertext bytea
+       )
+       language plpgsql
+       security definer
+       set search_path = pg_catalog
+       as $$
+       begin
+         return;
+       end;
+       $$`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+
+    await adminPool.query(
+      `alter function renave.begin_operation_send_dispatch(uuid,uuid,uuid)
+       security invoker`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `alter function renave.begin_operation_send_dispatch(uuid,uuid,uuid)
+         security definer`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa grant inesperado na função beginDispatch", async () => {
+    await adminPool.query("create role begin_dispatch_acl_probe nologin");
+    await adminPool.query(
+      `grant execute on function
+         renave.begin_operation_send_dispatch(uuid,uuid,uuid)
+       to begin_dispatch_acl_probe`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `revoke execute on function
+           renave.begin_operation_send_dispatch(uuid,uuid,uuid)
+         from begin_dispatch_acl_probe`,
+      );
+      await adminPool.query("drop role begin_dispatch_acl_probe");
     }
     await expectAppContractReady();
   });

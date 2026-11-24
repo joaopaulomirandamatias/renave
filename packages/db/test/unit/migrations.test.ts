@@ -10,25 +10,30 @@ describe("loadMigrations", () => {
     const second = await loadMigrations();
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
-    expect(first.at(-5)?.version).toBe("0024_runtime_contract_stock_query");
-    expect(first.at(-4)?.version).toBe("0025_operation_outbox");
-    expect(first.at(-3)?.version).toBe(
+    expect(first.at(-7)?.version).toBe("0024_runtime_contract_stock_query");
+    expect(first.at(-6)?.version).toBe("0025_operation_outbox");
+    expect(first.at(-5)?.version).toBe(
       "0026_runtime_contract_operation_outbox",
     );
-    expect(first.at(-2)?.version).toBe("0027_operation_outbox_claim_lease");
-    expect(first.at(-1)?.version).toBe("0028_runtime_contract_operation_claim");
+    expect(first.at(-4)?.version).toBe("0027_operation_outbox_claim_lease");
+    expect(first.at(-3)?.version).toBe("0028_runtime_contract_operation_claim");
+    expect(first.at(-2)?.version).toBe("0029_operation_begin_dispatch");
+    expect(first.at(-1)?.version).toBe("0030_runtime_contract_begin_dispatch");
     expect(first.map((m) => m.checksum)).toEqual(second.map((m) => m.checksum));
     expect(first[0]?.checksum).toMatch(/^[0-9a-f]{64}$/);
     expect(first.at(-1)?.sql).toContain(first.at(-2)?.checksum);
     expect(first.at(-1)?.sql).toContain(first.at(-3)?.checksum);
-    expect(first.at(-1)?.sql).toContain("'0027_operation_outbox_claim_lease'");
-    expect(first.at(-2)?.sql).toContain("for update of outbox skip locked");
-    expect(first.at(-1)?.sql).toContain(
-      "operation_outbox_contract_ready_v0026",
+    expect(first.at(-1)?.sql).toContain("'0029_operation_begin_dispatch'");
+    expect(first.at(-4)?.sql).toContain("for update of outbox skip locked");
+    expect(first.at(-2)?.sql).toContain("for update");
+    expect(first.at(-2)?.sql.match(/for share/gu)).toHaveLength(2);
+    expect(first.at(-2)?.sql).toContain(
+      "outbox -> operação -> tenant -> estabelecimento",
     );
-    expect(first.at(-1)?.sql).toContain("pg_catalog.pg_get_expr");
-    expect(first.at(-1)?.sql).toContain("pg_catalog.pg_get_indexdef");
+    expect(first.at(-2)?.sql).toContain("DISPATCH_BEGUN");
+    expect(first.at(-1)?.sql).toContain("operation_claim_contract_ready_v0028");
     expect(first.at(-1)?.sql).toContain("pg_catalog.sha256");
+    expect(first.at(-4)?.sql).not.toMatch(/grant\s+execute/iu);
     expect(first.at(-2)?.sql).not.toMatch(/grant\s+execute/iu);
   });
 
