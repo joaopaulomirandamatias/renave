@@ -980,6 +980,16 @@ export function decryptOperationReconciliationProjection(
   }
 }
 
+/** Consulta nominal usada para tratar rotação ausente sem tentar decriptar. */
+export function hasOperationReconciliationProjectionKey(
+  cipher: OperationReconciliationProjectionCipher,
+  keyId: string,
+): boolean {
+  const state = cipherState(cipher);
+  if (typeof keyId !== "string" || !KEY_ID_PATTERN.test(keyId)) return false;
+  return state.effectiveKeys.has(keyId);
+}
+
 export class OperationReconciliationProjectionCipher {
   constructor(config: {
     activeKeyId: string;

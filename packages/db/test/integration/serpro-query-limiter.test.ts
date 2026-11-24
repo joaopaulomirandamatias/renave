@@ -19,12 +19,14 @@ let adminPool: Pool;
 let appPoolA: Pool;
 let appPoolB: Pool;
 let identityPool: Pool;
+let workerPool: Pool;
 
 beforeAll(() => {
   adminPool = createPool(urls.admin, { max: 2 });
   appPoolA = createPool(urls.app, { max: 4 });
   appPoolB = createPool(urls.app, { max: 4 });
   identityPool = createPool(urls.identity, { max: 1 });
+  workerPool = createPool(urls.operationWorker, { max: 2 });
 });
 
 beforeEach(async () => {
@@ -46,6 +48,7 @@ afterAll(async () => {
     appPoolA?.end(),
     appPoolB?.end(),
     identityPool?.end(),
+    workerPool?.end(),
   ]);
 });
 
@@ -132,6 +135,19 @@ describe.sequential("limite distribuído de consultas SERPRO", () => {
         "select * from renave_runtime.acquire_serpro_query_permit(gen_random_uuid(), $1, $1)",
         [Buffer.alloc(32)],
       ),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  it("permite ao worker somente acquire/release sem ACL de tabela", async () => {
+    const limiter = new PostgresSerproQueryLimiter(workerPool, key);
+    const acquired = await limiter.acquire(
+      input("tenant-worker", "reconciliation-worker", "store-worker"),
+    );
+    expect(acquired.allowed).toBe(true);
+    if (acquired.allowed) await acquired.permit.release();
+    limiter.destroy();
+    await expect(
+      workerPool.query("select * from renave_operations.serpro_query_lease"),
     ).rejects.toMatchObject({ code: "42501" });
   });
 });

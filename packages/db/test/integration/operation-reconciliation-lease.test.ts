@@ -73,6 +73,7 @@ interface LeaseState {
 let adminPool: Pool;
 let appPool: Pool;
 let migratorPool: Pool;
+let workerPool: Pool;
 let sequence = 0;
 
 function digest(value: string): Buffer {
@@ -299,10 +300,16 @@ beforeAll(() => {
   adminPool = createPool(urls.admin, { max: 2 });
   appPool = createPool(urls.app, { max: 8 });
   migratorPool = createPool(urls.migrator, { max: 32 });
+  workerPool = createPool(urls.operationWorker, { max: 4 });
 });
 
 afterAll(async () => {
-  await Promise.all([adminPool.end(), appPool.end(), migratorPool.end()]);
+  await Promise.all([
+    adminPool.end(),
+    appPool.end(),
+    migratorPool.end(),
+    workerPool.end(),
+  ]);
 });
 
 describe("operation reconciliation lease", () => {
@@ -1272,5 +1279,130 @@ describe("operation reconciliation lease", () => {
         public: false,
       });
     }
+  });
+
+  it("lista somente IDs de chave pendentes do tenant sem expor envelope", async () => {
+    const first = await createTarget("key-catalog");
+    const second = await createTarget("key-catalog-second", first);
+    const rows = await withTenant(workerPool, first.tenant.id, (client) =>
+      client.query<{ projection_key_id: string }>(
+        "select * from renave.list_pending_operation_reconciliation_projection_key_ids()",
+      ),
+    );
+    expect(rows.rows).toEqual([
+      { projection_key_id: "test-projection-key-v1" },
+    ]);
+    expect(Object.keys(rows.rows[0]!)).toEqual(["projection_key_id"]);
+    await expect(
+      workerPool.query(
+        "select * from renave.list_pending_operation_reconciliation_projection_key_ids()",
+      ),
+    ).rejects.toMatchObject({ code: "22023" });
+    await expect(
+      appPool.query(
+        "select * from renave.list_pending_operation_reconciliation_projection_key_ids()",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+
+    const before = await adminPool.query(
+      `select operation_id, delivery_status, attempt_count, lease_owner,
+              lease_token, lease_expires_at
+         from renave.operation_outbox
+        where id = any($1::uuid[])
+        order by operation_id`,
+      [[first.outboxId, second.outboxId]],
+    );
+    const sample = async () =>
+      withTenant(workerPool, first.tenant.id, (client) =>
+        client.query(
+          "select * from renave.preflight_pending_operation_reconciliation_projection_samples()",
+        ),
+      );
+    const [sampleA, sampleB] = await Promise.all([sample(), sample()]);
+    expect(sampleA.rows).toHaveLength(1);
+    expect(sampleB.rows).toHaveLength(1);
+    expect(sampleA.rows[0]?.operation_id).toBe(sampleB.rows[0]?.operation_id);
+    expect([first.operationId, second.operationId]).toContain(
+      sampleA.rows[0]?.operation_id,
+    );
+    expect(Object.keys(sampleA.rows[0]!).sort()).toEqual(
+      [
+        "establishment_id",
+        "kind",
+        "mutation_family",
+        "operation_id",
+        "projection_auth_tag",
+        "projection_ciphertext",
+        "projection_generation",
+        "projection_key_id",
+        "projection_kind",
+        "projection_nonce",
+        "projection_schema_version",
+        "projection_size",
+        "request_schema_version",
+        "source_request_sha256",
+      ].sort(),
+    );
+    expect(JSON.stringify(sampleA.rows)).not.toMatch(
+      /cnpj|lease_owner|lease_token|85106037000585/iu,
+    );
+    const after = await adminPool.query(
+      `select operation_id, delivery_status, attempt_count, lease_owner,
+              lease_token, lease_expires_at
+         from renave.operation_outbox
+        where id = any($1::uuid[])
+        order by operation_id`,
+      [[first.outboxId, second.outboxId]],
+    );
+    expect(after.rows).toEqual(before.rows);
+    await expect(
+      workerPool.query(
+        "select * from renave.preflight_pending_operation_reconciliation_projection_samples()",
+      ),
+    ).rejects.toMatchObject({ code: "22023" });
+    await expect(
+      appPool.query(
+        "select * from renave.preflight_pending_operation_reconciliation_projection_samples()",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+
+    const inactiveEstablishment = await createTarget(
+      "preflight-inactive-establishment",
+    );
+    await withTenant(migratorPool, inactiveEstablishment.tenant.id, (client) =>
+      client.query(
+        "update renave.establishment set status='inactive' where id=$1",
+        [inactiveEstablishment.establishment.id],
+      ),
+    );
+    expect(
+      (
+        await withTenant(
+          workerPool,
+          inactiveEstablishment.tenant.id,
+          (client) =>
+            client.query(
+              "select * from renave.preflight_pending_operation_reconciliation_projection_samples()",
+            ),
+        )
+      ).rows,
+    ).toEqual([]);
+
+    const suspendedTenant = await createTarget("preflight-suspended-tenant");
+    await withTenant(migratorPool, suspendedTenant.tenant.id, (client) =>
+      client.query("update renave.tenant set status='suspended' where id=$1", [
+        suspendedTenant.tenant.id,
+      ]),
+    );
+    expect(
+      (
+        await withTenant(workerPool, suspendedTenant.tenant.id, (client) =>
+          client.query(
+            "select * from renave.preflight_pending_operation_reconciliation_projection_samples()",
+          ),
+        )
+      ).rows,
+    ).toEqual([]);
+    expect((await sample()).rows).toHaveLength(1);
   });
 });

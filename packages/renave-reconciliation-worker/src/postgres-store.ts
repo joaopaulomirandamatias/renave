@@ -3,6 +3,8 @@ import {
   claimOperationReconciliations,
   completeOperationReconciliationConfirmed,
   completeOperationReconciliationManualReview,
+  listPendingOperationReconciliationProjectionKeyIds,
+  preflightPendingOperationReconciliationProjectionSamples,
   assertRuntimeDatabase,
   OPERATION_WORKER_ROLE,
   releaseOperationReconciliationLease,
@@ -101,6 +103,18 @@ export class PostgresReconciliationDatabase implements ReconciliationDatabasePor
   renew(input: Parameters<ReconciliationDatabasePort["renew"]>[0]) {
     return withTenant(databasePool(this), input.tenantId, (client) =>
       renewOperationReconciliationLease(client, withoutTenant(input)),
+    );
+  }
+
+  listPendingProjectionKeyIds(tenantId: string) {
+    return withTenant(databasePool(this), tenantId, (client) =>
+      listPendingOperationReconciliationProjectionKeyIds(client),
+    );
+  }
+
+  preflightPendingProjectionSamples(tenantId: string) {
+    return withTenant(databasePool(this), tenantId, (client) =>
+      preflightPendingOperationReconciliationProjectionSamples(client),
     );
   }
 }

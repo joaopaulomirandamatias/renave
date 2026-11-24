@@ -7,6 +7,8 @@ import {
   claimOperationReconciliations,
   completeOperationReconciliationConfirmed,
   completeOperationReconciliationManualReview,
+  listPendingOperationReconciliationProjectionKeyIds,
+  preflightPendingOperationReconciliationProjectionSamples,
   OperationReconciliationInputError,
   OperationReconciliationStorageError,
   releaseOperationReconciliationLease,
@@ -39,6 +41,85 @@ function claimRow() {
 }
 
 describe("operation reconciliation repository", () => {
+  it("lista IDs de chave validados, ordenados pelo banco e sem duplicatas", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ projection_key_id: "key-a" }, { projection_key_id: "key-b" }],
+    });
+    await expect(
+      listPendingOperationReconciliationProjectionKeyIds(client(query)),
+    ).resolves.toEqual(["key-a", "key-b"]);
+    expect(query).toHaveBeenCalledWith(
+      "select * from renave.list_pending_operation_reconciliation_projection_key_ids()",
+    );
+    for (const rows of [
+      [{ projection_key_id: "bad key" }],
+      [{ projection_key_id: "key-a" }, { projection_key_id: "key-a" }],
+    ]) {
+      await expect(
+        listPendingOperationReconciliationProjectionKeyIds(
+          client(vi.fn().mockResolvedValue({ rows })),
+        ),
+      ).rejects.toBeInstanceOf(OperationReconciliationStorageError);
+    }
+  });
+
+  it("mapeia e copia somente amostras cifradas de preflight", async () => {
+    const ciphertext = Buffer.from("sample-ciphertext");
+    const authTag = Buffer.alloc(16, 1);
+    const nonce = Buffer.alloc(12, 2);
+    const sourceHash = Buffer.alloc(32, 3);
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        {
+          establishment_id: randomUUID(),
+          kind: "USED_STOCK_ENTRY",
+          mutation_family: "STOCK_ENTRY",
+          operation_id: randomUUID(),
+          projection_auth_tag: authTag,
+          projection_ciphertext: ciphertext,
+          projection_generation: "1",
+          projection_key_id: "key-a",
+          projection_kind: "STOCK_ENTRY_RECONCILIATION",
+          projection_nonce: nonce,
+          projection_schema_version: 1,
+          projection_size: ciphertext.length,
+          request_schema_version: 1,
+          source_request_sha256: sourceHash,
+        },
+      ],
+    });
+    const result =
+      await preflightPendingOperationReconciliationProjectionSamples(
+        client(query),
+      );
+    expect(query).toHaveBeenCalledWith(
+      "select * from renave.preflight_pending_operation_reconciliation_projection_samples()",
+    );
+    expect(result).toHaveLength(1);
+    expect(Object.keys(result[0]!).sort()).toEqual(
+      [
+        "establishmentId",
+        "kind",
+        "mutationFamily",
+        "operationId",
+        "projectionAuthTag",
+        "projectionByteLength",
+        "projectionCiphertext",
+        "projectionGeneration",
+        "projectionKeyId",
+        "projectionKind",
+        "projectionNonce",
+        "projectionSchemaVersion",
+        "requestSchemaVersion",
+        "sourceRequestSha256",
+      ].sort(),
+    );
+    expect(result[0]!.projectionCiphertext).not.toBe(ciphertext);
+    expect(result[0]!.projectionAuthTag).not.toBe(authTag);
+    expect(result[0]!.projectionNonce).not.toBe(nonce);
+    expect(result[0]!.sourceRequestSha256).not.toBe(sourceHash);
+  });
+
   it("mapeia claim e begin copiando o envelope", async () => {
     const claim = claimRow();
     const ciphertext = Buffer.from("projection");

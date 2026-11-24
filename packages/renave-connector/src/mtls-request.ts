@@ -6,6 +6,8 @@ import type { RenaveEnvironment } from "./connector.js";
 import type { RenaveHttpRequest } from "./http-transport.js";
 
 const HOMOLOGATION_ORIGIN = "https://hom.renave.estaleiro.serpro.gov.br";
+const HOMOLOGATION_IDENTITY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/cliente-autenticado`;
+const HOMOLOGATION_STOCKS_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/estoques`;
 const ALLOWED_PATHS = new Set([
   "/renave-ws/api/aptidao-veiculo-estoque",
   "/renave-ws/api/cliente-autenticado",
@@ -31,6 +33,17 @@ export interface HomologationMtlsClient {
 export interface PemMtlsClientOptions {
   now?: () => Date;
 }
+
+interface HomologationRenaveReadOnlyRequestState {
+  request: RenaveHttpRequest;
+}
+
+const homologationRenaveReadOnlyRequestStates = new WeakMap<
+  HomologationRenaveReadOnlyRequest,
+  HomologationRenaveReadOnlyRequestState
+>();
+
+const homologationRenaveReadOnlyRequestConstructorToken = Object.freeze({});
 
 export type PemMtlsValidationCode =
   | "RENAVE_MTLS_CA_INVALID"
@@ -81,6 +94,127 @@ export class RenaveMtlsOriginError extends Error {
     );
     this.name = "RenaveMtlsOriginError";
   }
+}
+
+/** Capacidade nominal mTLS limitada às leituras de reconciliação. */
+export class HomologationRenaveReadOnlyRequest {
+  constructor(token: never, request: RenaveHttpRequest) {
+    if (
+      new.target !== HomologationRenaveReadOnlyRequest ||
+      token !== (homologationRenaveReadOnlyRequestConstructorToken as never) ||
+      typeof request !== "function"
+    ) {
+      throw new RenaveMtlsOriginError();
+    }
+    homologationRenaveReadOnlyRequestStates.set(this, {
+      request: request.bind(undefined),
+    });
+    Object.freeze(this);
+  }
+
+  async request(input: string, init: RequestInit): Promise<Response> {
+    return await executeHomologationRenaveReadOnlyRequest(
+      homologationRenaveReadOnlyRequestState(this),
+      input,
+      init,
+    );
+  }
+}
+
+export function createHomologationRenaveReadOnlyRequest(
+  environment: RenaveEnvironment,
+  request: RenaveHttpRequest,
+): HomologationRenaveReadOnlyRequest {
+  if (environment !== "homologation") {
+    throw new PemMtlsProductionBlockedError();
+  }
+  return new HomologationRenaveReadOnlyRequest(
+    homologationRenaveReadOnlyRequestConstructorToken as never,
+    request,
+  );
+}
+
+/** @internal Liga o transporte HTTP à marca nominal sem dispatch virtual. */
+export function bindHomologationRenaveReadOnlyRequest(
+  capability: HomologationRenaveReadOnlyRequest,
+): RenaveHttpRequest {
+  const state = homologationRenaveReadOnlyRequestState(capability);
+  return async (input, init) =>
+    await executeHomologationRenaveReadOnlyRequest(state, input, init);
+}
+
+function homologationRenaveReadOnlyRequestState(
+  capability: HomologationRenaveReadOnlyRequest,
+): HomologationRenaveReadOnlyRequestState {
+  const state = homologationRenaveReadOnlyRequestStates.get(capability);
+  if (!state) throw new RenaveMtlsOriginError();
+  return state;
+}
+
+function isAllowedReadUrl(input: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    return false;
+  }
+  if (
+    url.origin !== HOMOLOGATION_ORIGIN ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.hash !== ""
+  ) {
+    return false;
+  }
+  if (input === HOMOLOGATION_IDENTITY_URL) return true;
+  if (url.pathname !== "/renave-ws/api/estoques") return false;
+
+  const entries = [...url.searchParams.entries()];
+  if (
+    entries.length !== 1 ||
+    entries[0]?.[0] !== "placa" ||
+    !/^[A-Z]{3}[0-9][0-9A-Z][0-9]{2}$/.test(entries[0][1])
+  ) {
+    return false;
+  }
+  return input === `${HOMOLOGATION_STOCKS_URL}?placa=${entries[0][1]}`;
+}
+
+function executeHomologationRenaveReadOnlyRequest(
+  state: HomologationRenaveReadOnlyRequestState,
+  input: string,
+  init: RequestInit,
+): Promise<Response> {
+  let method: string | undefined;
+  let redirect: RequestRedirect | undefined;
+  let body: BodyInit | null | undefined;
+  let headers: HeadersInit | undefined;
+  let signal: AbortSignal | null | undefined;
+  try {
+    method = init.method;
+    redirect = init.redirect;
+    body = init.body;
+    headers = init.headers;
+    signal = init.signal;
+  } catch {
+    throw new RenaveMtlsOriginError();
+  }
+  if (
+    method !== "GET" ||
+    redirect !== "error" ||
+    body !== undefined ||
+    !isAllowedReadUrl(input)
+  ) {
+    throw new RenaveMtlsOriginError();
+  }
+
+  const safeInit: RequestInit = {
+    headers: new Headers(headers),
+    method: "GET",
+    redirect: "error",
+    ...(signal === undefined || signal === null ? {} : { signal }),
+  };
+  return state.request(input, safeInit);
 }
 
 export class RenaveMtlsResponseTooLargeError extends Error {
@@ -338,3 +472,6 @@ export function createHomologationPemMtlsClient(
     request,
   };
 }
+
+Object.freeze(HomologationRenaveReadOnlyRequest.prototype);
+Object.freeze(HomologationRenaveReadOnlyRequest);

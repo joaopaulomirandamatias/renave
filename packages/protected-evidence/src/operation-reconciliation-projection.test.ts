@@ -17,6 +17,7 @@ import {
 import {
   decryptOperationReconciliationProjection,
   encryptOperationReconciliationProjection,
+  hasOperationReconciliationProjectionKey,
   OperationReconciliationProjectionCipher,
   OperationReconciliationProjectionConfigurationError,
   OperationReconciliationProjectionDecryptionError,
@@ -1049,6 +1050,36 @@ describe("cifra da projeção de reconciliação", () => {
     expect(() => destroyed.decrypt({} as never, localBinding)).toThrow(
       OperationReconciliationProjectionConfigurationError,
     );
+  });
+
+  it("consulta chave somente pelo estado nominal do cipher", () => {
+    const projectionCipher = cipher("key-a", new Map([["key-a", MASTER]]));
+    expect(
+      hasOperationReconciliationProjectionKey(projectionCipher, "key-a"),
+    ).toBe(true);
+    expect(
+      hasOperationReconciliationProjectionKey(projectionCipher, "key-b"),
+    ).toBe(false);
+    class Subclass extends OperationReconciliationProjectionCipher {}
+    const candidates = [
+      {} as OperationReconciliationProjectionCipher,
+      Object.create(
+        OperationReconciliationProjectionCipher.prototype,
+      ) as OperationReconciliationProjectionCipher,
+      new Proxy(projectionCipher, {}),
+      Object.create(
+        Subclass.prototype,
+      ) as OperationReconciliationProjectionCipher,
+    ];
+    for (const candidate of candidates) {
+      expect(() =>
+        hasOperationReconciliationProjectionKey(candidate, "key-a"),
+      ).toThrow(OperationReconciliationProjectionConfigurationError);
+    }
+    projectionCipher.destroy();
+    expect(() =>
+      hasOperationReconciliationProjectionKey(projectionCipher, "key-a"),
+    ).toThrow(OperationReconciliationProjectionConfigurationError);
   });
 
   it("não inclui CPF, placa, IDs, key id ou master em erros", async () => {

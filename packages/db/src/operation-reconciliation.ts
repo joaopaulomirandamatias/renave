@@ -65,6 +65,23 @@ export interface OperationReconciliationCompletion {
   reconcileOutboxId: string;
 }
 
+export interface OperationReconciliationProjectionPreflight {
+  establishmentId: string;
+  kind: OperationKind;
+  mutationFamily: OperationMutationFamily;
+  operationId: string;
+  projectionAuthTag: Buffer;
+  projectionByteLength: number;
+  projectionCiphertext: Buffer;
+  projectionGeneration: string;
+  projectionKeyId: string;
+  projectionKind: "STOCK_ENTRY_RECONCILIATION";
+  projectionNonce: Buffer;
+  projectionSchemaVersion: 1;
+  requestSchemaVersion: number;
+  sourceRequestSha256: Buffer;
+}
+
 export class OperationReconciliationInputError extends Error {
   override get name(): string {
     return "OperationReconciliationInputError";
@@ -123,6 +140,23 @@ interface CompletionRow {
   operation_id: string;
   operation_version: string;
   reconcile_outbox_id: string;
+}
+
+interface ProjectionPreflightRow {
+  establishment_id: string;
+  kind: string;
+  mutation_family: string;
+  operation_id: string;
+  projection_auth_tag: Buffer;
+  projection_ciphertext: Buffer;
+  projection_generation: string;
+  projection_key_id: string;
+  projection_kind: string;
+  projection_nonce: Buffer;
+  projection_schema_version: number;
+  projection_size: number;
+  request_schema_version: number;
+  source_request_sha256: Buffer;
 }
 
 function isUuid(value: unknown): value is string {
@@ -295,6 +329,84 @@ export async function claimOperationReconciliations(
     return rows.map(toClaim);
   } catch (error) {
     if (error instanceof OperationReconciliationStorageError) throw error;
+    throw new OperationReconciliationStorageError();
+  }
+}
+
+export async function listPendingOperationReconciliationProjectionKeyIds(
+  client: TenantClient,
+): Promise<readonly string[]> {
+  try {
+    const { rows } = await client.query<{ projection_key_id: string }>(
+      "select * from renave.list_pending_operation_reconciliation_projection_key_ids()",
+    );
+    const keyIds = rows.map(({ projection_key_id }) => projection_key_id);
+    if (
+      keyIds.some(
+        (keyId) => typeof keyId !== "string" || !KEY_ID_PATTERN.test(keyId),
+      ) ||
+      new Set(keyIds).size !== keyIds.length
+    ) {
+      throw new OperationReconciliationStorageError();
+    }
+    return keyIds;
+  } catch (error) {
+    if (error instanceof OperationReconciliationStorageError) throw error;
+    throw new OperationReconciliationStorageError();
+  }
+}
+
+export async function preflightPendingOperationReconciliationProjectionSamples(
+  client: TenantClient,
+): Promise<readonly OperationReconciliationProjectionPreflight[]> {
+  try {
+    const { rows } = await client.query<ProjectionPreflightRow>(
+      "select * from renave.preflight_pending_operation_reconciliation_projection_samples()",
+    );
+    return rows.map((row) => {
+      const ciphertext = copyBytes(row.projection_ciphertext);
+      if (
+        !isUuid(row.operation_id) ||
+        !isUuid(row.establishment_id) ||
+        row.kind !== "USED_STOCK_ENTRY" ||
+        row.mutation_family !== "STOCK_ENTRY" ||
+        !Number.isSafeInteger(row.request_schema_version) ||
+        row.request_schema_version < 1 ||
+        row.projection_kind !== "STOCK_ENTRY_RECONCILIATION" ||
+        row.projection_schema_version !== 1 ||
+        !isPositiveVersion(row.projection_generation) ||
+        !Number.isSafeInteger(row.projection_size) ||
+        row.projection_size !== ciphertext.byteLength ||
+        typeof row.projection_key_id !== "string" ||
+        !KEY_ID_PATTERN.test(row.projection_key_id)
+      ) {
+        ciphertext.fill(0);
+        throw new OperationReconciliationStorageError();
+      }
+      return {
+        establishmentId: row.establishment_id,
+        kind: row.kind,
+        mutationFamily: row.mutation_family,
+        operationId: row.operation_id,
+        projectionAuthTag: copyBytes(row.projection_auth_tag, 16),
+        projectionByteLength: row.projection_size,
+        projectionCiphertext: ciphertext,
+        projectionGeneration: row.projection_generation,
+        projectionKeyId: row.projection_key_id,
+        projectionKind: row.projection_kind,
+        projectionNonce: copyBytes(row.projection_nonce, 12),
+        projectionSchemaVersion: row.projection_schema_version,
+        requestSchemaVersion: row.request_schema_version,
+        sourceRequestSha256: copyBytes(row.source_request_sha256, SHA256_BYTES),
+      };
+    });
+  } catch (error) {
+    if (
+      error instanceof OperationReconciliationInputError ||
+      error instanceof OperationReconciliationStorageError
+    ) {
+      throw error;
+    }
     throw new OperationReconciliationStorageError();
   }
 }

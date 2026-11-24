@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createHomologationRenaveReadOnlyRequest,
+  HomologationRenaveReadOnlyRequest,
+  HttpRenaveReadOnlyTransport,
   HttpRenaveTransport,
   RenaveHttpError,
   RenaveMutationOutcomeUnknownError,
@@ -12,6 +15,7 @@ import {
   prepareRenaveMutation,
   restorePreparedRenaveMutation,
   type EstablishmentHeaders,
+  type RenaveHttpRequest,
 } from "./index.js";
 
 const headers: EstablishmentHeaders = {
@@ -519,5 +523,109 @@ describe("HttpRenaveTransport", () => {
       status: 0,
     });
     expect(request).toHaveBeenCalledOnce();
+  });
+});
+
+describe("HttpRenaveReadOnlyTransport", () => {
+  function capability(request: RenaveHttpRequest) {
+    return createHomologationRenaveReadOnlyRequest("homologation", request);
+  }
+
+  it("expõe somente identidade e estoques pela capability mTLS", async () => {
+    const baseRequest = vi.fn<RenaveHttpRequest>(async (url: string) =>
+      url.endsWith("/cliente-autenticado")
+        ? Response.json({
+            cnpj: "85106037000585",
+            cnpjIntegradora: "69418503000188",
+          })
+        : Response.json([{ id: 7, placa: "QTP4H82" }]),
+    );
+    const transport = new HttpRenaveReadOnlyTransport({
+      environment: "homologation",
+      request: createHomologationRenaveReadOnlyRequest(
+        "homologation",
+        baseRequest,
+      ),
+    });
+
+    await expect(transport.getAuthenticatedClient(headers)).resolves.toEqual({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    await expect(
+      transport.findStocksByPlate(headers, " qtp4h82 "),
+    ).resolves.toEqual([{ id: 7, placa: "QTP4H82" }]);
+
+    expect(transport.environment).toBe("homologation");
+    expect("mutate" in transport).toBe(false);
+    expect("getVehicleEligibility" in transport).toBe(false);
+    expect(baseRequest).toHaveBeenCalledTimes(2);
+    expect(baseRequest.mock.calls.map(([url]) => url)).toEqual([
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/cliente-autenticado",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82",
+    ]);
+    for (const [, init] of baseRequest.mock.calls) {
+      expect(init).toMatchObject({ method: "GET", redirect: "error" });
+      expect(init.body).toBeUndefined();
+    }
+  });
+
+  it("recusa capability estrutural, forged e Proxy na composição", () => {
+    const baseRequest = vi.fn<RenaveHttpRequest>(async () => Response.json({}));
+    const real = createHomologationRenaveReadOnlyRequest(
+      "homologation",
+      baseRequest,
+    );
+    const structural = {
+      request: vi.fn(async () => Response.json({})),
+    } as unknown as HomologationRenaveReadOnlyRequest;
+    const forged = Object.create(
+      HomologationRenaveReadOnlyRequest.prototype,
+    ) as HomologationRenaveReadOnlyRequest;
+
+    for (const request of [structural, forged, new Proxy(real, {})]) {
+      expect(
+        () =>
+          new HttpRenaveReadOnlyTransport({
+            environment: "homologation",
+            request,
+          }),
+      ).toThrow(RenaveProtocolError);
+    }
+    expect(baseRequest).not.toHaveBeenCalled();
+    expect(structural.request).not.toHaveBeenCalled();
+  });
+
+  it("é nominal, congelado e recusa forged e subclasses", async () => {
+    const transport = new HttpRenaveReadOnlyTransport({
+      environment: "homologation",
+      request: capability(async () => Response.json([])),
+    });
+    const forged = Object.create(
+      HttpRenaveReadOnlyTransport.prototype,
+    ) as HttpRenaveReadOnlyTransport;
+    const proxied = new Proxy(transport, {});
+
+    expect(Object.isFrozen(transport)).toBe(true);
+    expect(Object.isFrozen(HttpRenaveReadOnlyTransport)).toBe(true);
+    expect(Object.isFrozen(HttpRenaveReadOnlyTransport.prototype)).toBe(true);
+    await expect(forged.getAuthenticatedClient(headers)).rejects.toBeInstanceOf(
+      RenaveProtocolError,
+    );
+    await expect(
+      proxied.getAuthenticatedClient(headers),
+    ).rejects.toBeInstanceOf(RenaveProtocolError);
+
+    const Constructor = HttpRenaveReadOnlyTransport as unknown as new (
+      options: ConstructorParameters<typeof HttpRenaveReadOnlyTransport>[0],
+    ) => HttpRenaveReadOnlyTransport;
+    class Subclass extends Constructor {}
+    expect(
+      () =>
+        new Subclass({
+          environment: "homologation",
+          request: capability(async () => Response.json([])),
+        }),
+    ).toThrow(RenaveProtocolError);
   });
 });

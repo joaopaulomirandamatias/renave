@@ -25,6 +25,7 @@
     "dev": "pnpm --filter @seu-renave/db --filter @seu-renave/identity build && pnpm --parallel --filter @seu-renave/api --filter @seu-renave/web dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "reconciliation-worker:start": "pnpm --filter @seu-renave/reconciliation-worker-app start",
     "security:guards": "node scripts/check-security-guards.mjs --self-test && node scripts/check-security-guards.mjs",
     "smoke:serpro:fallback": "node scripts/smoke-serpro-fallback.mjs",
     "smoke:serpro:hml": "pnpm --filter @seu-renave/renave-connector build && node scripts/smoke-serpro-homologation.mjs",

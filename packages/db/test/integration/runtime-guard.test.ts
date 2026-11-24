@@ -284,6 +284,33 @@ describe("guard do banco de runtime", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("contrato fecha catálogo de chaves e ACL das rotinas do limitador", async () => {
+    await adminPool.query(`
+      create function renave.list_pending_operation_reconciliation_projection_key_ids(text)
+      returns table (projection_key_id text) language sql as 'select null::text'
+    `);
+    try {
+      await expectWorkerContractRejected();
+    } finally {
+      await adminPool.query(
+        "drop function renave.list_pending_operation_reconciliation_projection_key_ids(text)",
+      );
+    }
+    await expectWorkerContractReady();
+
+    await migratorPool.query(
+      "grant execute on function renave_runtime.acquire_serpro_query_permit(uuid,bytea,bytea) to renave_identity_app",
+    );
+    try {
+      await expectWorkerContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke execute on function renave_runtime.acquire_serpro_query_permit(uuid,bytea,bytea) from renave_identity_app",
+      );
+    }
+    await expectWorkerContractReady();
+  });
+
   it.each([
     {
       replacement: `
@@ -506,6 +533,80 @@ describe("guard do banco de runtime", () => {
     } finally {
       await migratorPool.query(
         "drop function renave_runtime.operation_worker_public_probe()",
+      );
+    }
+    await expectWorkerContractReady();
+  });
+
+  it("contrato efetivo recusa tabela, sequência e coluna herdadas de PUBLIC", async () => {
+    const probes = [
+      {
+        grant: "grant select on renave.operation to public",
+      },
+      {
+        grant:
+          "grant usage on sequence renave.operation_transition_id_seq to public",
+      },
+      {
+        grant:
+          "grant select (request_ciphertext) on renave.operation to public",
+      },
+      {
+        grant: "grant maintain on renave.operation to public",
+      },
+    ];
+    for (const probe of probes) {
+      const client = await adminPool.connect();
+      try {
+        await client.query("begin");
+        await client.query(probe.grant);
+        const result = await client.query<{ ready: boolean }>(
+          "select renave_runtime.api_contract_ready() as ready",
+        );
+        expect(result.rows[0]?.ready).toBe(false);
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+      await expectWorkerContractReady();
+    }
+  });
+
+  it("contrato recusa overload e body adulterado do preflight de amostra", async () => {
+    const signature =
+      "renave.preflight_pending_operation_reconciliation_projection_samples()";
+    const original = await adminPool.query<{ definition: string }>(
+      "select pg_catalog.pg_get_functiondef($1::regprocedure) as definition",
+      [signature],
+    );
+    await adminPool.query(`
+      create or replace function ${signature}
+      returns table (
+        operation_id uuid, establishment_id uuid, kind text,
+        mutation_family text, request_schema_version integer,
+        source_request_sha256 bytea, projection_kind text,
+        projection_schema_version integer, projection_generation bigint,
+        projection_size integer, projection_key_id text,
+        projection_nonce bytea, projection_auth_tag bytea,
+        projection_ciphertext bytea
+      ) language plpgsql volatile security definer set search_path=pg_catalog
+      as $$ begin return; end $$
+    `);
+    try {
+      await expectWorkerContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectWorkerContractReady();
+    await adminPool.query(`
+      create function renave.preflight_pending_operation_reconciliation_projection_samples(text)
+      returns void language sql as 'select'
+    `);
+    try {
+      await expectWorkerContractRejected();
+    } finally {
+      await adminPool.query(
+        "drop function renave.preflight_pending_operation_reconciliation_projection_samples(text)",
       );
     }
     await expectWorkerContractReady();

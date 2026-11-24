@@ -1,14 +1,18 @@
 export { InvalidCnpjError, normalizeCnpj } from "./cnpj.js";
 export {
+  HttpRenaveReadOnlyTransport,
   HttpRenaveTransport,
   RenaveHttpError,
   RenaveMutationOutcomeUnknownError,
   RenaveProtocolError,
+  type HttpRenaveReadOnlyTransportOptions,
   type HttpRenaveTransportOptions,
   type RenaveHttpRequest,
 } from "./http-transport.js";
 export {
+  createHomologationRenaveReadOnlyRequest,
   createHomologationPemMtlsClient,
+  HomologationRenaveReadOnlyRequest,
   InvalidPemMtlsMaterialError,
   PemMtlsProductionBlockedError,
   RenaveMtlsOriginError,

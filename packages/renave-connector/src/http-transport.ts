@@ -3,9 +3,14 @@ import type {
   EstablishmentHeaders,
   RenaveEnvironment,
   RenaveReadOptions,
+  RenaveReadOnlyTransport,
   RenaveTransport,
 } from "./connector.js";
 import { RenaveProductionBlockedError } from "./connector.js";
+import {
+  bindHomologationRenaveReadOnlyRequest,
+  type HomologationRenaveReadOnlyRequest,
+} from "./mtls-request.js";
 import {
   renaveMutationRoutes,
   type RenaveMutationOperation,
@@ -39,6 +44,12 @@ export interface HttpRenaveTransportOptions {
   mutationTimeoutMs?: number;
 }
 
+export interface HttpRenaveReadOnlyTransportOptions {
+  environment: "homologation";
+  request: HomologationRenaveReadOnlyRequest;
+  readTimeoutMs?: number;
+}
+
 interface HttpRenaveTransportState {
   environment: RenaveEnvironment;
   mutationTimeoutMs: number;
@@ -49,6 +60,16 @@ interface HttpRenaveTransportState {
 const httpTransportStates = new WeakMap<
   HttpRenaveTransport,
   HttpRenaveTransportState
+>();
+
+interface HttpRenaveReadOnlyTransportState {
+  readTimeoutMs: number;
+  request: RenaveHttpRequest;
+}
+
+const httpReadOnlyTransportStates = new WeakMap<
+  HttpRenaveReadOnlyTransport,
+  HttpRenaveReadOnlyTransportState
 >();
 
 type RenaveHttpOperation =
@@ -625,6 +646,104 @@ export class HttpRenaveTransport implements RenaveTransport {
   }
 }
 
+/** Transporte nominal que não possui superfícies de aptidão ou mutação. */
+export class HttpRenaveReadOnlyTransport implements RenaveReadOnlyTransport {
+  constructor(options: HttpRenaveReadOnlyTransportOptions) {
+    if (new.target !== HttpRenaveReadOnlyTransport) {
+      throw new RenaveProtocolError("get-authenticated-client");
+    }
+    try {
+      const environment = options.environment;
+      const readTimeoutMs = options.readTimeoutMs ?? 60_000;
+      const request = bindHomologationRenaveReadOnlyRequest(options.request);
+      if (
+        environment !== "homologation" ||
+        !Number.isInteger(readTimeoutMs) ||
+        readTimeoutMs < 1
+      ) {
+        throw new RenaveProtocolError("get-authenticated-client");
+      }
+      httpReadOnlyTransportStates.set(this, { readTimeoutMs, request });
+      Object.freeze(this);
+    } catch (error) {
+      if (error instanceof RenaveProtocolError) throw error;
+      throw new RenaveProtocolError("get-authenticated-client");
+    }
+  }
+
+  get environment(): "homologation" {
+    httpReadOnlyTransportState(this, "get-authenticated-client");
+    return "homologation";
+  }
+
+  async getAuthenticatedClient(
+    headers: EstablishmentHeaders,
+    options?: RenaveReadOptions,
+  ): Promise<AuthenticatedClientIdentity> {
+    const state = httpReadOnlyTransportState(this, "get-authenticated-client");
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls.homologation}/api/cliente-autenticado`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "get-authenticated-client");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "get-authenticated-client");
+    }
+    return identityFrom(await parseJson(response, "get-authenticated-client"));
+  }
+
+  async findStocksByPlate(
+    headers: EstablishmentHeaders,
+    plate: string,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord[]> {
+    const state = httpReadOnlyTransportState(this, "find-stocks-by-plate");
+    const normalizedPlate = normalizeStockPlate(plate);
+    const search = new URLSearchParams({ placa: normalizedPlate });
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls.homologation}/api/estoques?${search.toString()}`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "find-stocks-by-plate");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "find-stocks-by-plate");
+    }
+    const result = await parseJson(response, "find-stocks-by-plate");
+    if (!Array.isArray(result)) {
+      throw new RenaveProtocolError("find-stocks-by-plate");
+    }
+    return result.map(stockRecordFrom);
+  }
+}
+
 function httpTransportState(
   transport: HttpRenaveTransport,
   operation: RenaveHttpOperation,
@@ -634,5 +753,16 @@ function httpTransportState(
   return state;
 }
 
+function httpReadOnlyTransportState(
+  transport: HttpRenaveReadOnlyTransport,
+  operation: RenaveHttpOperation,
+): HttpRenaveReadOnlyTransportState {
+  const state = httpReadOnlyTransportStates.get(transport);
+  if (!state) throw new RenaveProtocolError(operation);
+  return state;
+}
+
 Object.freeze(HttpRenaveTransport.prototype);
 Object.freeze(HttpRenaveTransport);
+Object.freeze(HttpRenaveReadOnlyTransport.prototype);
+Object.freeze(HttpRenaveReadOnlyTransport);

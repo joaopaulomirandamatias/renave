@@ -1,0 +1,25 @@
+{
+  "name": "@seu-renave/reconciliation-worker-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --conditions=production dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@seu-renave/db": "workspace:*",
+    "@seu-renave/protected-evidence": "workspace:*",
+    "@seu-renave/renave-connector": "workspace:*",
+    "@seu-renave/renave-reconciliation-worker": "workspace:*",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

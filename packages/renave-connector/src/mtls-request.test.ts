@@ -1,14 +1,17 @@
 import { generateKeyPairSync } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createHomologationPemMtlsClient,
+  createHomologationRenaveReadOnlyRequest,
+  HomologationRenaveReadOnlyRequest,
   InvalidPemMtlsMaterialError,
   PemMtlsProductionBlockedError,
   RenaveMtlsOriginError,
   RenaveMtlsResponseTooLargeError,
   readBoundedResponseBody,
+  type RenaveHttpRequest,
   type PemMtlsMaterial,
 } from "./index.js";
 
@@ -284,5 +287,134 @@ describe("createHomologationPemMtlsClient", () => {
     } finally {
       client.close();
     }
+  });
+});
+
+describe("createHomologationRenaveReadOnlyRequest", () => {
+  const identityUrl =
+    "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/cliente-autenticado";
+  const stocksUrl =
+    "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82";
+
+  it("delega somente GETs canônicos de identidade e estoque sem corpo", async () => {
+    const baseRequest = vi.fn<RenaveHttpRequest>(async () => Response.json([]));
+    const capability = createHomologationRenaveReadOnlyRequest(
+      "homologation",
+      baseRequest,
+    );
+
+    await capability.request(identityUrl, {
+      headers: { accept: "application/json" },
+      method: "GET",
+      redirect: "error",
+    });
+    await capability.request(stocksUrl, {
+      method: "GET",
+      redirect: "error",
+    });
+
+    expect(baseRequest).toHaveBeenCalledTimes(2);
+    for (const [, init] of baseRequest.mock.calls) {
+      expect(init).toMatchObject({ method: "GET", redirect: "error" });
+      expect(init.body).toBeUndefined();
+    }
+  });
+
+  it.each([
+    ["POST", identityUrl, { method: "POST", redirect: "error" }],
+    ["body", identityUrl, { body: "{}", method: "GET", redirect: "error" }],
+    [
+      "body nulo",
+      identityUrl,
+      { body: null, method: "GET", redirect: "error" },
+    ],
+    ["redirect", identityUrl, { method: "GET", redirect: "follow" }],
+    [
+      "mutação",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/solicitacoes-entrada-estoque",
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "aptidão",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque",
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "host",
+      "https://example.invalid/renave-ws/api/cliente-autenticado",
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "userinfo",
+      "https://user:password@hom.renave.estaleiro.serpro.gov.br/renave-ws/api/cliente-autenticado",
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "fragmento",
+      `${identityUrl}#fragmento`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "query na identidade",
+      `${identityUrl}?placa=QTP4H82`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "query adicional no estoque",
+      `${stocksUrl}&pagina=1`,
+      { method: "GET", redirect: "error" },
+    ],
+  ] as const)("recusa %s antes da rede base", async (_label, url, init) => {
+    const baseRequest = vi.fn<RenaveHttpRequest>(async () => Response.json({}));
+    const capability = createHomologationRenaveReadOnlyRequest(
+      "homologation",
+      baseRequest,
+    );
+
+    await expect(capability.request(url, init)).rejects.toBeInstanceOf(
+      RenaveMtlsOriginError,
+    );
+    expect(baseRequest).not.toHaveBeenCalled();
+  });
+
+  it("só pode ser criada para homologação", () => {
+    const baseRequest = vi.fn<RenaveHttpRequest>();
+
+    expect(() =>
+      createHomologationRenaveReadOnlyRequest("production", baseRequest),
+    ).toThrow(PemMtlsProductionBlockedError);
+    expect(baseRequest).not.toHaveBeenCalled();
+  });
+
+  it("é nominal, congelada e recusa forged, Proxy e subclasses", async () => {
+    const baseRequest = vi.fn<RenaveHttpRequest>(async () => Response.json({}));
+    const capability = createHomologationRenaveReadOnlyRequest(
+      "homologation",
+      baseRequest,
+    );
+    const forged = Object.create(
+      HomologationRenaveReadOnlyRequest.prototype,
+    ) as HomologationRenaveReadOnlyRequest;
+    const proxied = new Proxy(capability, {});
+
+    expect(Object.isFrozen(capability)).toBe(true);
+    expect(Object.isFrozen(HomologationRenaveReadOnlyRequest)).toBe(true);
+    expect(Object.isFrozen(HomologationRenaveReadOnlyRequest.prototype)).toBe(
+      true,
+    );
+    await expect(
+      forged.request(identityUrl, { method: "GET", redirect: "error" }),
+    ).rejects.toBeInstanceOf(RenaveMtlsOriginError);
+    await expect(
+      proxied.request(identityUrl, { method: "GET", redirect: "error" }),
+    ).rejects.toBeInstanceOf(RenaveMtlsOriginError);
+
+    const Constructor = HomologationRenaveReadOnlyRequest as unknown as new (
+      token: object,
+      request: typeof baseRequest,
+    ) => HomologationRenaveReadOnlyRequest;
+    class Subclass extends Constructor {}
+    expect(() => new Subclass({}, baseRequest)).toThrow(RenaveMtlsOriginError);
+    expect(baseRequest).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,7 @@ export {
 export {
   decryptOperationReconciliationProjection,
   encryptOperationReconciliationProjection,
+  hasOperationReconciliationProjectionKey,
   OperationReconciliationProjectionCipher,
   OperationReconciliationProjectionConfigurationError,
   OperationReconciliationProjectionDecryptionError,

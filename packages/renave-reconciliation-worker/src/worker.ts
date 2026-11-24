@@ -8,6 +8,7 @@ import {
 } from "@seu-renave/db";
 import {
   decryptOperationReconciliationProjection,
+  hasOperationReconciliationProjectionKey,
   type EncryptedOperationReconciliationProjection,
   type OperationReconciliationProjectionBinding,
   OperationReconciliationProjectionCipher,
@@ -63,13 +64,17 @@ export interface ReconciliationDatabasePort {
 }
 
 export interface ReconciliationPermit {
-  release(): void;
+  release(): Promise<void> | void;
 }
 
 export interface ReconciliationLimiterPort {
   /** Tenta adquirir imediatamente; nunca mantém a lease aguardando capacidade. */
   tryAcquire(
-    input: { operationId: string; tenantId: string },
+    input: {
+      establishmentId: string;
+      operationId: string;
+      tenantId: string;
+    },
     signal: AbortSignal,
   ): Promise<ReconciliationPermit | null>;
 }
@@ -83,7 +88,12 @@ export interface ReconciliationSchedulerPort {
 }
 
 export type ReconciliationWorkerEventName =
-  "confirmed" | "manual_review" | "released" | "lease_lost" | "aborted";
+  | "confirmed"
+  | "manual_review"
+  | "released"
+  | "lease_lost"
+  | "aborted"
+  | "key_unavailable";
 
 export interface ReconciliationWorkerEvent {
   attemptCount: number;
@@ -130,6 +140,7 @@ export interface ReconciliationWorkerSummary {
   leaseLost: number;
   manualReview: number;
   released: number;
+  keyUnavailable: number;
 }
 
 type Decision =
@@ -200,6 +211,7 @@ function emptySummary(): ReconciliationWorkerSummary {
     leaseLost: 0,
     manualReview: 0,
     released: 0,
+    keyUnavailable: 0,
   };
 }
 
@@ -213,6 +225,7 @@ function addSummary(
   target.leaseLost += source.leaseLost;
   target.manualReview += source.manualReview;
   target.released += source.released;
+  target.keyUnavailable += source.keyUnavailable;
 }
 
 function fence(
@@ -547,6 +560,7 @@ export class ReconciliationWorker {
     let permit: ReconciliationPermit | null = null;
     let projection: StockEntryReconciliationProjectionV1 | undefined;
     let cleanupFailed = false;
+    let keyUnavailable = false;
     try {
       if (externalSignal.aborted) {
         decision = { kind: "abort" };
@@ -554,13 +568,29 @@ export class ReconciliationWorker {
         try {
           let envelope: EncryptedOperationReconciliationProjection | undefined;
           try {
-            envelope = envelopeFrom(begun);
-            const binding = bindingFrom(tenantId, begun);
-            projection = decryptOperationReconciliationProjection(
-              state.ports.projectionCipher,
-              envelope,
-              binding,
-            );
+            if (
+              !hasOperationReconciliationProjectionKey(
+                state.ports.projectionCipher,
+                begun.projectionKeyId,
+              )
+            ) {
+              keyUnavailable = true;
+              decision = {
+                delaySeconds: deterministicBackoff(
+                  state.config.transientBackoff,
+                  claim.attemptCount,
+                ),
+                kind: "release",
+              };
+            } else {
+              envelope = envelopeFrom(begun);
+              const binding = bindingFrom(tenantId, begun);
+              projection = decryptOperationReconciliationProjection(
+                state.ports.projectionCipher,
+                envelope,
+                binding,
+              );
+            }
           } finally {
             envelope?.authTag.fill(0);
             envelope?.ciphertext.fill(0);
@@ -588,7 +618,11 @@ export class ReconciliationWorker {
           } else {
             try {
               permit = await state.ports.limiterTryAcquire(
-                { operationId: begun.operationId, tenantId },
+                {
+                  establishmentId: begun.establishmentId,
+                  operationId: begun.operationId,
+                  tenantId,
+                },
                 executionSignal,
               );
             } catch {
@@ -642,7 +676,7 @@ export class ReconciliationWorker {
     } finally {
       projection = undefined;
       try {
-        permit?.release();
+        await permit?.release();
       } catch {
         cleanupFailed = true;
       } finally {
@@ -683,7 +717,16 @@ export class ReconciliationWorker {
       }
       if (released) summary.released = 1;
       else summary.leaseLost = 1;
-      this.event(released ? "released" : "lease_lost", tenantId, claim);
+      if (keyUnavailable) summary.keyUnavailable = 1;
+      this.event(
+        released
+          ? keyUnavailable
+            ? "key_unavailable"
+            : "released"
+          : "lease_lost",
+        tenantId,
+        claim,
+      );
       return summary;
     }
     let completed: OperationReconciliationCompletion | null = null;

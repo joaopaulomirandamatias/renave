@@ -281,6 +281,7 @@ describe("ReconciliationWorker", () => {
       aborted: 0,
       claimed: 1,
       confirmed: 1,
+      keyUnavailable: 0,
       leaseLost: 0,
       manualReview: 0,
       released: 0,
@@ -354,6 +355,32 @@ describe("ReconciliationWorker", () => {
       expect.objectContaining({ retryDelaySeconds: 12 }),
     );
     expect(transient.database.completeManual).not.toHaveBeenCalled();
+  });
+
+  it("chave surgida após preflight libera com backoff e nunca vira manual", async () => {
+    const test = await setup({
+      observedAt: new Date("2026-11-24T10:00:30.000Z"),
+      outcome: "confirmed",
+      remoteRecordId: 7,
+      remoteState: "CONFIRMADO",
+    });
+    test.begun.projectionKeyId = "projection-key-rotated-after-preflight";
+    await expect(test.worker.runCycle()).resolves.toMatchObject({
+      keyUnavailable: 1,
+      manualReview: 0,
+      released: 1,
+    });
+    expect(test.database.release).toHaveBeenCalledWith(
+      expect.objectContaining({ retryDelaySeconds: 12 }),
+    );
+    expect(test.database.completeManual).not.toHaveBeenCalled();
+    expect(test.database.completeConfirmed).not.toHaveBeenCalled();
+    expect(test.limiter.tryAcquire).not.toHaveBeenCalled();
+    expect(test.transport.getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(test.transport.findStocksByPlate).not.toHaveBeenCalled();
+    expect(test.events).toEqual([
+      expect.objectContaining({ event: "key_unavailable" }),
+    ]);
   });
 
   it("limiter indisponível libera antes de qualquer rede e >1h vira manual", async () => {
