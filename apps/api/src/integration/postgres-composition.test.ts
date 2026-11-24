@@ -7,8 +7,13 @@ import {
   OperationRequestCipher,
 } from "@seu-renave/protected-evidence";
 import {
+  RenaveHttpError,
+  RenaveQueryConnector,
+  RenaveVehicleLookupConnector,
   restorePreparedRenaveMutation,
   type RenaveConnector,
+  type RenaveStockRecord,
+  type RenaveVehicle,
 } from "@seu-renave/renave-connector";
 import {
   createEstablishment,
@@ -39,6 +44,7 @@ import { buildCreateOperationInput } from "../renave/operation-request-builder.j
 import { PostgresRenaveLinkPreflightUseCase } from "../renave/preflight-use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "../renave/link-status-use-case.js";
 import { PostgresStockQueryUseCase } from "../renave/stock-query-use-case.js";
+import { PostgresVehicleLookupUseCase } from "../renave/vehicle-lookup-use-case.js";
 import { createPostgresTenantDirectory } from "../tenant/directory.js";
 import { PostgresTenantEstablishmentAdministration } from "../tenant/postgres-administration.js";
 
@@ -358,6 +364,147 @@ function successfulStockConnector(scenario: PreflightScenario) {
       tenantId: scenario.tenant.id,
     },
   }));
+}
+
+const VEHICLE_PLATE = "ABC1D23";
+const VEHICLE_RENAVAM = "00607701676";
+const VEHICLE_CHASSIS = "9BWZZZ377VT004251";
+
+function vehicleLookupInput(
+  scenario: PreflightScenario,
+  traceId: string,
+  subject = ADMIN,
+) {
+  return {
+    actorIp: "198.51.100.14",
+    establishmentId: scenario.store.id,
+    plate: VEHICLE_PLATE,
+    subject,
+    tenantId: scenario.tenant.id,
+    traceId,
+  };
+}
+
+function confirmedVehicleStock(
+  overrides: Partial<RenaveStockRecord> = {},
+): RenaveStockRecord {
+  return {
+    codigoSegurancaCrv: "12345678901",
+    estado: "CONFIRMADO",
+    id: 81,
+    numeroCrv: "123456789012",
+    placa: VEHICLE_PLATE,
+    renavam: VEHICLE_RENAVAM,
+    tipoCrv: "DIGITAL",
+    ...overrides,
+  };
+}
+
+function vehicleLookupHarness(
+  scenario: PreflightScenario,
+  options: {
+    stockRecords?: readonly RenaveStockRecord[];
+    vehicle?: RenaveVehicle;
+    vehicleError?: Error;
+  } = {},
+) {
+  const getAuthenticatedClient = vi.fn(async () => ({
+    cnpj: scenario.store.cnpj,
+    cnpjIntegradora: INTEGRATOR_CNPJ,
+  }));
+  const findStocksByPlate = vi.fn(async () =>
+    Array.from(options.stockRecords ?? [confirmedVehicleStock()]),
+  );
+  const getVehicleByPlate = vi.fn(async () => {
+    if (options.vehicleError) throw options.vehicleError;
+    return (
+      options.vehicle ?? {
+        chassi: VEHICLE_CHASSIS,
+        placa: VEHICLE_PLATE,
+        renavam: VEHICLE_RENAVAM,
+        restricoes: [{ codigoTipo: "01", tipo: "Administrativa" }],
+        veiculoAcabado: true,
+      }
+    );
+  });
+  const stockConnector = new RenaveQueryConnector({
+    environment: "homologation",
+    findStocksByPlate,
+    getAuthenticatedClient,
+    getVehicleEligibility: vi.fn(async () => {
+      throw new Error("capacidade não utilizada no ensaio de veículo");
+    }),
+  });
+  const vehicleConnector = new RenaveVehicleLookupConnector({
+    environment: "homologation",
+    getAuthenticatedClient,
+    getVehicleByPlate,
+  });
+  const useCase = new PostgresVehicleLookupUseCase({
+    certificateThumbprintSha256: "a".repeat(64),
+    cipher: new EvidenceCipher({
+      activeKeyId: "vehicle-lookup-integration-key",
+      keys: new Map([
+        ["vehicle-lookup-integration-key", Buffer.alloc(32, 0x5a)],
+      ]),
+    }),
+    integratorCnpj: INTEGRATOR_CNPJ,
+    pool: appPool,
+    stockConnector,
+    vehicleConnector,
+  });
+  return {
+    findStocksByPlate,
+    getAuthenticatedClient,
+    getVehicleByPlate,
+    useCase,
+  };
+}
+
+async function vehicleEvidenceState(scenario: PreflightScenario) {
+  const { rows } = await adminPool.query<{
+    failure_code: string | null;
+    request_clear_absent: boolean;
+    response_ciphertext_present: boolean;
+    response_clear_absent: boolean;
+    status: string;
+  }>(
+    `select status, failure_code,
+            response_ciphertext is not null as response_ciphertext_present,
+            position(convert_to($3, 'UTF8') in request_ciphertext) = 0
+              as request_clear_absent,
+            response_ciphertext is null
+              or (
+                position(convert_to($4, 'UTF8') in response_ciphertext) = 0
+                and position(convert_to($5, 'UTF8') in response_ciphertext) = 0
+                and position(convert_to($6, 'UTF8') in response_ciphertext) = 0
+              ) as response_clear_absent
+       from renave.protected_evidence
+      where tenant_id = $1
+        and establishment_id = $2
+        and action = 'renave.vehicle.read'
+      order by created_at`,
+    [
+      scenario.tenant.id,
+      scenario.store.id,
+      VEHICLE_PLATE,
+      VEHICLE_RENAVAM,
+      VEHICLE_CHASSIS,
+      "Administrativa",
+    ],
+  );
+  return rows;
+}
+
+async function vehicleAuditOutcomes(
+  scenario: PreflightScenario,
+): Promise<string[]> {
+  const audits = await withTenant(appPool, scenario.tenant.id, (client) =>
+    listAuditEvents(client),
+  );
+  return audits
+    .filter(({ action }) => action === "renave.vehicle.read")
+    .map(({ outcome }) => outcome);
 }
 
 beforeAll(async () => {
@@ -1324,6 +1471,200 @@ describe("composição PostgreSQL real da API", () => {
         },
       ]);
       expect(await stockAuditOutcomes(scenario)).toEqual(["attempted"]);
+    } finally {
+      await adminPool.query(
+        `drop trigger if exists ${triggerName} on renave.audit_event`,
+      );
+      await adminPool.query(`drop function if exists ${functionName}()`);
+    }
+  });
+
+  it("compõe consulta de veículo com PostgreSQL real e mantém identificadores somente cifrados", async () => {
+    const scenario = await createPreflightScenario("vehicle-success");
+    await prepareCredentialLink(scenario, "confirmed");
+    const harness = vehicleLookupHarness(scenario);
+
+    await expect(
+      harness.useCase.execute(
+        vehicleLookupInput(scenario, "vehicle-success-trace"),
+      ),
+    ).resolves.toEqual({
+      chassi: VEHICLE_CHASSIS,
+      placa: VEHICLE_PLATE,
+      renavam: VEHICLE_RENAVAM,
+      restricoes: [{ codigoTipo: "01", tipo: "Administrativa" }],
+      veiculoAcabado: true,
+    });
+    expect(harness.findStocksByPlate).toHaveBeenCalledOnce();
+    expect(harness.getVehicleByPlate).toHaveBeenCalledOnce();
+    expect(harness.getAuthenticatedClient).toHaveBeenCalledTimes(2);
+    expect(await vehicleEvidenceState(scenario)).toEqual([
+      {
+        failure_code: null,
+        request_clear_absent: true,
+        response_ciphertext_present: true,
+        response_clear_absent: true,
+        status: "completed",
+      },
+    ]);
+    expect(await vehicleAuditOutcomes(scenario)).toEqual([
+      "attempted",
+      "succeeded",
+    ]);
+    const audits = await withTenant(appPool, scenario.tenant.id, (client) =>
+      listAuditEvents(client),
+    );
+    const publicAudit = JSON.stringify(
+      audits.filter(({ action }) => action === "renave.vehicle.read"),
+    );
+    for (const sentinel of [
+      VEHICLE_PLATE,
+      VEHICLE_RENAVAM,
+      VEHICLE_CHASSIS,
+      "Administrativa",
+    ]) {
+      expect(publicAudit).not.toContain(sentinel);
+    }
+  });
+
+  it("nega vínculo, BOLA e tenant divergente antes de qualquer rede", async () => {
+    const unlinked = await createPreflightScenario("vehicle-unlinked");
+    const unlinkedHarness = vehicleLookupHarness(unlinked);
+    await expect(
+      unlinkedHarness.useCase.execute(
+        vehicleLookupInput(unlinked, "vehicle-unlinked-trace"),
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_LINK_NOT_READY" });
+    expect(unlinkedHarness.getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(await vehicleEvidenceState(unlinked)).toEqual([]);
+
+    const scoped = await createPreflightScenario("vehicle-bola");
+    await prepareCredentialLink(scoped, "confirmed");
+    const bolaHarness = vehicleLookupHarness(scoped);
+    await expect(
+      bolaHarness.useCase.execute(
+        vehicleLookupInput(scoped, "vehicle-bola-trace", OPERATOR),
+      ),
+    ).rejects.toMatchObject({ code: "AUTHORIZATION_DENIED" });
+    expect(bolaHarness.getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(await vehicleEvidenceState(scoped)).toEqual([]);
+
+    const divergentHarness = vehicleLookupHarness(scoped);
+    await expect(
+      divergentHarness.useCase.execute({
+        ...vehicleLookupInput(scoped, "vehicle-tenant-divergent-trace"),
+        tenantId: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ code: "AUTHORIZATION_DENIED" });
+    expect(divergentHarness.getAuthenticatedClient).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["estoque ausente", [] as RenaveStockRecord[], undefined],
+    [
+      "estoque cancelado",
+      [
+        confirmedVehicleStock({
+          cancelamentoEstoque: { motivo: "cancelado" },
+        }),
+      ],
+      undefined,
+    ],
+    [
+      "estoque ambíguo",
+      [confirmedVehicleStock(), confirmedVehicleStock({ id: 82 })],
+      undefined,
+    ],
+    [
+      "HTTP 404",
+      [confirmedVehicleStock()],
+      new RenaveHttpError(404, "get-vehicle-by-plate"),
+    ],
+    [
+      "HTTP 422",
+      [confirmedVehicleStock()],
+      new RenaveHttpError(422, "get-vehicle-by-plate"),
+    ],
+  ] as const)(
+    "uniformiza %s como veículo indisponível",
+    async (label, stockRecords, vehicleError) => {
+      const scenario = await createPreflightScenario(
+        `vehicle-unavailable-${label.replaceAll(/[^a-z0-9]+/giu, "-").toLowerCase()}`,
+      );
+      await prepareCredentialLink(scenario, "confirmed");
+      const harness = vehicleLookupHarness(scenario, {
+        stockRecords,
+        ...(vehicleError === undefined ? {} : { vehicleError }),
+      });
+
+      await expect(
+        harness.useCase.execute(
+          vehicleLookupInput(scenario, `vehicle-unavailable-${label}`),
+        ),
+      ).rejects.toMatchObject({ code: "VEHICLE_NOT_AVAILABLE" });
+      expect(await vehicleAuditOutcomes(scenario)).toEqual([
+        "attempted",
+        "rejected",
+      ]);
+      expect(await vehicleEvidenceState(scenario)).toEqual([
+        {
+          failure_code: "VEHICLE_NOT_AVAILABLE",
+          request_clear_absent: true,
+          response_ciphertext_present: false,
+          response_clear_absent: true,
+          status: "failed",
+        },
+      ]);
+      if (stockRecords.length === 1 && !stockRecords[0]!.cancelamentoEstoque) {
+        expect(harness.getVehicleByPlate).toHaveBeenCalledOnce();
+      } else {
+        expect(harness.getVehicleByPlate).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("reverte evidência do veículo quando a auditoria final falha", async () => {
+    const scenario = await createPreflightScenario("vehicle-atomic-rollback");
+    await prepareCredentialLink(scenario, "confirmed");
+    const functionName = "renave.test_fail_vehicle_success_audit";
+    const triggerName = "test_fail_vehicle_success_audit";
+    await adminPool.query(
+      `create function ${functionName}()
+       returns trigger
+       language plpgsql
+       as $$
+       begin
+         if new.action = 'renave.vehicle.read' and new.outcome = 'succeeded' then
+           raise exception 'falha local induzida na auditoria final';
+         end if;
+         return new;
+       end
+       $$`,
+    );
+    await adminPool.query(
+      `create trigger ${triggerName}
+       before insert on renave.audit_event
+       for each row execute function ${functionName}()`,
+    );
+
+    try {
+      const harness = vehicleLookupHarness(scenario);
+      await expect(
+        harness.useCase.execute(
+          vehicleLookupInput(scenario, "vehicle-rollback-trace"),
+        ),
+      ).rejects.toMatchObject({ code: "P0001" });
+      expect(harness.getVehicleByPlate).toHaveBeenCalledOnce();
+      expect(await vehicleEvidenceState(scenario)).toEqual([
+        {
+          failure_code: null,
+          request_clear_absent: true,
+          response_ciphertext_present: false,
+          response_clear_absent: true,
+          status: "pending",
+        },
+      ]);
+      expect(await vehicleAuditOutcomes(scenario)).toEqual(["attempted"]);
     } finally {
       await adminPool.query(
         `drop trigger if exists ${triggerName} on renave.audit_event`,
