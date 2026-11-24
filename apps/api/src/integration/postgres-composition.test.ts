@@ -30,7 +30,7 @@ import {
   transitionCredentialServiceScope,
   transitionEstablishmentRegulatoryJurisdiction,
   withTenant,
-  type CreateOperationInput,
+  type CreateHeldLocalOperationInput,
   type CredentialLinkStatus,
   type CredentialServiceNature,
   type Establishment,
@@ -83,7 +83,7 @@ let otherStore: Establishment;
 
 async function createLegacyOperationForTest(
   client: TenantClient,
-  operation: CreateOperationInput,
+  operation: CreateHeldLocalOperationInput,
 ): Promise<string> {
   const { rows } = await client.query<{ operation_id: string }>(
     `select operation_id
@@ -120,6 +120,33 @@ async function createLegacyOperationForTest(
   );
   const operationId = rows[0]?.operation_id;
   if (!operationId) throw new Error("Fixture de operação legada não criada.");
+  await client.query(
+    `insert into renave.operation_authorization_binding(
+       tenant_id,operation_id,service_nature,jurisdiction_uf,
+       jurisdiction_generation,scope_generation,credential_link_version,
+       operator_profile_id,operator_profile_version,
+       establishment_profile_id,establishment_profile_version)
+     select renave.current_tenant_id(),$1,'establishment',scope.jurisdiction_uf,
+       jurisdiction.generation,scope.generation,link.version,$2,$3,$4,$5
+     from renave.operation item
+     join renave.credential_link link on link.tenant_id=item.tenant_id
+       and link.establishment_id=item.establishment_id
+     join renave.credential_service_scope scope on scope.tenant_id=item.tenant_id
+       and scope.establishment_id=item.establishment_id
+       and scope.service_nature='establishment'
+     join renave.establishment_regulatory_jurisdiction jurisdiction
+       on jurisdiction.tenant_id=item.tenant_id
+       and jurisdiction.establishment_id=item.establishment_id
+       and jurisdiction.jurisdiction_uf=scope.jurisdiction_uf
+     where item.id=$1`,
+    [
+      operationId,
+      operation.operatorProfileId,
+      operation.operatorProfileVersion,
+      operation.establishmentProfileId,
+      operation.establishmentProfileVersion,
+    ],
+  );
   return operationId;
 }
 
@@ -159,6 +186,88 @@ async function createPreflightScenario(
     grantTenantUserAccess(client, ADMIN, [{ role: "tenant_admin" }]),
   );
   return { store, tenant: scenarioTenant };
+}
+
+async function seedVerifiedOperationPrincipalsForComposition(
+  client: TenantClient,
+  input: { establishmentId: string; label: string; subject: string },
+): Promise<{
+  establishmentProfileId: string;
+  establishmentProfileVersion: string;
+  operatorProfileId: string;
+  operatorProfileVersion: string;
+}> {
+  await grantTenantUserAccess(client, input.subject, [
+    {
+      establishmentIds: [input.establishmentId],
+      role: "renave_operator",
+    },
+  ]);
+  const operator = await client.query<{ id: string; version: string }>(
+    `insert into renave.operator_identity_profile (
+       tenant_id,subject,hmac_key_id,identity_hmac,
+       envelope_schema_version,envelope_key_id,envelope_nonce,
+       envelope_auth_tag,envelope_ciphertext,envelope_aad_sha256,
+       status,verification_source,source_evidence_digest,
+       changed_by_subject_hash,verified_by_subject_hash,verified_at
+     ) values (
+       renave.current_tenant_id(),$1,'cpf-hmac-v1',$2,
+       1,'cpf-envelope-v1',$3,$4,$5,$6,
+       'verified','regulated_provider',$7,$8,$9,
+       pg_catalog.clock_timestamp()
+     ) returning id,version::text`,
+    [
+      input.subject,
+      createHash("sha256").update(`operator-hmac:${input.label}`).digest(),
+      Buffer.alloc(12, 1),
+      Buffer.alloc(16, 2),
+      Buffer.alloc(128, 3),
+      createHash("sha256").update(`operator-aad:${input.label}`).digest(),
+      createHash("sha256").update(`operator-evidence:${input.label}`).digest(),
+      createHash("sha256").update(`operator-changer:${input.label}`).digest(),
+      createHash("sha256").update(`operator-verifier:${input.label}`).digest(),
+    ],
+  );
+  const establishment = await client.query<{
+    id: string;
+    version: string;
+  }>(
+    `insert into renave.establishment_renave_profile (
+       tenant_id,establishment_id,hmac_key_id,email_hmac,
+       envelope_schema_version,envelope_key_id,envelope_nonce,
+       envelope_auth_tag,envelope_ciphertext,envelope_aad_sha256,
+       status,verification_source,source_evidence_digest,
+       changed_by_subject_hash,verified_by_subject_hash,verified_at
+     ) values (
+       renave.current_tenant_id(),$1,'email-hmac-v1',$2,
+       1,'email-envelope-v1',$3,$4,$5,$6,
+       'verified','mailbox_challenge',$7,$8,$9,
+       pg_catalog.clock_timestamp()
+     ) returning id,version::text`,
+    [
+      input.establishmentId,
+      createHash("sha256").update(`establishment-hmac:${input.label}`).digest(),
+      Buffer.alloc(12, 4),
+      Buffer.alloc(16, 5),
+      Buffer.alloc(512, 6),
+      createHash("sha256").update(`establishment-aad:${input.label}`).digest(),
+      createHash("sha256")
+        .update(`establishment-evidence:${input.label}`)
+        .digest(),
+      createHash("sha256")
+        .update(`establishment-changer:${input.label}`)
+        .digest(),
+      createHash("sha256")
+        .update(`establishment-verifier:${input.label}`)
+        .digest(),
+    ],
+  );
+  return {
+    establishmentProfileId: establishment.rows[0]!.id,
+    establishmentProfileVersion: establishment.rows[0]!.version,
+    operatorProfileId: operator.rows[0]!.id,
+    operatorProfileVersion: operator.rows[0]!.version,
+  };
 }
 
 function createPreflightUseCase(
@@ -893,6 +1002,23 @@ describe("composição PostgreSQL real da API", () => {
   });
 
   it("compõe builder, persistência, UNKNOWN/recovery e reconciliação cifrada", async () => {
+    const subject = "oidc|postgres-composition";
+    const cnpjBase = "431234560001";
+    const compositionStore = await withTenant(appPool, tenant.id, (client) =>
+      createEstablishment(client, {
+        cnpj: `${cnpjBase}${computeCnpjCheckDigits(cnpjBase)}`,
+        tradeName: "Loja Composição de Operação",
+      }),
+    );
+    const compositionScenario = { store: compositionStore, tenant };
+    await prepareCredentialLink(compositionScenario, "enabled");
+    const principals = await withTenant(migratorPool, tenant.id, (client) =>
+      seedVerifiedOperationPrincipalsForComposition(client, {
+        establishmentId: compositionStore.id,
+        label: "postgres-composition",
+        subject,
+      }),
+    );
     const requestCipher = new OperationRequestCipher({
       activeKeyId: "composition-request-key",
       environment: "homologation",
@@ -944,16 +1070,16 @@ describe("composição PostgreSQL real da API", () => {
           .digest(),
         correlationId: randomUUID(),
         environment: "homologation",
-        establishmentId: operatorStore.id,
-        establishmentProfileId: "66666666-6666-4666-8666-666666666666",
-        establishmentProfileVersion: "11",
+        establishmentId: compositionStore.id,
+        establishmentProfileId: principals.establishmentProfileId,
+        establishmentProfileVersion: principals.establishmentProfileVersion,
         idempotencyKeyDigest: createHash("sha256")
           .update(`idempotency:${suffix}`)
           .digest(),
-        operatorProfileId: "55555555-5555-4555-8555-555555555555",
-        operatorProfileVersion: "7",
+        operatorProfileId: principals.operatorProfileId,
+        operatorProfileVersion: principals.operatorProfileVersion,
         prepared,
-        subject: "oidc|postgres-composition",
+        subject,
         tenantId: tenant.id,
         vehicleKeyDigest: createHash("sha256").update(plate).digest(),
       });

@@ -26,6 +26,10 @@ import { provisionTenant, type Tenant } from "../../src/tenants.js";
 import { operationProjectionFields } from "../helpers/operation-projection.js";
 
 const urls = inject("dbUrls");
+const PROMOTION_ENVIRONMENT = "homologation" as const;
+const PROMOTION_DATABASE_ID = "00000000-0000-4000-8000-000000000074";
+const SIGNED_PROMOTION_SIGNATURE =
+  "renave_promotion.promote_held_local_operation(uuid,text,uuid,uuid,timestamptz,timestamptz,timestamptz,text,text,bytea,bytea,bytea,bytea,bytea,text,text,bigint,bigint,bigint,uuid,bigint,uuid,bigint)";
 
 interface ProfileBinding {
   establishmentProfileId: string;
@@ -320,18 +324,73 @@ async function promote(
   target: Fixture,
   decision = promotionDecision(target),
 ): Promise<PromotionRow> {
+  const parameters = await signedPromotionParameters(target, decision);
   return withTenant(promoterPool, target.tenant.id, async (client) => {
     const { rows } = await client.query<PromotionRow>(
-      "select * from renave_admin.promote_held_local_operation($1,$2,$3,$4)",
-      [
-        target.operationId,
-        decision.decisionTicketDigest,
-        decision.evidenceDigest,
-        decision.changedByDigest,
-      ],
+      `select * from renave_promotion.promote_held_local_operation(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+        $18,$19,$20,$21,$22,$23)`,
+      parameters,
     );
     return rows[0]!;
   });
+}
+
+async function signedPromotionParameters(
+  target: Fixture,
+  decision = promotionDecision(target),
+): Promise<unknown[]> {
+  const binding = await withTenant(migratorPool, target.tenant.id, (client) =>
+    client.query<{
+      credential_link_version: string | null;
+      created_at: Date;
+      establishment_profile_id: string | null;
+      establishment_profile_version: string | null;
+      jurisdiction_generation: string | null;
+      jurisdiction_uf: string | null;
+      operator_profile_id: string | null;
+      operator_profile_version: string | null;
+      scope_generation: string | null;
+      service_nature: string | null;
+    }>(
+      `select b.credential_link_version::text,o.created_at,
+        b.establishment_profile_id,b.establishment_profile_version::text,
+        b.jurisdiction_generation::text,b.jurisdiction_uf,
+        b.operator_profile_id,b.operator_profile_version::text,
+        b.scope_generation::text,b.service_nature
+       from renave.operation o left join renave.operation_authorization_binding b
+         on b.tenant_id=o.tenant_id and b.operation_id=o.id where o.id=$1`,
+      [target.operationId],
+    ),
+  );
+  const item = binding.rows[0]!;
+  const issuedAt = item.created_at;
+  return [
+    target.operationId,
+    PROMOTION_ENVIRONMENT,
+    PROMOTION_DATABASE_ID,
+    target.operationId,
+    issuedAt,
+    issuedAt,
+    new Date(issuedAt.getTime() + 600_000),
+    "held-local-test-key",
+    "promotion/v1",
+    digest(`authorization-binding:${target.operationId}`),
+    digest("held-local-test-workload"),
+    decision.decisionTicketDigest,
+    decision.evidenceDigest,
+    decision.changedByDigest,
+    item.service_nature ?? "establishment",
+    item.jurisdiction_uf ?? "PA",
+    item.jurisdiction_generation ?? "1",
+    item.scope_generation ?? "1",
+    item.credential_link_version ?? "1",
+    item.operator_profile_id ?? target.binding.operatorProfileId,
+    item.operator_profile_version ?? target.binding.operatorProfileVersion,
+    item.establishment_profile_id ?? target.binding.establishmentProfileId,
+    item.establishment_profile_version ??
+      target.binding.establishmentProfileVersion,
+  ];
 }
 
 async function state(target: Fixture): Promise<PersistedState> {
@@ -414,7 +473,7 @@ async function waitForBlockedQuery(pattern: string): Promise<void> {
   throw new Error(`query did not block: ${pattern}`);
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   adminPool = createPool(urls.admin, { max: 2 });
   appPool = createPool(urls.app, { max: 16 });
   migratorPool = createPool(urls.migrator, { max: 8 });
@@ -425,6 +484,15 @@ beforeAll(() => {
   scopeProvisionerPool = createPool(urls.credentialScopeProvisioner, {
     max: 4,
   });
+  const identity = await migratorPool.query(
+    "select environment,logical_database_id from renave_promotion.operation_promotion_identity",
+  );
+  if (identity.rows.length === 0) {
+    await migratorPool.query(
+      "select renave_promotion.configure_operation_promotion_identity($1,$2)",
+      [PROMOTION_ENVIRONMENT, PROMOTION_DATABASE_ID],
+    );
+  }
 });
 
 afterAll(async () => {
@@ -917,11 +985,11 @@ describe("held-local regulatory promotion", () => {
     }>(
       `select
         has_function_privilege('renave_app',
-          'renave_admin.promote_held_local_operation(uuid,bytea,bytea,bytea)','execute') app_executes,
+          $1,'execute') app_executes,
         has_function_privilege('renave_operation_promoter',
-          'renave_admin.promote_held_local_operation(uuid,bytea,bytea,bytea)','execute') promoter_executes,
+          $1,'execute') promoter_executes,
         has_function_privilege('public',
-          'renave_admin.promote_held_local_operation(uuid,bytea,bytea,bytea)','execute') public_executes,
+          $1,'execute') public_executes,
         (select rolbypassrls from pg_roles
           where rolname='renave_operation_promoter') promoter_bypassrls,
         (select count(*)::int from pg_auth_members membership
@@ -929,6 +997,7 @@ describe("held-local regulatory promotion", () => {
             where rolname='renave_operation_promoter')
              or membership.member=(select oid from pg_roles
             where rolname='renave_operation_promoter')) promoter_memberships`,
+      [SIGNED_PROMOTION_SIGNATURE],
     );
     expect(rows[0]).toEqual({
       app_executes: false,
@@ -954,16 +1023,14 @@ describe("held-local regulatory promotion", () => {
     const target = await fixture("tenant-a");
     const other = await fixture("tenant-b");
     const before = await state(target);
+    const parameters = await signedPromotionParameters(target);
     await expect(
       withTenant(promoterPool, other.tenant.id, (client) =>
         client.query(
-          "select * from renave_admin.promote_held_local_operation($1,$2,$3,$4)",
-          [
-            target.operationId,
-            promotionDecision(target).decisionTicketDigest,
-            promotionDecision(target).evidenceDigest,
-            promotionDecision(target).changedByDigest,
-          ],
+          `select * from renave_promotion.promote_held_local_operation(
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+            $18,$19,$20,$21,$22,$23)`,
+          parameters,
         ),
       ),
     ).rejects.toMatchObject({ code: "55000" });

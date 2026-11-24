@@ -413,6 +413,198 @@ jobs:
             find /tmp/reconciliation-worker-rootfs -depth -delete
           fi
 
+  operation-promoter-image-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.1
+
+      - name: Validate operation promoter release policy
+        run: |
+          node --test scripts/check-operation-promoter-release.test.mjs \
+            apps/operation-promoter/scripts/runtime-imports.test.mjs
+          node scripts/check-operation-promoter-release.mjs
+
+      - name: Build local promoter image
+        run: >-
+          docker build
+          --no-cache
+          --tag seu-renave/operation-promoter:ci
+          --file apps/operation-promoter/Dockerfile
+          .
+
+      - name: Inspect immutable promoter runtime
+        run: |
+          set -euo pipefail
+          docker image inspect seu-renave/operation-promoter:ci \
+            > /tmp/operation-promoter-image.json
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+
+          const [image] = JSON.parse(
+            readFileSync("/tmp/operation-promoter-image.json", "utf8"),
+          );
+          assert.match(image.Config.User, /^[1-9][0-9]*(?::[1-9][0-9]*)?$/);
+          assert.deepEqual(image.Config.Entrypoint, [
+            "/nodejs/bin/node",
+            "dist/main.js",
+          ]);
+          assert.deepEqual(image.Config.Cmd ?? null, null);
+          assert.equal(image.Config.Healthcheck ?? null, null);
+          const environment = new Map(
+            (image.Config.Env ?? []).map((item) => {
+              const separator = item.indexOf("=");
+              return [item.slice(0, separator), item.slice(separator + 1)];
+            }),
+          );
+          assert.equal(environment.get("NODE_ENV"), "production");
+          for (const forbidden of [
+            "DATABASE_OPERATION_PROMOTER_URL",
+            "DATABASE_URL",
+            "OPERATION_PROMOTER_DATABASE_CA",
+            "OPERATION_PROMOTER_DECISION",
+            "OPERATION_PROMOTER_DECISION_KEYRING",
+            "OPERATION_PROMOTER_TARGET",
+          ]) {
+            assert.equal(environment.has(forbidden), false);
+          }
+          NODE
+
+          docker history --no-trunc --format '{{.CreatedBy}}' \
+            seu-renave/operation-promoter:ci \
+            > /tmp/operation-promoter-history.txt
+          if rg -n -i 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|RENAVE_RELEASE_SENTINEL_DO_NOT_SHIP' /tmp/operation-promoter-history.txt; then
+            exit 1
+          fi
+
+          docker create --name operation-promoter-rootfs \
+            seu-renave/operation-promoter:ci >/dev/null
+          docker export operation-promoter-rootfs \
+            --output /tmp/operation-promoter-rootfs.tar
+          workdir="$(docker image inspect --format '{{.Config.WorkingDir}}' seu-renave/operation-promoter:ci)"
+          workdir="${workdir#/}"
+          tar --list --file /tmp/operation-promoter-rootfs.tar \
+            > /tmp/operation-promoter-files.txt
+          if rg -n '^(?:bin/(?:sh|bash)|usr/bin/(?:apt|apt-get|dpkg)|usr/local/bin/(?:npm|npx|pnpm|corepack)|nodejs/bin/(?:npm|npx|pnpm|corepack))$' /tmp/operation-promoter-files.txt; then
+            exit 1
+          fi
+          if rg -n -i '(^|/)(\.env(?:\.|$)|\.npmrc$|[^/]+\.(?:key|pem|p12|pfx))' /tmp/operation-promoter-files.txt; then
+            exit 1
+          fi
+          rootfs=/tmp/operation-promoter-rootfs
+          mkdir --parents "$rootfs"
+          tar --extract --file /tmp/operation-promoter-rootfs.tar \
+            --directory "$rootfs"
+          application_root="$rootfs/$workdir"
+          if find "$application_root" -type f \
+            \( -name '*.ts' -o -name '*.tsx' -o -name '*.mts' -o -name '*.cts' \
+            -o -name '*.map' -o -name '*.test.*' -o -name '*.spec.*' \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if find "$application_root" -type d \
+            \( -name src -o -name test -o -name tests -o -name __tests__ \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if find "$application_root" -type d \
+            \( -path '*/node_modules/@seu-renave/renave-connector' \
+            -o -path '*/node_modules/@seu-renave/api' \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if find "$application_root/node_modules/.pnpm" -type f \
+            -path '*/node_modules/@seu-renave/db/dist/*' \
+            \( -name 'api-runtime.js' -o -name 'bootstrap.js' -o -name 'cli.js' \
+            -o -name 'local-defaults.js' -o -name 'migrate.js' \
+            -o -name 'operation-worker.js' \
+            -o -name 'operation-reconciliation.js' \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if rg -uuu -l -i 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|RENAVE_RELEASE_SENTINEL_DO_NOT_SHIP' "$application_root"; then
+            exit 1
+          fi
+
+      - name: Generate and validate promoter SBOM
+        run: |
+          set -euo pipefail
+          syft_image='ghcr.io/anchore/syft:v1.57.2-nonroot@sha256:00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3'
+          docker pull "$syft_image"
+          docker save seu-renave/operation-promoter:ci \
+            --output /tmp/operation-promoter-image.tar
+          chmod 0444 /tmp/operation-promoter-image.tar
+          docker run --rm \
+            --network none \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g \
+            --tmpfs /home/nonroot/.cache:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --env SYFT_CHECK_FOR_APP_UPDATE=false \
+            --volume /tmp/operation-promoter-image.tar:/scan/image.tar:ro \
+            "$syft_image" \
+            scan docker-archive:/scan/image.tar --output cyclonedx-json \
+            > /tmp/operation-promoter-sbom.cdx.json
+          node scripts/check-image-sbom.mjs \
+            /tmp/operation-promoter-sbom.cdx.json
+
+      - name: Run fail-closed image without mounts
+        run: |
+          set -euo pipefail
+          set +e
+          docker run --name operation-promoter-smoke \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            seu-renave/operation-promoter:ci \
+            > /tmp/operation-promoter-stdout \
+            2> /tmp/operation-promoter-stderr
+          status="$?"
+          set -e
+          test "$status" -eq 1
+          test ! -s /tmp/operation-promoter-stdout
+          test "$(wc -l < /tmp/operation-promoter-stderr)" -eq 1
+          test "$(cat /tmp/operation-promoter-stderr)" = \
+            '{"schemaVersion":1,"job":"operation-promoter","errorCode":"OPERATION_PROMOTER_CONFIG_INVALID","outcome":"failed"}'
+          test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' operation-promoter-smoke)" = none
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' operation-promoter-smoke)" = true
+          test "$(docker inspect --format '{{.HostConfig.Privileged}}' operation-promoter-smoke)" = false
+          docker inspect --format '{{json .HostConfig.CapDrop}}' operation-promoter-smoke | \
+            jq -e 'index("ALL") != null'
+          docker inspect --format '{{json .HostConfig.SecurityOpt}}' operation-promoter-smoke | \
+            jq -e 'index("no-new-privileges") != null'
+
+      - name: Remove local promoter smoke artifacts
+        if: always()
+        run: |
+          docker rm --force operation-promoter-smoke operation-promoter-rootfs 2>/dev/null || true
+          docker image rm --force seu-renave/operation-promoter:ci 2>/dev/null || true
+          rm -f /tmp/operation-promoter-image.json \
+            /tmp/operation-promoter-image.tar \
+            /tmp/operation-promoter-history.txt \
+            /tmp/operation-promoter-rootfs.tar \
+            /tmp/operation-promoter-files.txt \
+            /tmp/operation-promoter-sbom.cdx.json \
+            /tmp/operation-promoter-stdout \
+            /tmp/operation-promoter-stderr
+          if test -d /tmp/operation-promoter-rootfs; then
+            chmod --recursive u+w /tmp/operation-promoter-rootfs
+            find /tmp/operation-promoter-rootfs -depth -delete
+          fi
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -488,44 +488,137 @@ export class OperationPromotionDeniedError extends Error {
 }
 
 export interface PromoteHeldLocalOperationResult {
-  operation: OperationRecord;
+  operationId: string;
+  operationStatus: "PENDING_SEND";
   outboxId: string;
   promotedAt: Date;
   replayed: boolean;
 }
 
 export interface PromoteHeldLocalOperationInput {
+  artifactDigest: Buffer;
+  authorizationBindingDigest: Buffer;
   changedByDigest: Buffer;
-  decisionTicketDigest: Buffer;
-  evidenceDigest: Buffer;
+  credentialLinkVersion: string;
+  decisionId: string;
+  environment: "homologation" | "production";
+  establishmentProfileId: string;
+  establishmentProfileVersion: string;
+  evidenceManifestDigest: Buffer;
+  executorWorkloadDigest: Buffer;
+  expiresAt: Date;
+  issuerKeyId: string;
+  issuedAt: Date;
+  jurisdictionGeneration: string;
+  jurisdictionUf: string;
+  logicalDatabaseId: string;
+  notBefore: Date;
   operationId: string;
+  operatorProfileId: string;
+  operatorProfileVersion: string;
+  policyVersion: string;
+  scopeGeneration: string;
+  serviceNature: "establishment" | "ite" | "manufacturer";
 }
 
 interface PromotionRow {
   operation_id: string;
+  operation_status: string;
   outbox_id: string;
   promoted_at: Date;
   replayed: boolean;
+}
+
+const OPERATION_PROMOTION_KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
+const OPERATION_PROMOTION_POLICY = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,63}$/u;
+const OPERATION_PROMOTION_UF =
+  /^(?:A[CLMP]|BA|CE|DF|ES|GO|MA|M[GS]|P[ABREI]|R[JNSOR]|S[CEP]|TO)$/u;
+
+function positivePgBigint(value: string): boolean {
+  try {
+    return (
+      /^[1-9][0-9]*$/u.test(value) &&
+      BigInt(value) <= 9_223_372_036_854_775_807n
+    );
+  } catch {
+    return false;
+  }
+}
+
+function validPromotionTime(value: Date): boolean {
+  return value instanceof Date && Number.isFinite(value.getTime());
 }
 
 export async function promoteHeldLocalOperation(
   client: TenantClient,
   input: PromoteHeldLocalOperationInput,
 ): Promise<PromoteHeldLocalOperationResult> {
-  if (!input || !isUuid(input.operationId)) throw new OperationInputError();
-  const decisionTicketDigest = copyBuffer(input.decisionTicketDigest, 32);
-  const evidenceDigest = copyBuffer(input.evidenceDigest, 32);
+  if (
+    !input ||
+    !isUuid(input.operationId) ||
+    !isUuid(input.logicalDatabaseId) ||
+    !isUuid(input.decisionId) ||
+    !isUuid(input.operatorProfileId) ||
+    !isUuid(input.establishmentProfileId) ||
+    !["homologation", "production"].includes(input.environment) ||
+    !["establishment", "ite", "manufacturer"].includes(input.serviceNature) ||
+    !OPERATION_PROMOTION_UF.test(input.jurisdictionUf) ||
+    !OPERATION_PROMOTION_KEY_ID.test(input.issuerKeyId) ||
+    !OPERATION_PROMOTION_POLICY.test(input.policyVersion) ||
+    !positivePgBigint(input.jurisdictionGeneration) ||
+    !positivePgBigint(input.scopeGeneration) ||
+    !positivePgBigint(input.credentialLinkVersion) ||
+    !positivePgBigint(input.operatorProfileVersion) ||
+    !positivePgBigint(input.establishmentProfileVersion) ||
+    !validPromotionTime(input.issuedAt) ||
+    !validPromotionTime(input.notBefore) ||
+    !validPromotionTime(input.expiresAt) ||
+    input.issuedAt.getTime() > input.notBefore.getTime() ||
+    input.notBefore.getTime() >= input.expiresAt.getTime() ||
+    input.expiresAt.getTime() - input.issuedAt.getTime() > 86_400_000
+  ) {
+    throw new OperationInputError();
+  }
+  const authorizationBindingDigest = copyBuffer(
+    input.authorizationBindingDigest,
+    32,
+  );
+  const executorWorkloadDigest = copyBuffer(input.executorWorkloadDigest, 32);
+  const artifactDigest = copyBuffer(input.artifactDigest, 32);
+  const evidenceManifestDigest = copyBuffer(input.evidenceManifestDigest, 32);
   const changedByDigest = copyBuffer(input.changedByDigest, 32);
   let row: PromotionRow | undefined;
   try {
     const result = await client.query<PromotionRow>(
       `select operation_id,outbox_id,promoted_at,replayed
-         from renave_admin.promote_held_local_operation($1,$2,$3,$4)`,
+         ,operation_status
+         from renave_promotion.promote_held_local_operation(
+           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+           $18,$19,$20,$21,$22,$23)`,
       [
         input.operationId.toLowerCase(),
-        decisionTicketDigest,
-        evidenceDigest,
+        input.environment,
+        input.logicalDatabaseId.toLowerCase(),
+        input.decisionId.toLowerCase(),
+        input.issuedAt,
+        input.notBefore,
+        input.expiresAt,
+        input.issuerKeyId,
+        input.policyVersion,
+        authorizationBindingDigest,
+        executorWorkloadDigest,
+        artifactDigest,
+        evidenceManifestDigest,
         changedByDigest,
+        input.serviceNature,
+        input.jurisdictionUf,
+        input.jurisdictionGeneration,
+        input.scopeGeneration,
+        input.credentialLinkVersion,
+        input.operatorProfileId.toLowerCase(),
+        input.operatorProfileVersion,
+        input.establishmentProfileId.toLowerCase(),
+        input.establishmentProfileVersion,
       ],
     );
     row = result.rows[0];
@@ -537,23 +630,27 @@ export async function promoteHeldLocalOperation(
       throw new OperationPromotionDeniedError();
     }
     throw new OperationStorageError();
+  } finally {
+    authorizationBindingDigest.fill(0);
+    executorWorkloadDigest.fill(0);
+    artifactDigest.fill(0);
+    evidenceManifestDigest.fill(0);
+    changedByDigest.fill(0);
   }
   if (
     !row ||
     !isUuid(row.operation_id) ||
     !isUuid(row.outbox_id) ||
+    row.operation_status !== "PENDING_SEND" ||
     typeof row.replayed !== "boolean" ||
     !(row.promoted_at instanceof Date) ||
     !Number.isFinite(row.promoted_at.getTime())
   ) {
     throw new OperationStorageError();
   }
-  const operation = await getOperation(client, row.operation_id);
-  if (!operation || operation.status !== "PENDING_SEND") {
-    throw new OperationStorageError();
-  }
   return {
-    operation,
+    operationId: row.operation_id,
+    operationStatus: "PENDING_SEND",
     outboxId: row.outbox_id,
     promotedAt: new Date(row.promoted_at),
     replayed: row.replayed,

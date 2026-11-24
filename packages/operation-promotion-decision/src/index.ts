@@ -1,0 +1,16 @@
+export {
+  OPERATION_PROMOTION_DECISION_ACTION,
+  OPERATION_PROMOTION_DECISION_AUDIENCE,
+  OperationPromotionDecisionConfigurationError,
+  OperationPromotionDecisionInvalidError,
+  OperationPromotionDecisionVerifier,
+  VerifiedOperationPromotionDecision,
+  encodeOperationPromotionDecisionClaims,
+  parseOperationPromotionKeyring,
+  type OperationAuthorizationBindingClaims,
+  type OperationPromotionDecisionClaims,
+  type OperationPromotionDecisionEnvironment,
+  type OperationPromotionDecisionVerifierConfig,
+  type OperationPromotionKeyring,
+  type OperationPromotionServiceNature,
+} from "./operation-promotion-decision.js";

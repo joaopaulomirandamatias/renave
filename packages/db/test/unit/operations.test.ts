@@ -51,10 +51,29 @@ function input(): CreateHeldLocalOperationInput {
 
 function promotionInput(operationId: string = randomUUID()) {
   return {
+    artifactDigest: Buffer.alloc(32, 11),
+    authorizationBindingDigest: Buffer.alloc(32, 12),
     changedByDigest: Buffer.alloc(32, 13),
-    decisionTicketDigest: Buffer.alloc(32, 11),
-    evidenceDigest: Buffer.alloc(32, 12),
+    credentialLinkVersion: "3",
+    decisionId: randomUUID(),
+    environment: "homologation" as const,
+    establishmentProfileId: randomUUID(),
+    establishmentProfileVersion: "5",
+    evidenceManifestDigest: Buffer.alloc(32, 14),
+    executorWorkloadDigest: Buffer.alloc(32, 15),
+    expiresAt: new Date("2026-11-24T12:10:00.000Z"),
+    issuerKeyId: "operations-key-v1",
+    issuedAt: new Date("2026-11-24T12:00:00.000Z"),
+    jurisdictionGeneration: "7",
+    jurisdictionUf: "PA",
+    logicalDatabaseId: randomUUID(),
+    notBefore: new Date("2026-11-24T12:00:00.000Z"),
     operationId,
+    operatorProfileId: randomUUID(),
+    operatorProfileVersion: "9",
+    policyVersion: "operation-promotion/v1",
+    scopeGeneration: "11",
+    serviceNature: "establishment" as const,
   };
 }
 
@@ -460,49 +479,57 @@ describe("operation repository", () => {
     const outboxId = randomUUID();
     const promotedAt = new Date("2026-11-24T12:00:00.000Z");
     const promotion = promotionInput(operationId);
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            operation_id: operationId,
-            outbox_id: outboxId,
-            promoted_at: promotedAt,
-            replayed: false,
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [summary(operationId, candidate)] });
+    const query = vi.fn().mockResolvedValueOnce({
+      rows: [
+        {
+          operation_id: operationId,
+          operation_status: "PENDING_SEND",
+          outbox_id: outboxId,
+          promoted_at: promotedAt,
+          replayed: false,
+        },
+      ],
+    });
 
     await expect(
       promoteHeldLocalOperation(clientWithQuery(query), promotion),
     ).resolves.toEqual({
-      operation: expect.objectContaining({
-        id: operationId,
-        status: "PENDING_SEND",
-      }),
+      operationId,
+      operationStatus: "PENDING_SEND",
       outboxId,
       promotedAt,
       replayed: false,
     });
-    expect(query.mock.calls[0]?.[1]).toEqual([
+    expect(query.mock.calls[0]?.[1]?.slice(0, 9)).toEqual([
       operationId,
-      promotion.decisionTicketDigest,
-      promotion.evidenceDigest,
-      promotion.changedByDigest,
+      promotion.environment,
+      promotion.logicalDatabaseId,
+      promotion.decisionId,
+      promotion.issuedAt,
+      promotion.notBefore,
+      promotion.expiresAt,
+      promotion.issuerKeyId,
+      promotion.policyVersion,
     ]);
     for (const [index, source] of [
-      promotion.decisionTicketDigest,
-      promotion.evidenceDigest,
+      promotion.authorizationBindingDigest,
+      promotion.executorWorkloadDigest,
+      promotion.artifactDigest,
+      promotion.evidenceManifestDigest,
       promotion.changedByDigest,
     ].entries()) {
-      expect(query.mock.calls[0]?.[1]?.[index + 1]).not.toBe(source);
+      const captured = query.mock.calls[0]?.[1]?.[index + 9] as Buffer;
+      expect(captured).not.toBe(source);
+      expect(captured).toEqual(Buffer.alloc(32));
     }
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it.each([
-    ["decisionTicketDigest", Buffer.alloc(31)],
-    ["evidenceDigest", Buffer.alloc(33)],
+    ["artifactDigest", Buffer.alloc(31)],
+    ["authorizationBindingDigest", Buffer.alloc(33)],
+    ["evidenceManifestDigest", Buffer.alloc(0)],
+    ["executorWorkloadDigest", Buffer.alloc(0)],
     ["changedByDigest", Buffer.alloc(0)],
   ] as const)(
     "recusa digest de promoção inválido em %s",
@@ -562,6 +589,7 @@ describe("operation repository", () => {
       rows: [
         {
           operation_id: randomUUID(),
+          operation_status: "PENDING_SEND",
           outbox_id: "invalid",
           promoted_at: new Date(),
           replayed: false,
