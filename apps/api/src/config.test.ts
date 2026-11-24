@@ -76,6 +76,7 @@ describe("configuração da API", () => {
       RENAVE_MTLS_CERT_FILE: "/run/secrets/cert.pem",
       RENAVE_MTLS_KEY_FILE: "/run/secrets/key.pem",
       SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64: Buffer.alloc(32).toString("base64"),
+      TENANT_ADMIN_HMAC_KEY_BASE64: Buffer.alloc(32, 1).toString("base64"),
       SESSION_STORE: "memory",
     });
 
@@ -86,6 +87,9 @@ describe("configuração da API", () => {
     });
     expect(config.serproQueryLimitHmacKeyBase64).toBe(
       Buffer.alloc(32).toString("base64"),
+    );
+    expect(config.tenantAdminHmacKeyBase64).toBe(
+      Buffer.alloc(32, 1).toString("base64"),
     );
   });
 
@@ -125,6 +129,25 @@ describe("configuração da API", () => {
         SESSION_STORE: "memory",
       }),
     ).toThrow("IDENTITY_DATABASE_URL");
+  });
+
+  it("exige segredo administrativo com banco SaaS fora de desenvolvimento", () => {
+    expect(() =>
+      loadConfig({
+        ...oidc,
+        APP_ENVIRONMENT: "homologation",
+        DATABASE_URL: "postgres://app@127.0.0.1:5432/db",
+        IDENTITY_DATABASE_URL: "postgres://identity@127.0.0.1:5432/identity",
+        LOGIN_RATE_LIMIT_HMAC_KEY_BASE64: Buffer.alloc(32).toString("base64"),
+        SESSION_STORE: "postgres",
+      }),
+    ).toThrow("TENANT_ADMIN_HMAC_KEY_BASE64");
+
+    expect(() =>
+      loadConfig({
+        TENANT_ADMIN_HMAC_KEY_BASE64: Buffer.alloc(32).toString("base64"),
+      }),
+    ).toThrow("DATABASE_URL");
   });
 
   it("exige rate limit também em homologação OIDC", () => {

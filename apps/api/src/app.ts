@@ -2,7 +2,10 @@ import type { IdentityService } from "@seu-renave/identity";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { redactedLogPaths, stripQuery } from "./auth/redaction.js";
-import { createRequestAccessGuard } from "./auth/request-access-guard.js";
+import {
+  createRequestAccessGuard,
+  type TenantActionRunner,
+} from "./auth/request-access-guard.js";
 import {
   registerAuthRoutes,
   type LoginRateLimiter,
@@ -17,6 +20,10 @@ import {
 import type { EligibilityUseCase } from "./renave/use-case.js";
 import type { RenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./renave/preflight-use-case.js";
+import type {
+  TenantEstablishmentAdministration,
+  TenantMutationRateLimiter,
+} from "./tenant/admin-establishments.js";
 import { registerTenantRoutes, type TenantDirectory } from "./tenant/routes.js";
 
 export interface BuildAppOptions {
@@ -42,6 +49,12 @@ export interface BuildAppOptions {
   stockQuery?: StockQueryUseCase;
   /** Diretório global mínimo; ausente mantém descoberta de tenants bloqueada. */
   tenantDirectory?: TenantDirectory;
+  /** Mutação administrativa atômica; ausente mantém o POST bloqueado. */
+  tenantEstablishmentAdministration?: TenantEstablishmentAdministration;
+  /** Limitador distribuído das mutações administrativas. */
+  tenantMutationRateLimiter?: TenantMutationRateLimiter;
+  /** Autoriza e executa a mutação no mesmo contexto transacional RLS. */
+  tenantActionRunner?: TenantActionRunner;
   /** Probe das dependências já compostas pelo runtime. */
   ready?: () => Promise<boolean>;
   logger?: boolean;
@@ -77,6 +90,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     !options.serproQueryLimiter
   ) {
     throw new Error("Consulta RENAVE exige limitador distribuído");
+  }
+  if (
+    options.tenantEstablishmentAdministration &&
+    (!options.tenantMutationRateLimiter || !options.tenantActionRunner)
+  ) {
+    throw new Error(
+      "Administração de estabelecimento exige runner e rate limit distribuído",
+    );
   }
 
   const app = Fastify({
@@ -143,8 +164,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     if (!accessGuard) throw new Error("Guard de acesso não configurado");
     registerTenantRoutes(app, {
       accessGuard,
+      publicOrigin: options.identity.config.publicOrigin,
+      ...(options.tenantEstablishmentAdministration
+        ? { administration: options.tenantEstablishmentAdministration }
+        : {}),
       ...(options.tenantDirectory
         ? { directory: options.tenantDirectory }
+        : {}),
+      ...(options.tenantMutationRateLimiter
+        ? { mutationRateLimiter: options.tenantMutationRateLimiter }
+        : {}),
+      ...(options.tenantActionRunner
+        ? { tenantActionRunner: options.tenantActionRunner }
         : {}),
     });
     registerRenaveRoutes(app, {

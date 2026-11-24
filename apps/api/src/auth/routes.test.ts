@@ -30,6 +30,7 @@ const config: AppConfig = {
   identityDatabaseUrl: undefined,
   identityDatabaseTlsCaFile: undefined,
   loginRateLimitHmacKeyBase64: undefined,
+  tenantAdminHmacKeyBase64: undefined,
   sessionLookupMaxConcurrency: 4,
   serproQueryLimitHmacKeyBase64: undefined,
   databaseUrl: undefined,

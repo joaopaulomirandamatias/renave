@@ -27,6 +27,18 @@ const app = buildApp({
   ...(runtime.tenantDirectory
     ? { tenantDirectory: runtime.tenantDirectory }
     : {}),
+  ...(runtime.tenantActionRunner
+    ? { tenantActionRunner: runtime.tenantActionRunner }
+    : {}),
+  ...(runtime.tenantEstablishmentAdministration
+    ? {
+        tenantEstablishmentAdministration:
+          runtime.tenantEstablishmentAdministration,
+      }
+    : {}),
+  ...(runtime.tenantMutationRateLimiter
+    ? { tenantMutationRateLimiter: runtime.tenantMutationRateLimiter }
+    : {}),
   ready: runtime.ready,
 });
 

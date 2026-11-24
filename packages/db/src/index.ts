@@ -53,6 +53,23 @@ export {
   type Establishment,
 } from "./establishments.js";
 export {
+  PostgresTenantAdministration,
+  TenantAdminAccessDeniedError,
+  TenantAdminCnpjConflictError,
+  TenantAdminIdempotencyConflictError,
+  TenantAdminInputError,
+  TenantAdminStorageError,
+  type CreateAdminEstablishmentInput,
+  type CreateAdminEstablishmentResult,
+} from "./tenant-administration.js";
+export {
+  decodeTenantAdminHmacKeyBase64,
+  PostgresTenantAdminRateLimiter,
+  TenantAdminRateLimitInputError,
+  type TenantAdminRateLimitResult,
+  type TenantAdminRateLimitScope,
+} from "./tenant-admin-rate-limiter.js";
+export {
   evidenceMonitorNeedsAttention,
   getEvidenceMonitorStatus,
   scanStaleProtectedEvidence,

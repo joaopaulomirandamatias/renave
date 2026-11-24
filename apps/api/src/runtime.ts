@@ -5,10 +5,12 @@ import {
   assertRuntimeDatabase,
   decodeLoginRateHmacKeyBase64,
   decodeSerproQueryHmacKeyBase64,
+  decodeTenantAdminHmacKeyBase64,
   IDENTITY_APP_ROLE,
   PostgresIdentitySessionStore,
   PostgresLoginRateLimiter,
   PostgresSerproQueryLimiter,
+  PostgresTenantAdminRateLimiter,
 } from "@seu-renave/db";
 import {
   decodeEvidenceKeyBase64,
@@ -24,6 +26,8 @@ import {
 import type { Pool } from "pg";
 
 import { composeIdentity } from "./auth/compose.js";
+import { createTenantActionRunner } from "./auth/request-access-guard.js";
+import type { TenantActionRunner } from "./auth/request-access-guard.js";
 import type { LoginRateLimiter } from "./auth/routes.js";
 import type { SessionLookupGate } from "./auth/routes.js";
 import { LocalSessionLookupGate } from "./auth/session-lookup-gate.js";
@@ -36,6 +40,11 @@ import { PostgresRenaveLinkPreflightUseCase } from "./renave/preflight-use-case.
 import type { SerproQueryLimiter } from "./renave/routes.js";
 import { PostgresStockQueryUseCase } from "./renave/stock-query-use-case.js";
 import { createPostgresTenantDirectory } from "./tenant/directory.js";
+import type {
+  TenantEstablishmentAdministration,
+  TenantMutationRateLimiter,
+} from "./tenant/admin-establishments.js";
+import { PostgresTenantEstablishmentAdministration } from "./tenant/postgres-administration.js";
 import type { TenantDirectory } from "./tenant/routes.js";
 
 export interface AppRuntime {
@@ -51,6 +60,9 @@ export interface AppRuntime {
   serproQueryLimiter?: SerproQueryLimiter;
   stockQuery?: PostgresStockQueryUseCase;
   tenantDirectory?: TenantDirectory;
+  tenantEstablishmentAdministration?: TenantEstablishmentAdministration;
+  tenantMutationRateLimiter?: TenantMutationRateLimiter;
+  tenantActionRunner?: TenantActionRunner;
 }
 
 export function areRuntimeDependenciesReady(input: {
@@ -72,6 +84,9 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
   }> = [];
   let degraded = false;
   let mtls: HomologationMtlsClient | undefined;
+  let tenantAdminLimiter: PostgresTenantAdminRateLimiter | undefined;
+  let tenantAdministration:
+    PostgresTenantEstablishmentAdministration | undefined;
   function registerPool(pool: Pool): Pool {
     pools.push(pool);
     pool.on("error", () => {
@@ -148,6 +163,29 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     const tenantDirectory: TenantDirectory | undefined = businessPool
       ? createPostgresTenantDirectory(businessPool)
       : undefined;
+    const tenantActionRunner = businessPool
+      ? createTenantActionRunner(businessPool)
+      : undefined;
+    let tenantMutationRateLimiter: TenantMutationRateLimiter | undefined;
+    if (businessPool && config.tenantAdminHmacKeyBase64) {
+      const key = decodeTenantAdminHmacKeyBase64(
+        config.tenantAdminHmacKeyBase64,
+      );
+      try {
+        tenantAdminLimiter = new PostgresTenantAdminRateLimiter(
+          businessPool,
+          key,
+        );
+        tenantAdministration = new PostgresTenantEstablishmentAdministration(
+          key,
+        );
+      } finally {
+        key.fill(0);
+      }
+      tenantMutationRateLimiter = {
+        acquire: (input) => tenantAdminLimiter!.consume(input),
+      };
+    }
     const linkStatus = businessPool
       ? new PostgresRenaveLinkStatusUseCase(businessPool)
       : undefined;
@@ -231,6 +269,11 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       ...(serproQueryLimiter ? { serproQueryLimiter } : {}),
       ...(stockQuery ? { stockQuery } : {}),
       ...(tenantDirectory ? { tenantDirectory } : {}),
+      ...(tenantActionRunner ? { tenantActionRunner } : {}),
+      ...(tenantAdministration
+        ? { tenantEstablishmentAdministration: tenantAdministration }
+        : {}),
+      ...(tenantMutationRateLimiter ? { tenantMutationRateLimiter } : {}),
       async ready() {
         let databasesReady = true;
         try {
@@ -250,11 +293,15 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       },
       async close() {
         mtls?.close();
+        tenantAdministration?.destroy();
+        tenantAdminLimiter?.destroy();
         await Promise.all(pools.map((pool) => pool.end()));
       },
     };
   } catch (error) {
     mtls?.close();
+    tenantAdministration?.destroy();
+    tenantAdminLimiter?.destroy();
     await Promise.allSettled(pools.map((pool) => pool.end()));
     throw error;
   }

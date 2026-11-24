@@ -37,6 +37,7 @@ export interface AppConfig {
   identityDatabaseUrl: string | undefined;
   identityDatabaseTlsCaFile: string | undefined;
   loginRateLimitHmacKeyBase64: string | undefined;
+  tenantAdminHmacKeyBase64: string | undefined;
   sessionLookupMaxConcurrency: number;
   serproQueryLimitHmacKeyBase64: string | undefined;
   /** Banco de negócio SaaS; independe de a integração SERPRO estar ligada. */
@@ -257,6 +258,9 @@ export function loadConfig(
   const serproQueryLimitHmacKeyBase64 = optionalText(
     environment.SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64,
   );
+  const tenantAdminHmacKeyBase64 = optionalText(
+    environment.TENANT_ADMIN_HMAC_KEY_BASE64,
+  );
   const renave = loadRenaveIntegration(environment, appEnvironment, authMode);
 
   validateDatabaseUrl(
@@ -289,6 +293,9 @@ export function loadConfig(
       "LOGIN_RATE_LIMIT_HMAC_KEY_BASE64 exige IDENTITY_DATABASE_URL",
     );
   }
+  if (tenantAdminHmacKeyBase64 && !databaseUrl) {
+    throw new Error("TENANT_ADMIN_HMAC_KEY_BASE64 exige DATABASE_URL");
+  }
   if (
     appEnvironment !== "development" &&
     authMode === "oidc" &&
@@ -296,6 +303,16 @@ export function loadConfig(
   ) {
     throw new Error(
       "OIDC fora de desenvolvimento exige LOGIN_RATE_LIMIT_HMAC_KEY_BASE64",
+    );
+  }
+  if (
+    appEnvironment !== "development" &&
+    authMode === "oidc" &&
+    databaseUrl &&
+    !tenantAdminHmacKeyBase64
+  ) {
+    throw new Error(
+      "Banco SaaS fora de desenvolvimento exige TENANT_ADMIN_HMAC_KEY_BASE64",
     );
   }
 
@@ -311,6 +328,7 @@ export function loadConfig(
     identityDatabaseUrl,
     identityDatabaseTlsCaFile,
     loginRateLimitHmacKeyBase64,
+    tenantAdminHmacKeyBase64,
     sessionLookupMaxConcurrency: parseSessionLookupMaxConcurrency(
       environment.SESSION_LOOKUP_MAX_CONCURRENCY,
     ),

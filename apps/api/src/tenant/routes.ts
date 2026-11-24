@@ -1,6 +1,14 @@
 import type { FastifyInstance } from "fastify";
 
-import type { RequestAccessGuard } from "../auth/request-access-guard.js";
+import type {
+  RequestAccessGuard,
+  TenantActionRunner,
+} from "../auth/request-access-guard.js";
+import {
+  registerTenantEstablishmentAdminRoutes,
+  type TenantEstablishmentAdministration,
+  type TenantMutationRateLimiter,
+} from "./admin-establishments.js";
 
 export interface TenantDirectoryEntry {
   displayName: string;
@@ -22,13 +30,19 @@ export interface TenantDirectory {
 
 export interface TenantRoutesOptions {
   accessGuard: RequestAccessGuard;
+  administration?: TenantEstablishmentAdministration;
   directory?: TenantDirectory;
+  mutationRateLimiter?: TenantMutationRateLimiter;
+  publicOrigin: string;
+  tenantActionRunner?: TenantActionRunner;
 }
 
 export function registerTenantRoutes(
   app: FastifyInstance,
   options: TenantRoutesOptions,
 ): void {
+  registerTenantEstablishmentAdminRoutes(app, options);
+
   app.get("/api/tenants", async (request, reply) => {
     const lookup = await options.accessGuard.authenticate(request, reply);
     if (!lookup.ok) return;

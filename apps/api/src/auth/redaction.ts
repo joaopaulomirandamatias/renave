@@ -10,8 +10,11 @@ export function stripQuery(url: string): string {
 export const redactedLogPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
+  'req.headers["idempotency-key"]',
+  "req.body.cnpj",
   "req.body.password",
   "req.body.token",
+  "req.body.tradeName",
   'res.headers["set-cookie"]',
   "res.headers.location",
 ];
