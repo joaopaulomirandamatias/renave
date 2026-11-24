@@ -15,6 +15,18 @@ let identityPool: Pool;
 let maintenancePool: Pool;
 let migratorPool: Pool;
 
+async function expectAppContractRejected(): Promise<void> {
+  await expect(
+    assertRuntimeDatabase(appPool, { expectedRole: "renave_app" }),
+  ).rejects.toBeInstanceOf(RuntimeDatabaseContractError);
+}
+
+async function expectAppContractReady(): Promise<void> {
+  await expect(
+    assertRuntimeDatabase(appPool, { expectedRole: "renave_app" }),
+  ).resolves.toBeUndefined();
+}
+
 beforeAll(() => {
   adminPool = createPool(urls.admin, { max: 1 });
   appPool = createPool(urls.app, { max: 1 });
@@ -150,23 +162,288 @@ describe("guard do banco de runtime", () => {
   it("recusa contrato quando um checksum do ledger diverge", async () => {
     const original = await adminPool.query<{ checksum: string }>(
       `select checksum from renave.schema_migrations
-        where version = '0013_serpro_query_limit'`,
+        where version = '0025_operation_outbox'`,
     );
     await adminPool.query(
       `update renave.schema_migrations set checksum = $1
-        where version = '0013_serpro_query_limit'`,
+        where version = '0025_operation_outbox'`,
       ["0".repeat(64)],
     );
     try {
-      await expect(
-        assertRuntimeDatabase(appPool, { expectedRole: "renave_app" }),
-      ).rejects.toBeInstanceOf(RuntimeDatabaseContractError);
+      await expectAppContractRejected();
     } finally {
       await adminPool.query(
         `update renave.schema_migrations set checksum = $1
-          where version = '0013_serpro_query_limit'`,
+          where version = '0025_operation_outbox'`,
         [original.rows[0]!.checksum],
       );
     }
+    await expectAppContractReady();
+  });
+
+  it("recusa RLS desabilitada nas tabelas do outbox", async () => {
+    await adminPool.query(
+      "alter table renave.operation_outbox disable row level security",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "alter table renave.operation_outbox enable row level security",
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa tabela sem FORCE RLS", async () => {
+    await adminPool.query(
+      "alter table renave.operation_transition no force row level security",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "alter table renave.operation_transition force row level security",
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa tabela UNLOGGED na fundação do outbox", async () => {
+    await adminPool.query("alter table renave.operation_outbox set unlogged");
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query("alter table renave.operation_outbox set logged");
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa policy permissiva adicional na mesma tabela", async () => {
+    await adminPool.query(
+      `create policy operation_permissive_probe on renave.operation
+       using (true) with check (true)`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "drop policy operation_permissive_probe on renave.operation",
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa policy que mantém dependência mas abre isolamento com OR", async () => {
+    await adminPool.query(
+      `alter policy operation_isolation on renave.operation
+       using (
+         tenant_id = (select renave.current_tenant_id())
+         or renave.current_tenant_id() is not null
+       )
+       with check (
+         tenant_id = (select renave.current_tenant_id())
+         or renave.current_tenant_id() is not null
+       )`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `alter policy operation_isolation on renave.operation
+         using (tenant_id = (select renave.current_tenant_id()))
+         with check (tenant_id = (select renave.current_tenant_id()))`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa índice essencial adulterado", async () => {
+    await adminPool.query("drop index renave.operation_outbox_ready_idx");
+    await adminPool.query(
+      `create index operation_outbox_ready_idx
+       on renave.operation_outbox (
+         tenant_id, event_type, created_at, available_at, id
+       )
+       where delivery_status in ('READY', 'LEASED')`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query("drop index renave.operation_outbox_ready_idx");
+      await adminPool.query(
+        `create index operation_outbox_ready_idx
+         on renave.operation_outbox (
+           tenant_id, event_type, available_at, created_at, id
+         ) where delivery_status = 'READY'`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa índice único homônimo sem a constraint correspondente", async () => {
+    await adminPool.query(
+      `alter table renave.operation_outbox
+       drop constraint operation_outbox_event_key`,
+    );
+    await adminPool.query(
+      `create unique index operation_outbox_event_key
+       on renave.operation_outbox (tenant_id, operation_id, event_type)`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query("drop index renave.operation_outbox_event_key");
+      await adminPool.query(
+        `alter table renave.operation_outbox
+         add constraint operation_outbox_event_key
+         unique (tenant_id, operation_id, event_type)`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa trigger protetor desabilitado", async () => {
+    await adminPool.query(
+      "alter table renave.operation disable trigger operation_guard",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "alter table renave.operation enable trigger operation_guard",
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa trigger neutralizado por WHEN false", async () => {
+    await adminPool.query("drop trigger operation_guard on renave.operation");
+    await adminPool.query(
+      `create trigger operation_guard
+       before insert or update on renave.operation
+       for each row when (false)
+       execute function renave.operation_guard()`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query("drop trigger operation_guard on renave.operation");
+      await adminPool.query(
+        `create trigger operation_guard
+         before insert or update on renave.operation
+         for each row execute function renave.operation_guard()`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa trigger UPDATE restrito a uma coluna", async () => {
+    const original = await adminPool.query<{ definition: string }>(
+      `select pg_catalog.pg_get_triggerdef(triggers.oid, false) as definition
+         from pg_catalog.pg_trigger triggers
+        where triggers.tgrelid = 'renave.operation_outbox'::regclass
+          and triggers.tgname = 'operation_outbox_guard'`,
+    );
+    await adminPool.query(
+      "drop trigger operation_outbox_guard on renave.operation_outbox",
+    );
+    await adminPool.query(
+      `create trigger operation_outbox_guard
+       before update of delivery_status on renave.operation_outbox
+       for each row execute function renave.operation_outbox_guard()`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "drop trigger operation_outbox_guard on renave.operation_outbox",
+      );
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa função essencial com owner inadequado", async () => {
+    await adminPool.query(
+      "alter function renave.operation_guard() owner to renave_app",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "alter function renave.operation_guard() owner to renave_migrator",
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa troca de corpo que preserva metadados da função", async () => {
+    const original = await adminPool.query<{ definition: string }>(
+      `select pg_catalog.pg_get_functiondef(
+         'renave.operation_guard()'::regprocedure
+       ) as definition`,
+    );
+    await adminPool.query(
+      `create or replace function renave.operation_guard()
+       returns trigger
+       language plpgsql
+       set search_path = pg_catalog
+       as $$
+       begin
+         return new;
+       end;
+       $$`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa privilégio direto inesperado nas tabelas outbox", async () => {
+    await adminPool.query("grant select on renave.operation to renave_app");
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "revoke select on renave.operation from renave_app",
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa grant por coluna em conteúdo cifrado", async () => {
+    await adminPool.query(
+      `grant select (request_ciphertext) on renave.operation
+       to renave_app`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `revoke select (request_ciphertext) on renave.operation
+         from renave_app`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa execução inesperada das funções outbox", async () => {
+    await adminPool.query(
+      `grant execute on function renave.get_operation_summary(uuid)
+       to renave_identity_app`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `revoke execute on function renave.get_operation_summary(uuid)
+         from renave_identity_app`,
+      );
+    }
+    await expectAppContractReady();
   });
 });
