@@ -40,6 +40,20 @@ export interface CredentialLinkHistoryEntry {
   version: string;
 }
 
+export interface CredentialLinkQueueEntry {
+  establishmentId: string;
+  status: "not_started" | CredentialLinkStatus;
+  tradeName: string;
+  updatedAt: Date | null;
+}
+
+export interface CredentialLinkQueuePage {
+  entries: CredentialLinkQueueEntry[];
+  truncated: boolean;
+}
+
+export const CREDENTIAL_LINK_QUEUE_PAGE_SIZE = 500;
+
 export interface TransitionCredentialLinkInput {
   changedBySubject: string;
   establishmentId: string;
@@ -54,6 +68,13 @@ interface CredentialLinkRow {
   tenant_id: string;
   updated_at: Date;
   version: string;
+}
+
+interface CredentialLinkQueueRow {
+  establishment_id: string;
+  status: "not_started" | CredentialLinkStatus;
+  trade_name: string;
+  updated_at: Date | null;
 }
 
 interface CredentialLinkHistoryRow {
@@ -103,6 +124,46 @@ export async function getCredentialLink(
     [establishmentId],
   );
   return rows[0] ? toLink(rows[0]) : null;
+}
+
+/**
+ * Lista os vínculos visíveis no tenant ativo. A RLS continua sendo a fronteira
+ * de isolamento; o chamador não fornece tenant nem filtro de CNPJ.
+ */
+export async function listCredentialLinkQueue(
+  client: TenantClient,
+): Promise<CredentialLinkQueuePage> {
+  const { rows } = await client.query<CredentialLinkQueueRow>(
+    `select establishment.id as establishment_id,
+            establishment.trade_name,
+            coalesce(link.status, 'not_started') as status,
+            link.updated_at
+       from renave.establishment establishment
+       left join renave.credential_link link
+         on link.tenant_id = establishment.tenant_id
+        and link.establishment_id = establishment.id
+      where establishment.status = 'active'
+      order by case coalesce(link.status, 'not_started')
+                 when 'pending' then 0
+                 when 'confirmed' then 1
+                 when 'not_started' then 2
+                 when 'rejected' then 3
+                 when 'deactivated' then 4
+                 when 'enabled' then 5
+                 else 6
+               end,
+               link.updated_at asc nulls last,
+               establishment.id
+      limit ${CREDENTIAL_LINK_QUEUE_PAGE_SIZE + 1}`,
+  );
+  const truncated = rows.length > CREDENTIAL_LINK_QUEUE_PAGE_SIZE;
+  const entries = rows.slice(0, CREDENTIAL_LINK_QUEUE_PAGE_SIZE).map((row) => ({
+    establishmentId: row.establishment_id,
+    status: row.status,
+    tradeName: row.trade_name,
+    updatedAt: row.updated_at,
+  }));
+  return { entries, truncated };
 }
 
 export async function transitionCredentialLink(

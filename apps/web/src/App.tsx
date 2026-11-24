@@ -94,6 +94,19 @@ export interface BrowserRenaveLink {
   status: BrowserRenaveLinkStatus;
 }
 
+export interface BrowserCredentialLinkQueueItem {
+  establishment: BrowserEstablishment;
+  renaveLink: {
+    status: BrowserRenaveLinkStatus;
+    updatedAt?: string;
+  };
+}
+
+export interface BrowserCredentialLinkQueue {
+  items: readonly BrowserCredentialLinkQueueItem[];
+  truncated: boolean;
+}
+
 export interface BrowserRenaveReadiness {
   certificate: "ready" | "warning" | "blocked" | "unavailable";
   environment: "homologation";
@@ -179,6 +192,9 @@ export interface SessionClient {
   ): Promise<CreateStockEntryResult>;
   load(): Promise<BrowserSession>;
   loadEstablishments(tenantId: string): Promise<BrowserEstablishmentCollection>;
+  loadCredentialLinkQueue(
+    tenantId: string,
+  ): Promise<BrowserCredentialLinkQueue>;
   loadTenants(): Promise<readonly BrowserTenant[]>;
   loadRenaveLinkStatus(
     tenantId: string,
@@ -405,6 +421,58 @@ function parseRenaveLink(value: unknown): BrowserRenaveLink {
     preflightAvailable: value.preflightAvailable,
     status: value.status as BrowserRenaveLinkStatus,
   };
+}
+
+function parseCredentialLinkQueue(value: unknown): BrowserCredentialLinkQueue {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 2 ||
+    !Array.isArray(value.items) ||
+    typeof value.truncated !== "boolean"
+  ) {
+    throw new Error("Resposta da fila de vínculos inválida");
+  }
+  const items = value.items.map((item) => {
+    if (
+      !isRecord(item) ||
+      Object.keys(item).length !== 2 ||
+      !isRecord(item.establishment) ||
+      Object.keys(item.establishment).length !== 2 ||
+      typeof item.establishment.id !== "string" ||
+      item.establishment.id.length === 0 ||
+      typeof item.establishment.tradeName !== "string" ||
+      item.establishment.tradeName.trim().length === 0 ||
+      !isRecord(item.renaveLink) ||
+      Object.keys(item.renaveLink).some(
+        (key) => key !== "status" && key !== "updatedAt",
+      ) ||
+      typeof item.renaveLink.status !== "string" ||
+      !renaveLinkStatuses.has(
+        item.renaveLink.status as BrowserRenaveLinkStatus,
+      ) ||
+      (item.renaveLink.updatedAt !== undefined &&
+        (typeof item.renaveLink.updatedAt !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/u.test(
+            item.renaveLink.updatedAt,
+          ) ||
+          !Number.isFinite(Date.parse(item.renaveLink.updatedAt))))
+    ) {
+      throw new Error("Item inválido na fila de vínculos");
+    }
+    return {
+      establishment: {
+        id: item.establishment.id,
+        tradeName: item.establishment.tradeName,
+      },
+      renaveLink: {
+        status: item.renaveLink.status as BrowserRenaveLinkStatus,
+        ...(typeof item.renaveLink.updatedAt === "string"
+          ? { updatedAt: item.renaveLink.updatedAt }
+          : {}),
+      },
+    };
+  });
+  return { items, truncated: value.truncated };
 }
 
 const renaveCertificateReadiness = new Set<
@@ -839,6 +907,20 @@ export const browserSessionClient: SessionClient = {
       throw new Error("Não foi possível carregar os estabelecimentos");
     return parseEstablishmentCollection(await response.json());
   },
+  async loadCredentialLinkQueue(tenantId) {
+    const response = await fetch(
+      `/api/tenants/${encodeURIComponent(tenantId)}/renave-link-queue`,
+      {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { accept: "application/json" },
+      },
+    );
+    if (!response.ok) {
+      throw new Error("Não foi possível carregar a fila de vínculos");
+    }
+    return parseCredentialLinkQueue(await response.json());
+  },
   async loadRenaveLinkStatus(tenantId, establishmentId) {
     const response = await fetch(
       `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/renave-link`,
@@ -1028,6 +1110,10 @@ type RenaveReadinessView =
   | { status: "idle" | "loading" | "error" }
   | { readiness: BrowserRenaveReadiness; status: "ready" };
 
+type CredentialLinkQueueView =
+  | { status: "idle" | "loading" | "error" }
+  | { queue: BrowserCredentialLinkQueue; status: "ready" };
+
 export function App({
   client = browserSessionClient,
   locationSearch = window.location.search,
@@ -1048,6 +1134,12 @@ export function App({
   });
   const [renaveReadinessView, setRenaveReadinessView] =
     useState<RenaveReadinessView>({ status: "idle" });
+  const [credentialLinkQueueView, setCredentialLinkQueueView] =
+    useState<CredentialLinkQueueView>({ status: "idle" });
+  const [
+    credentialLinkQueueReloadVersion,
+    setCredentialLinkQueueReloadVersion,
+  ] = useState(0);
   const [linkReloadVersion, setLinkReloadVersion] = useState(0);
   const [readinessReloadVersion, setReadinessReloadVersion] = useState(0);
   const [selectedTenantId, setSelectedTenantId] = useState("");
@@ -1062,6 +1154,7 @@ export function App({
   const loadRequestVersion = useRef(0);
   const linkLoadVersion = useRef(0);
   const readinessLoadVersion = useRef(0);
+  const credentialLinkQueueLoadVersion = useRef(0);
   const activeSelectionKeyRef = useRef("");
   const selectedTenantIdRef = useRef("");
   selectedTenantIdRef.current = selectedTenantId;
@@ -1154,6 +1247,46 @@ export function App({
     activeEstablishmentId,
     client,
     linkReloadVersion,
+    selectedTenantId,
+    view,
+  ]);
+
+  useEffect(() => {
+    const authenticated = view.status === "ready" && view.session.authenticated;
+    if (
+      !authenticated ||
+      !selectedTenantId ||
+      establishmentManagement !== "available"
+    ) {
+      credentialLinkQueueLoadVersion.current += 1;
+      setCredentialLinkQueueView({ status: "idle" });
+      return;
+    }
+    const tenantId = selectedTenantId;
+    const requestVersion = ++credentialLinkQueueLoadVersion.current;
+    setCredentialLinkQueueView({ status: "loading" });
+    void client
+      .loadCredentialLinkQueue(tenantId)
+      .then((queue) => {
+        if (
+          credentialLinkQueueLoadVersion.current === requestVersion &&
+          selectedTenantIdRef.current === tenantId
+        ) {
+          setCredentialLinkQueueView({ queue, status: "ready" });
+        }
+      })
+      .catch(() => {
+        if (
+          credentialLinkQueueLoadVersion.current === requestVersion &&
+          selectedTenantIdRef.current === tenantId
+        ) {
+          setCredentialLinkQueueView({ status: "error" });
+        }
+      });
+  }, [
+    client,
+    credentialLinkQueueReloadVersion,
+    establishmentManagement,
     selectedTenantId,
     view,
   ]);
@@ -1269,6 +1402,7 @@ export function App({
       loadRequestVersion.current += 1;
       linkLoadVersion.current += 1;
       readinessLoadVersion.current += 1;
+      credentialLinkQueueLoadVersion.current += 1;
       if (result.endSessionUrl) redirect(result.endSessionUrl);
     } catch {
       setLogoutError(true);
@@ -1294,6 +1428,7 @@ export function App({
     } finally {
       if (activeSelectionKeyRef.current === selectionKey) {
         setReadinessReloadVersion((current) => current + 1);
+        setCredentialLinkQueueReloadVersion((current) => current + 1);
         const requestVersion = ++linkLoadVersion.current;
         setRenaveLinkView({ status: "loading" });
         try {
@@ -1457,6 +1592,7 @@ export function App({
       link: { preflightAvailable: false, status: "not_started" },
       status: "ready",
     });
+    setCredentialLinkQueueReloadVersion((current) => current + 1);
     return result;
   }
 
@@ -1506,6 +1642,15 @@ export function App({
   return (
     <DashboardPage
       establishmentManagement={establishmentManagement}
+      credentialLinkQueueError={credentialLinkQueueView.status === "error"}
+      credentialLinkQueueLoading={credentialLinkQueueView.status === "loading"}
+      {...(credentialLinkQueueView.status === "ready"
+        ? {
+            credentialLinkQueue: credentialLinkQueueView.queue.items,
+            credentialLinkQueueTruncated:
+              credentialLinkQueueView.queue.truncated,
+          }
+        : {})}
       environment={environment}
       establishments={establishments.map((establishment) => ({
         id: establishment.id,
@@ -1543,6 +1688,9 @@ export function App({
           activeEstablishmentId ?? "",
           input,
         )
+      }
+      onReloadCredentialLinkQueue={() =>
+        setCredentialLinkQueueReloadVersion((current) => current + 1)
       }
       onRunPreflight={() => void runPreflight()}
       onSearchStocks={(plate) =>

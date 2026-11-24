@@ -1,3 +1,4 @@
+import { listCredentialLinkQueue } from "@seu-renave/db/api-runtime";
 import type { FastifyInstance } from "fastify";
 
 import type {
@@ -140,6 +141,65 @@ export function registerTenantRoutes(
       });
     }
   });
+
+  app.get(
+    "/api/tenants/:tenantId/renave-link-queue",
+    async (request, reply) => {
+      const lookup = await options.accessGuard.authenticate(request, reply, {
+        mfa: "required",
+      });
+      if (!lookup.ok) return;
+      const tenantId = (request.params as Record<string, unknown>).tenantId;
+      if (typeof tenantId !== "string" || !UUID_PATTERN.test(tenantId)) {
+        return reply.code(404).send({ code: "TENANT_RESOURCE_NOT_FOUND" });
+      }
+      if (!options.tenantActionRunner) {
+        return reply
+          .code(503)
+          .send({ code: "TENANT_DIRECTORY_NOT_CONFIGURED" });
+      }
+
+      try {
+        const result = await options.tenantActionRunner.run(
+          {
+            action: "tenant.establishment.manage",
+            mfa: "required",
+            session: lookup.session,
+            tenantId: tenantId.toLowerCase(),
+          },
+          ({ client }) => listCredentialLinkQueue(client),
+        );
+        if (!result.allowed) {
+          return reply.code(404).send({ code: "TENANT_RESOURCE_NOT_FOUND" });
+        }
+        reply.header("cache-control", "no-store");
+        return {
+          items: result.value.entries.map((item) => ({
+            establishment: {
+              id: item.establishmentId,
+              tradeName: item.tradeName,
+            },
+            renaveLink: {
+              status: item.status,
+              ...(item.updatedAt
+                ? { updatedAt: item.updatedAt.toISOString() }
+                : {}),
+            },
+          })),
+          truncated: result.value.truncated,
+        };
+      } catch {
+        request.log.error({
+          event: "tenant.renave_link_queue.failed",
+          traceId: request.id,
+        });
+        return reply.code(503).send({
+          code: "TENANT_DIRECTORY_UNAVAILABLE",
+          traceId: request.id,
+        });
+      }
+    },
+  );
 
   app.get(
     "/api/tenants/:tenantId/establishments/:establishmentId",

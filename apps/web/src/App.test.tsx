@@ -58,6 +58,10 @@ function clientFor(
     })),
     load: vi.fn(async () => session),
     loadEstablishments: vi.fn(async () => collection()),
+    loadCredentialLinkQueue: vi.fn(async () => ({
+      items: [],
+      truncated: false,
+    })),
     loadRenaveLinkStatus: vi.fn(async () => ({
       preflightAvailable: false,
       status: "not_started" as const,
@@ -527,6 +531,65 @@ describe("App session boundary", () => {
     ).rejects.toThrow("Resposta de estabelecimentos inválida");
   });
 
+  it("aceita somente a projeção mínima da fila de vínculos", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({
+          items: [
+            {
+              establishment: { id: "store-a", tradeName: "Loja A" },
+              renaveLink: {
+                status: "pending",
+                updatedAt: "2026-11-24T12:30:00.000Z",
+              },
+            },
+          ],
+          truncated: false,
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          items: [
+            {
+              establishment: {
+                cnpj: "11222333000181",
+                id: "store-a",
+                tradeName: "Loja A",
+              },
+              renaveLink: { status: "pending" },
+            },
+          ],
+          truncated: false,
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.loadCredentialLinkQueue("tenant-a"),
+    ).resolves.toEqual({
+      items: [
+        {
+          establishment: { id: "store-a", tradeName: "Loja A" },
+          renaveLink: {
+            status: "pending",
+            updatedAt: "2026-11-24T12:30:00.000Z",
+          },
+        },
+      ],
+      truncated: false,
+    });
+    await expect(
+      browserSessionClient.loadCredentialLinkQueue("tenant-a"),
+    ).rejects.toThrow("Item inválido na fila de vínculos");
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        cache: "no-store",
+        credentials: "same-origin",
+      }),
+    );
+  });
+
   it("aceita somente o contrato fechado de prontidão RENAVE", async () => {
     const valid: BrowserRenaveReadiness = {
       certificate: "warning",
@@ -768,6 +831,10 @@ describe("App session boundary", () => {
       })),
       load: vi.fn(() => new Promise<BrowserSession>(() => undefined)),
       loadEstablishments: vi.fn(async () => collection()),
+      loadCredentialLinkQueue: vi.fn(async () => ({
+        items: [],
+        truncated: false,
+      })),
       loadRenaveLinkStatus: vi.fn(async () => ({
         preflightAvailable: false,
         status: "not_started" as const,
@@ -1582,6 +1649,67 @@ describe("App session boundary", () => {
       screen.queryByRole("button", { name: "Registrar solicitação local" }),
     ).toBeNull();
     expect(screen.getByText(/capability explícita/i)).toBeVisible();
+  });
+
+  it("carrega a fila somente para administração com MFA disponível", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Administradora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }], "available"),
+    );
+    vi.mocked(client.loadCredentialLinkQueue).mockResolvedValue({
+      items: [
+        {
+          establishment: { id: "store-a", tradeName: "Loja Norte" },
+          renaveLink: { status: "pending" },
+        },
+      ],
+      truncated: false,
+    });
+
+    render(<App client={client} />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Fila de vínculos Credencia",
+      }),
+    ).toBeVisible();
+    expect(client.loadCredentialLinkQueue).toHaveBeenCalledWith("tenant-a");
+    expect(await screen.findByText("Pendente de verificação")).toBeVisible();
+  });
+
+  it("não consulta nem mostra a fila sem capability administrativa", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }], "denied"),
+    );
+
+    render(<App client={client} />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Olá, Operadora" }),
+    ).toBeVisible();
+    expect(client.loadCredentialLinkQueue).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("heading", { name: "Fila de vínculos Credencia" }),
+    ).toBeNull();
   });
 
   it("distingue indisponibilidade de sessão e permite tentar novamente", async () => {

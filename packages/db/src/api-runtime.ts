@@ -11,9 +11,12 @@ export {
 export { parseCnpj } from "./cnpj.js";
 export {
   getCredentialLink,
+  listCredentialLinkQueue,
   confirmCredentialLinkFromPreflight,
   rejectCredentialLinkFromPreflight,
   type CredentialLinkStatus,
+  type CredentialLinkQueueEntry,
+  type CredentialLinkQueuePage,
 } from "./credential-links.js";
 export { APP_ROLE, IDENTITY_APP_ROLE } from "./config.js";
 export {

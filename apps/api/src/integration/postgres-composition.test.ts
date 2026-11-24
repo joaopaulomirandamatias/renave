@@ -652,6 +652,7 @@ describe("composição PostgreSQL real da API", () => {
       config: loadConfig(),
       identity,
       logger: false,
+      tenantActionRunner: createTenantActionRunner(appPool),
       tenantDirectory: directory,
     });
     try {
@@ -670,6 +671,43 @@ describe("composição PostgreSQL real da API", () => {
       });
       expect(collection.body).not.toContain("tenant_admin");
       expect(collection.body).not.toContain(operatorStore.cnpj);
+
+      const linkQueue = await app.inject({
+        method: "GET",
+        url: `/api/tenants/${tenant.id}/renave-link-queue`,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+      expect(linkQueue.statusCode).toBe(200);
+      const linkQueueBody = linkQueue.json<{
+        items: Array<{
+          establishment: { id: string; tradeName: string };
+          renaveLink: { status: string };
+        }>;
+        truncated: boolean;
+      }>();
+      expect(linkQueueBody.items).toHaveLength(2);
+      expect(linkQueueBody.truncated).toBe(false);
+      expect(linkQueueBody.items).toEqual(
+        expect.arrayContaining([
+          {
+            establishment: {
+              id: operatorStore.id,
+              tradeName: operatorStore.tradeName,
+            },
+            renaveLink: { status: "not_started" },
+          },
+          {
+            establishment: {
+              id: otherStore.id,
+              tradeName: otherStore.tradeName,
+            },
+            renaveLink: { status: "not_started" },
+          },
+        ]),
+      );
+      expect(linkQueue.headers["cache-control"]).toBe("no-store");
+      expect(linkQueue.body).not.toContain(operatorStore.cnpj);
+      expect(linkQueue.body).not.toContain(tenant.id);
 
       const detail = await app.inject({
         method: "GET",

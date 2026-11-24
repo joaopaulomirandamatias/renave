@@ -14,6 +14,7 @@ import {
 import type {
   AuthFeedback,
   BrowserCrvType,
+  BrowserCredentialLinkQueueItem,
   BrowserEligibilitySummary,
   BrowserRenaveReadiness,
   BrowserRenaveLinkStatus,
@@ -30,6 +31,7 @@ import {
 } from "../features/homologation-canary/index.js";
 import { ActivationPage } from "./ActivationPage.js";
 import { AttentionPanel } from "./AttentionPanel.js";
+import { CredenciaLinkQueuePanel } from "./CredenciaLinkQueuePanel.js";
 import { EstablishmentCreationPanel } from "./EstablishmentCreationPanel.js";
 import { HomologationReadinessPanel } from "./HomologationReadinessPanel.js";
 import { EligibilityPanel } from "./EligibilityPanel.js";
@@ -38,6 +40,10 @@ import { UsedStockEntryPanel } from "./UsedStockEntryPanel.js";
 
 export interface DashboardPageProps {
   authFeedback?: AuthFeedback;
+  credentialLinkQueue?: readonly BrowserCredentialLinkQueueItem[];
+  credentialLinkQueueError?: boolean;
+  credentialLinkQueueLoading?: boolean;
+  credentialLinkQueueTruncated?: boolean;
   contextError?: boolean;
   contextLoading?: boolean;
   environment: AppEnvironment;
@@ -69,6 +75,7 @@ export interface DashboardPageProps {
     readonly { estado: RenaveStockState; id: number; placa: string }[]
   >;
   onLookupVehicle?: (plate: string) => Promise<BrowserVehicle>;
+  onReloadCredentialLinkQueue?: () => void;
   onTenantChange?: (tenantId: string) => void;
   selectedEstablishmentId?: string;
   selectedTenantId?: string;
@@ -104,6 +111,10 @@ const linkStatusLabels: Record<BrowserRenaveLinkStatus, string> = {
 
 export function DashboardPage({
   authFeedback,
+  credentialLinkQueue,
+  credentialLinkQueueError = false,
+  credentialLinkQueueLoading = false,
+  credentialLinkQueueTruncated = false,
   contextError = false,
   contextLoading = false,
   environment,
@@ -124,6 +135,7 @@ export function DashboardPage({
   onRunPreflight,
   onSearchStocks,
   onLookupVehicle,
+  onReloadCredentialLinkQueue,
   onTenantChange,
   selectedEstablishmentId,
   selectedTenantId,
@@ -320,6 +332,18 @@ export function DashboardPage({
           linkStatusError={linkStatusError}
           linkStatusLoading={linkStatusLoading}
         />
+
+        {establishmentManagement === "available" ? (
+          <CredenciaLinkQueuePanel
+            error={credentialLinkQueueError}
+            loading={credentialLinkQueueLoading}
+            truncated={credentialLinkQueueTruncated}
+            {...(credentialLinkQueue ? { items: credentialLinkQueue } : {})}
+            {...(onReloadCredentialLinkQueue
+              ? { onReload: onReloadCredentialLinkQueue }
+              : {})}
+          />
+        ) : null}
 
         <HomologationReadinessPanel
           error={readinessError}

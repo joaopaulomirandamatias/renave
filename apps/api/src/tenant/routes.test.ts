@@ -2,6 +2,7 @@ import type { IdentityService } from "@seu-renave/identity";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildApp } from "../app.js";
+import type { TenantActionRunner } from "../auth/request-access-guard.js";
 import { loadConfig } from "../config.js";
 import type { TenantDirectory } from "./routes.js";
 
@@ -19,6 +20,7 @@ function setup(
     directory?: TenantDirectory;
     mfaVerified?: boolean;
     sessionLookupGate?: { tryAcquire(): (() => void) | undefined };
+    tenantActionRunner?: TenantActionRunner;
   } = {},
 ) {
   const getSession = vi.fn(async () =>
@@ -43,6 +45,9 @@ function setup(
       ? { sessionLookupGate: options.sessionLookupGate }
       : {}),
     ...(options.directory ? { tenantDirectory: options.directory } : {}),
+    ...(options.tenantActionRunner
+      ? { tenantActionRunner: options.tenantActionRunner }
+      : {}),
   });
   apps.push(app);
   return { app, getSession };
@@ -258,6 +263,106 @@ describe("diretório autenticado de tenants", () => {
       capabilities: { establishmentManagement: "denied" },
       establishments: [],
     });
+  });
+
+  it("expõe fila mínima de vínculos após MFA e autorização administrativa", async () => {
+    const run = vi.fn(async () => ({
+      allowed: true as const,
+      value: {
+        entries: [
+          {
+            establishmentId: ESTABLISHMENT_ID,
+            status: "pending" as const,
+            tradeName: "Loja Centro",
+            updatedAt: new Date("2026-11-24T12:00:00.000Z"),
+          },
+          {
+            establishmentId: "33333333-3333-4333-8333-333333333333",
+            status: "not_started" as const,
+            tradeName: "Loja Norte",
+            updatedAt: null,
+          },
+        ],
+        truncated: true,
+      },
+    }));
+    const { app } = setup({
+      tenantActionRunner: { run } as unknown as TenantActionRunner,
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/renave-link-queue?cnpj=secret`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      items: [
+        {
+          establishment: {
+            id: ESTABLISHMENT_ID,
+            tradeName: "Loja Centro",
+          },
+          renaveLink: {
+            status: "pending",
+            updatedAt: "2026-11-24T12:00:00.000Z",
+          },
+        },
+        {
+          establishment: {
+            id: "33333333-3333-4333-8333-333333333333",
+            tradeName: "Loja Norte",
+          },
+          renaveLink: { status: "not_started" },
+        },
+      ],
+      truncated: true,
+    });
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "tenant.establishment.manage",
+        mfa: "required",
+        tenantId: TENANT_ID,
+      }),
+      expect.any(Function),
+    );
+    expect(response.body).not.toContain("cnpj");
+    expect(response.body).not.toContain("tenantId");
+    expect(response.body).not.toContain("version");
+  });
+
+  it("oculta a fila fora do papel administrativo e exige MFA", async () => {
+    const deniedRun = vi.fn(async () => ({
+      allowed: false as const,
+      reason: "ACCESS_DENIED" as const,
+    }));
+    const denied = setup({
+      tenantActionRunner: { run: deniedRun } as unknown as TenantActionRunner,
+    });
+    const deniedResponse = await denied.app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/renave-link-queue`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(deniedResponse.statusCode).toBe(404);
+    expect(deniedResponse.json()).toEqual({
+      code: "TENANT_RESOURCE_NOT_FOUND",
+    });
+
+    const mfaRun = vi.fn();
+    const withoutMfa = setup({
+      mfaVerified: false,
+      tenantActionRunner: { run: mfaRun } as unknown as TenantActionRunner,
+    });
+    const mfaResponse = await withoutMfa.app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/renave-link-queue`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(mfaResponse.statusCode).toBe(403);
+    expect(mfaResponse.json()).toEqual({ code: "MFA_REQUIRED" });
+    expect(mfaRun).not.toHaveBeenCalled();
   });
 
   it("retorna detalhe mínimo e torna o Location administrativo dereferenciável", async () => {

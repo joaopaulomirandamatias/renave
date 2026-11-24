@@ -4,10 +4,12 @@ import { afterAll, beforeAll, describe, expect, it, inject } from "vitest";
 import {
   confirmCredentialLinkFromPreflight,
   getCredentialLink,
+  listCredentialLinkQueue,
   listCredentialLinkHistory,
   rejectCredentialLinkFromPreflight,
   transitionCredentialLink,
 } from "../../src/credential-links.js";
+import { computeCnpjCheckDigits } from "../../src/cnpj.js";
 import {
   createEstablishment,
   type Establishment,
@@ -23,6 +25,8 @@ let migratorPool: Pool;
 let tenantA: Tenant;
 let tenantB: Tenant;
 let establishmentA: Establishment;
+let inactiveEstablishmentA: Establishment;
+let unlinkedEstablishmentA: Establishment;
 
 beforeAll(async () => {
   adminPool = createPool(urls.admin, { max: 1 });
@@ -42,6 +46,25 @@ beforeAll(async () => {
       tradeName: "Credential A",
     }),
   );
+  unlinkedEstablishmentA = await withTenant(appPool, tenantA.id, (client) =>
+    createEstablishment(client, {
+      cnpj: "12ABC34501DE35",
+      tradeName: "Credential sem vínculo",
+    }),
+  );
+  const inactiveCnpjBase = "99ABC12345DE";
+  inactiveEstablishmentA = await withTenant(appPool, tenantA.id, (client) =>
+    createEstablishment(client, {
+      cnpj: `${inactiveCnpjBase}${computeCnpjCheckDigits(inactiveCnpjBase)}`,
+      tradeName: "Credential inativo",
+    }),
+  );
+  await withTenant(migratorPool, tenantA.id, (client) =>
+    client.query(
+      "update renave.establishment set status = 'inactive' where id = $1",
+      [inactiveEstablishmentA.id],
+    ),
+  );
 });
 
 afterAll(async () => {
@@ -49,6 +72,32 @@ afterAll(async () => {
 });
 
 describe("vínculo Credencia/RENAVE", () => {
+  it("projeta fila sanitizada, inclui não iniciado e respeita RLS", async () => {
+    const queue = await withTenant(appPool, tenantA.id, (client) =>
+      listCredentialLinkQueue(client),
+    );
+    expect(queue.entries).toContainEqual({
+      establishmentId: unlinkedEstablishmentA.id,
+      status: "not_started",
+      tradeName: "Credential sem vínculo",
+      updatedAt: null,
+    });
+    expect(queue.entries).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          establishmentId: inactiveEstablishmentA.id,
+        }),
+      ]),
+    );
+    expect(queue.truncated).toBe(false);
+    expect(JSON.stringify(queue)).not.toContain(unlinkedEstablishmentA.cnpj);
+    await expect(
+      withTenant(appPool, tenantB.id, (client) =>
+        listCredentialLinkQueue(client),
+      ),
+    ).resolves.toEqual({ entries: [], truncated: false });
+  });
+
   it("mantém estado atual e histórico append-only", async () => {
     const pending = await withTenant(appPool, tenantA.id, (client) =>
       transitionCredentialLink(client, {
