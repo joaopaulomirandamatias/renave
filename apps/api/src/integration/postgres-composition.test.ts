@@ -1,6 +1,16 @@
-import { EvidenceCipher } from "@seu-renave/protected-evidence";
-import type { RenaveConnector } from "@seu-renave/renave-connector";
+import { createHash, randomUUID } from "node:crypto";
+
 import {
+  EvidenceCipher,
+  OperationReconciliationProjectionCipher,
+  OperationRequestCipher,
+} from "@seu-renave/protected-evidence";
+import {
+  restorePreparedRenaveMutation,
+  type RenaveConnector,
+} from "@seu-renave/renave-connector";
+import {
+  createOrReplayOperation,
   createEstablishment,
   createPool,
   getCredentialLink,
@@ -18,6 +28,7 @@ import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 
 import { PostgresVehicleEligibilityUseCase } from "../renave/use-case.js";
+import { buildCreateOperationInput } from "../renave/operation-request-builder.js";
 import { PostgresRenaveLinkPreflightUseCase } from "../renave/preflight-use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "../renave/link-status-use-case.js";
 import { PostgresStockQueryUseCase } from "../renave/stock-query-use-case.js";
@@ -389,6 +400,245 @@ describe("composição PostgreSQL real da API", () => {
           [tenant.id],
         ),
       );
+    }
+  });
+
+  it("compõe builder, persistência, UNKNOWN/recovery e reconciliação cifrada", async () => {
+    const requestCipher = new OperationRequestCipher({
+      activeKeyId: "composition-request-key",
+      environment: "homologation",
+      keys: new Map([["composition-request-key", Buffer.alloc(32, 0x31)]]),
+    });
+    const projectionCipher = new OperationReconciliationProjectionCipher({
+      activeKeyId: "composition-projection-key",
+      environment: "homologation",
+      masterKeys: new Map([
+        ["composition-projection-key", Buffer.alloc(32, 0x32)],
+      ]),
+    });
+    const cpfSentinel = "12345678901";
+    const plateSentinel = "QTP4H82";
+    const renavamSentinel = "10987654321";
+    const crvSentinel = "123456789012";
+    const codeSentinel = "98765432109";
+
+    async function build(plate: string, suffix: string) {
+      const exact = Buffer.from(
+        JSON.stringify({
+          cpfOperadorResponsavel: cpfSentinel,
+          dataCompra: "2026-11-24",
+          emailEstabelecimento: "loja@example.test",
+          emailVendedor: "vendedor@example.test",
+          valorCompra: 100,
+          veiculo: {
+            codigoSegurancaCrv: codeSentinel,
+            dataHoraMedicaoHodometro: "2026-11-24T12:00:00-03:00",
+            documentoProprietarioAtual: cpfSentinel,
+            numeroCrv: crvSentinel,
+            placa: plate,
+            quilometragemHodometro: 10,
+            renavam: renavamSentinel,
+            tipoCrv: "DIGITAL",
+            tipoDocumentoProprietarioAtual: "CPF",
+          },
+        }),
+        "utf8",
+      );
+      const prepared = await restorePreparedRenaveMutation(
+        "request-stock-entry",
+        exact,
+        createHash("sha256").update(exact).digest("hex"),
+      );
+      return buildCreateOperationInput(requestCipher, projectionCipher, {
+        actorSubjectHash: createHash("sha256")
+          .update(`actor:${suffix}`)
+          .digest(),
+        correlationId: randomUUID(),
+        environment: "homologation",
+        establishmentId: operatorStore.id,
+        idempotencyKeyDigest: createHash("sha256")
+          .update(`idempotency:${suffix}`)
+          .digest(),
+        prepared,
+        tenantId: tenant.id,
+        vehicleKeyDigest: createHash("sha256").update(plate).digest(),
+      });
+    }
+
+    async function reconcile(
+      operationInput: Awaited<ReturnType<typeof build>>,
+      path: "unknown" | "recovery",
+    ) {
+      const created = await withTenant(appPool, tenant.id, (client) =>
+        createOrReplayOperation(client, operationInput),
+      );
+      const result = await withTenant(
+        migratorPool,
+        tenant.id,
+        async (client) => {
+          const sendOwner = randomUUID();
+          const send = await client.query<{
+            lease_token: string;
+            outbox_id: string;
+          }>("select * from renave.claim_operation_send_leases($1,1)", [
+            sendOwner,
+          ]);
+          const dispatch = await client.query<{ operation_version: string }>(
+            "select * from renave.begin_operation_send_dispatch($1,$2,$3)",
+            [send.rows[0]!.outbox_id, sendOwner, send.rows[0]!.lease_token],
+          );
+          let reconcileOutboxId: string;
+          let operationVersion: string;
+          if (path === "unknown") {
+            const unknown = await client.query<{
+              operation_version: string;
+              reconcile_outbox_id: string;
+            }>(
+              "select * from renave.complete_operation_send_outcome_unknown($1,$2,$3,$4)",
+              [
+                send.rows[0]!.outbox_id,
+                sendOwner,
+                send.rows[0]!.lease_token,
+                dispatch.rows[0]!.operation_version,
+              ],
+            );
+            reconcileOutboxId = unknown.rows[0]!.reconcile_outbox_id;
+            operationVersion = unknown.rows[0]!.operation_version;
+          } else {
+            await client.query(
+              `update renave.operation_outbox
+                  set lease_expires_at=clock_timestamp()-interval '1 ms'
+                where id=$1`,
+              [send.rows[0]!.outbox_id],
+            );
+            const recovered = await client.query<{
+              operation_version: string;
+              reconcile_outbox_id: string;
+            }>("select * from renave.recover_expired_operation_sends(1)");
+            reconcileOutboxId = recovered.rows[0]!.reconcile_outbox_id;
+            operationVersion = recovered.rows[0]!.operation_version;
+          }
+          await client.query(
+            `update renave.operation_outbox
+                set available_at=clock_timestamp()-interval '1 ms'
+              where id=$1`,
+            [reconcileOutboxId],
+          );
+          const reconcileOwner = randomUUID();
+          const claimed = await client.query<{
+            lease_token: string;
+            operation_version: string;
+            outbox_id: string;
+          }>(
+            "select * from renave.claim_operation_reconciliation_leases($1,1)",
+            [reconcileOwner],
+          );
+          expect(claimed.rows[0]!.operation_version).toBe(operationVersion);
+          const begun = await client.query<{
+            establishment_id: string;
+            kind: "USED_STOCK_ENTRY";
+            mutation_family: "STOCK_ENTRY";
+            operation_id: string;
+            projection_auth_tag: Buffer;
+            projection_ciphertext: Buffer;
+            projection_generation: string;
+            projection_key_id: string;
+            projection_kind: "STOCK_ENTRY_RECONCILIATION";
+            projection_nonce: Buffer;
+            projection_schema_version: 1;
+            projection_size: number;
+            request_schema_version: 1;
+            source_request_sha256: Buffer;
+          }>(
+            "select * from renave.begin_operation_reconciliation($1,$2,$3,$4)",
+            [
+              claimed.rows[0]!.outbox_id,
+              reconcileOwner,
+              claimed.rows[0]!.lease_token,
+              claimed.rows[0]!.operation_version,
+            ],
+          );
+          return begun.rows[0]!;
+        },
+      );
+      expect(result.operation_id).toBe(created.operation.id);
+      const restored = projectionCipher.decrypt(
+        {
+          authTag: result.projection_auth_tag,
+          ciphertext: result.projection_ciphertext,
+          generation: Number(result.projection_generation),
+          keyId: result.projection_key_id,
+          nonce: result.projection_nonce,
+          projectionByteLength: result.projection_size,
+          projectionKind: result.projection_kind,
+          projectionSchemaVersion: result.projection_schema_version,
+        },
+        {
+          environment: "homologation",
+          establishmentId: result.establishment_id,
+          generation: Number(result.projection_generation),
+          kind: result.kind,
+          mutationFamily: result.mutation_family,
+          operationId: result.operation_id,
+          requestSchemaVersion: result.request_schema_version,
+          sourceRequestSha256: result.source_request_sha256.toString("hex"),
+          tenantId: tenant.id,
+        },
+      );
+      const projectionBytes = restored.copyBodyBytes();
+      restored.destroy();
+      return {
+        begin: result,
+        projection: JSON.parse(
+          new TextDecoder().decode(projectionBytes),
+        ) as unknown,
+      };
+    }
+
+    const unknown = await reconcile(
+      await build(plateSentinel, "composition-unknown"),
+      "unknown",
+    );
+    const recovery = await reconcile(
+      await build("ABC1D23", "composition-recovery"),
+      "recovery",
+    );
+    expect(unknown.projection).toMatchObject({
+      cpfOperadorResponsavel: cpfSentinel,
+      veiculo: {
+        codigoSegurancaCrv: codeSentinel,
+        numeroCrv: crvSentinel,
+        placa: plateSentinel,
+        renavam: renavamSentinel,
+        tipoCrv: "DIGITAL",
+      },
+    });
+    expect(recovery.projection).toMatchObject({
+      veiculo: { placa: "ABC1D23" },
+    });
+
+    const schema = await adminPool.query<{ column_name: string }>(
+      `select column_name from information_schema.columns
+        where table_schema='renave'
+          and table_name in ('operation','operation_reconciliation_projection')`,
+    );
+    expect(
+      schema.rows.map(({ column_name }) => column_name).join(" "),
+    ).not.toMatch(/cpf|placa|renavam|crv/iu);
+    const publicMetadata = JSON.stringify([unknown.begin, recovery.begin]);
+    for (const sentinel of [
+      cpfSentinel,
+      plateSentinel,
+      renavamSentinel,
+      crvSentinel,
+      codeSentinel,
+    ]) {
+      expect(publicMetadata).not.toContain(sentinel);
+      for (const row of [unknown.begin, recovery.begin]) {
+        expect(row.projection_ciphertext.toString("utf8")).not.toContain(
+          sentinel,
+        );
+      }
     }
   });
 

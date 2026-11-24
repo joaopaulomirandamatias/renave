@@ -21,6 +21,15 @@ function input(): CreateOperationInput {
     idempotencyKeyDigest: Buffer.alloc(32, 2),
     kind: "USED_STOCK_ENTRY",
     mutationFamily: "STOCK_ENTRY",
+    operationId: randomUUID(),
+    reconciliationProjectionAuthTag: Buffer.alloc(16, 7),
+    reconciliationProjectionByteLength: 21,
+    reconciliationProjectionCiphertext: Buffer.alloc(21, 8),
+    reconciliationProjectionGeneration: 1,
+    reconciliationProjectionKeyId: "projection-key-v1",
+    reconciliationProjectionKind: "STOCK_ENTRY_RECONCILIATION",
+    reconciliationProjectionNonce: Buffer.alloc(12, 9),
+    reconciliationProjectionSchemaVersion: 1,
     requestAuthTag: Buffer.alloc(16, 3),
     requestCiphertext: Buffer.from("ciphertext"),
     requestKeyId: "operation-key-v1",
@@ -84,6 +93,9 @@ describe("operation repository", () => {
       candidate.requestAuthTag,
       candidate.requestCiphertext,
       candidate.actorSubjectHash,
+      candidate.reconciliationProjectionNonce,
+      candidate.reconciliationProjectionAuthTag,
+      candidate.reconciliationProjectionCiphertext,
     ].map((buffer) => Buffer.from(buffer));
     const operationId = randomUUID();
     let resolveCreate!: (value: { rows: unknown[] }) => void;
@@ -107,11 +119,14 @@ describe("operation repository", () => {
       candidate.requestAuthTag,
       candidate.requestCiphertext,
       candidate.actorSubjectHash,
+      candidate.reconciliationProjectionNonce,
+      candidate.reconciliationProjectionAuthTag,
+      candidate.reconciliationProjectionCiphertext,
     ]) {
       buffer.fill(9);
     }
 
-    const capturedBuffers = [3, 4, 5, 9, 10, 11, 12].map(
+    const capturedBuffers = [4, 5, 6, 10, 11, 12, 13, 20, 21, 22].map(
       (index) => createParameters?.[index],
     );
     expect(capturedBuffers).toEqual(originalBuffers);
@@ -125,6 +140,9 @@ describe("operation repository", () => {
         candidate.requestAuthTag,
         candidate.requestCiphertext,
         candidate.actorSubjectHash,
+        candidate.reconciliationProjectionNonce,
+        candidate.reconciliationProjectionAuthTag,
+        candidate.reconciliationProjectionCiphertext,
       ][index],
     ])) {
       expect(captured).not.toBe(current);
@@ -148,6 +166,12 @@ describe("operation repository", () => {
     string,
     (value: CreateOperationInput) => void,
   ])[] = [
+    [
+      "operation uuid",
+      (value) => {
+        value.operationId = "invalid";
+      },
+    ],
     [
       "establishment uuid",
       (value) => {
@@ -268,6 +292,55 @@ describe("operation repository", () => {
         value.requestCiphertext = Buffer.alloc(1_048_577);
       },
     ],
+    [
+      "projection kind",
+      (value) => {
+        value.reconciliationProjectionKind = "OTHER" as never;
+      },
+    ],
+    [
+      "projection schema",
+      (value) => {
+        value.reconciliationProjectionSchemaVersion = 2 as never;
+      },
+    ],
+    [
+      "projection generation",
+      (value) => {
+        value.reconciliationProjectionGeneration = 2;
+      },
+    ],
+    [
+      "projection size mismatch",
+      (value) => {
+        value.reconciliationProjectionByteLength += 1;
+      },
+    ],
+    [
+      "projection key",
+      (value) => {
+        value.reconciliationProjectionKeyId = " invalid";
+      },
+    ],
+    [
+      "projection nonce",
+      (value) => {
+        value.reconciliationProjectionNonce = Buffer.alloc(11);
+      },
+    ],
+    [
+      "projection tag",
+      (value) => {
+        value.reconciliationProjectionAuthTag = Buffer.alloc(15);
+      },
+    ],
+    [
+      "projection ciphertext large",
+      (value) => {
+        value.reconciliationProjectionCiphertext = Buffer.alloc(4097);
+        value.reconciliationProjectionByteLength = 4097;
+      },
+    ],
   ];
 
   it.each(invalidCases)("recusa %s antes do banco", async (_name, mutate) => {
@@ -296,7 +369,7 @@ describe("operation repository", () => {
       createOrReplayOperation(clientWithQuery(query), candidate),
     ).resolves.toMatchObject({ replayed: false });
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[0]?.[1]?.[8]).toBe(candidate.requestKeyId);
+    expect(query.mock.calls[0]?.[1]?.[9]).toBe(candidate.requestKeyId);
   });
 
   it.each([

@@ -41,6 +41,15 @@ export interface CreateOperationInput {
   idempotencyKeyDigest: Buffer;
   kind: OperationKind;
   mutationFamily: OperationMutationFamily;
+  operationId: string;
+  reconciliationProjectionAuthTag: Buffer;
+  reconciliationProjectionByteLength: number;
+  reconciliationProjectionCiphertext: Buffer;
+  reconciliationProjectionGeneration: number;
+  reconciliationProjectionKeyId: string;
+  reconciliationProjectionKind: "STOCK_ENTRY_RECONCILIATION";
+  reconciliationProjectionNonce: Buffer;
+  reconciliationProjectionSchemaVersion: 1;
   requestAuthTag: Buffer;
   requestCiphertext: Buffer;
   requestKeyId: string;
@@ -79,6 +88,14 @@ export class OperationActiveConflictError extends Error {
   }
 }
 
+export class OperationIdentifierConflictError extends Error {
+  override name = "OperationIdentifierConflictError";
+
+  constructor() {
+    super("O identificador da operação já está em uso.");
+  }
+}
+
 export class OperationStorageError extends Error {
   override name = "OperationStorageError";
 
@@ -111,6 +128,15 @@ interface NormalizedOperationInput {
   idempotencyKeyDigest: Buffer;
   kind: OperationKind;
   mutationFamily: OperationMutationFamily;
+  operationId: string;
+  reconciliationProjectionAuthTag: Buffer;
+  reconciliationProjectionByteLength: number;
+  reconciliationProjectionCiphertext: Buffer;
+  reconciliationProjectionGeneration: number;
+  reconciliationProjectionKeyId: string;
+  reconciliationProjectionKind: "STOCK_ENTRY_RECONCILIATION";
+  reconciliationProjectionNonce: Buffer;
+  reconciliationProjectionSchemaVersion: 1;
   requestAuthTag: Buffer;
   requestCiphertext: Buffer;
   requestKeyId: string;
@@ -136,9 +162,21 @@ function copyBuffer(value: unknown, expectedSize?: number): Buffer {
   return Buffer.from(value);
 }
 
+function copyProjectionCiphertext(value: unknown): Buffer {
+  if (
+    !Buffer.isBuffer(value) ||
+    value.byteLength < 1 ||
+    value.byteLength > 4096
+  ) {
+    throw new OperationInputError();
+  }
+  return Buffer.from(value);
+}
+
 function normalizeInput(input: CreateOperationInput): NormalizedOperationInput {
   if (
     !input ||
+    !isUuid(input.operationId) ||
     !isUuid(input.establishmentId) ||
     !isUuid(input.correlationId) ||
     input.kind !== "USED_STOCK_ENTRY" ||
@@ -147,7 +185,18 @@ function normalizeInput(input: CreateOperationInput): NormalizedOperationInput {
     input.requestSchemaVersion < 1 ||
     input.requestSchemaVersion > MAX_SCHEMA_VERSION ||
     typeof input.requestKeyId !== "string" ||
-    !KEY_ID_PATTERN.test(input.requestKeyId)
+    !KEY_ID_PATTERN.test(input.requestKeyId) ||
+    input.reconciliationProjectionKind !== "STOCK_ENTRY_RECONCILIATION" ||
+    input.reconciliationProjectionSchemaVersion !== 1 ||
+    input.reconciliationProjectionGeneration !== 1 ||
+    !Number.isInteger(input.reconciliationProjectionByteLength) ||
+    input.reconciliationProjectionByteLength < 1 ||
+    input.reconciliationProjectionByteLength > 4096 ||
+    !Buffer.isBuffer(input.reconciliationProjectionCiphertext) ||
+    input.reconciliationProjectionCiphertext.byteLength !==
+      input.reconciliationProjectionByteLength ||
+    typeof input.reconciliationProjectionKeyId !== "string" ||
+    !KEY_ID_PATTERN.test(input.reconciliationProjectionKeyId)
   ) {
     throw new OperationInputError();
   }
@@ -159,6 +208,26 @@ function normalizeInput(input: CreateOperationInput): NormalizedOperationInput {
     idempotencyKeyDigest: copyBuffer(input.idempotencyKeyDigest, 32),
     kind: input.kind,
     mutationFamily: input.mutationFamily,
+    operationId: input.operationId.toLowerCase(),
+    reconciliationProjectionAuthTag: copyBuffer(
+      input.reconciliationProjectionAuthTag,
+      16,
+    ),
+    reconciliationProjectionByteLength:
+      input.reconciliationProjectionByteLength,
+    reconciliationProjectionCiphertext: copyProjectionCiphertext(
+      input.reconciliationProjectionCiphertext,
+    ),
+    reconciliationProjectionGeneration:
+      input.reconciliationProjectionGeneration,
+    reconciliationProjectionKeyId: input.reconciliationProjectionKeyId,
+    reconciliationProjectionKind: input.reconciliationProjectionKind,
+    reconciliationProjectionNonce: copyBuffer(
+      input.reconciliationProjectionNonce,
+      12,
+    ),
+    reconciliationProjectionSchemaVersion:
+      input.reconciliationProjectionSchemaVersion,
     requestAuthTag: copyBuffer(input.requestAuthTag, 16),
     requestCiphertext: copyBuffer(input.requestCiphertext),
     requestKeyId: input.requestKeyId,
@@ -195,6 +264,9 @@ function mapCreateError(error: unknown): never {
   }
   if (code === "23000" && message === "operation: mutação ativa conflitante") {
     throw new OperationActiveConflictError();
+  }
+  if (code === "23000" && message === "operation: identificador já utilizado") {
+    throw new OperationIdentifierConflictError();
   }
   throw new OperationStorageError();
 }
@@ -268,9 +340,11 @@ export async function createOrReplayOperation(
       `select operation_id, replayed
          from renave.create_operation_with_outbox(
            $1, $2, $3, $4, $5, $6, $7, $8,
-           $9, $10, $11, $12, $13, $14
+           $9, $10, $11, $12, $13, $14, $15, $16,
+           $17, $18, $19, $20, $21, $22, $23
          )`,
       [
+        operation.operationId,
         operation.establishmentId,
         operation.kind,
         operation.mutationFamily,
@@ -285,6 +359,14 @@ export async function createOrReplayOperation(
         operation.requestCiphertext,
         operation.actorSubjectHash,
         operation.correlationId,
+        operation.reconciliationProjectionKind,
+        operation.reconciliationProjectionSchemaVersion,
+        operation.reconciliationProjectionGeneration,
+        operation.reconciliationProjectionByteLength,
+        operation.reconciliationProjectionKeyId,
+        operation.reconciliationProjectionNonce,
+        operation.reconciliationProjectionAuthTag,
+        operation.reconciliationProjectionCiphertext,
       ],
     );
     created = rows[0];

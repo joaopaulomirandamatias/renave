@@ -772,6 +772,58 @@ function cipherState(
   return state;
 }
 
+function encryptProjectionWithState(
+  state: CipherState,
+  prepared: PreparedOperationReconciliationProjection,
+  binding: OperationReconciliationProjectionBinding,
+): EncryptedOperationReconciliationProjection {
+  const normalized = normalizeBinding(binding);
+  const preparedProjection = preparedState(prepared);
+  if (
+    normalized.environment !== state.environment ||
+    normalized.sourceRequestSha256 !== preparedProjection.sourceRequestSha256
+  ) {
+    throw new OperationReconciliationProjectionInputError();
+  }
+  const body = new Uint8Array(preparedProjection.body.byteLength);
+  body.set(preparedProjection.body);
+  try {
+    const nonce = randomBytes(NONCE_BYTES);
+    const cipher = createCipheriv(
+      "aes-256-gcm",
+      state.effectiveKeys.get(state.activeKeyId)!,
+      nonce,
+      { authTagLength: TAG_BYTES },
+    );
+    cipher.setAAD(aad(normalized, state.activeKeyId, body.byteLength));
+    const ciphertext = Buffer.concat([cipher.update(body), cipher.final()]);
+    return {
+      authTag: Buffer.from(cipher.getAuthTag()),
+      ciphertext: Buffer.from(ciphertext),
+      generation: normalized.generation,
+      keyId: state.activeKeyId,
+      nonce: Buffer.from(nonce),
+      projectionByteLength: body.byteLength,
+      projectionKind: PROJECTION_KIND,
+      projectionSchemaVersion: PROJECTION_SCHEMA_VERSION,
+    };
+  } finally {
+    body.fill(0);
+  }
+}
+
+/**
+ * Cifra uma projeção usando somente o estado nominal mantido pelo pacote.
+ * Não despacha para métodos sobrescrevíveis do objeto recebido.
+ */
+export function encryptOperationReconciliationProjection(
+  cipher: OperationReconciliationProjectionCipher,
+  prepared: PreparedOperationReconciliationProjection,
+  binding: OperationReconciliationProjectionBinding,
+): EncryptedOperationReconciliationProjection {
+  return encryptProjectionWithState(cipherState(cipher), prepared, binding);
+}
+
 function snapshotEnvelope(
   payload: EncryptedOperationReconciliationProjection,
 ): EnvelopeSnapshot {
@@ -927,39 +979,7 @@ export class OperationReconciliationProjectionCipher {
     prepared: PreparedOperationReconciliationProjection,
     binding: OperationReconciliationProjectionBinding,
   ): EncryptedOperationReconciliationProjection {
-    const state = cipherState(this);
-    const normalized = normalizeBinding(binding);
-    const preparedProjection = preparedState(prepared);
-    if (
-      normalized.environment !== state.environment ||
-      normalized.sourceRequestSha256 !== preparedProjection.sourceRequestSha256
-    ) {
-      throw new OperationReconciliationProjectionInputError();
-    }
-    const body = prepared.copyBodyBytes();
-    try {
-      const nonce = randomBytes(NONCE_BYTES);
-      const cipher = createCipheriv(
-        "aes-256-gcm",
-        state.effectiveKeys.get(state.activeKeyId)!,
-        nonce,
-        { authTagLength: TAG_BYTES },
-      );
-      cipher.setAAD(aad(normalized, state.activeKeyId, body.byteLength));
-      const ciphertext = Buffer.concat([cipher.update(body), cipher.final()]);
-      return {
-        authTag: Buffer.from(cipher.getAuthTag()),
-        ciphertext: Buffer.from(ciphertext),
-        generation: normalized.generation,
-        keyId: state.activeKeyId,
-        nonce: Buffer.from(nonce),
-        projectionByteLength: body.byteLength,
-        projectionKind: PROJECTION_KIND,
-        projectionSchemaVersion: PROJECTION_SCHEMA_VERSION,
-      };
-    } finally {
-      body.fill(0);
-    }
+    return encryptProjectionWithState(cipherState(this), prepared, binding);
   }
 
   decrypt(

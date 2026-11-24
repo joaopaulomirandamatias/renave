@@ -13,6 +13,7 @@ import {
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
+import { operationProjectionFields } from "../helpers/operation-projection.js";
 
 const urls = inject("dbUrls");
 
@@ -64,6 +65,7 @@ async function fixture(label: string): Promise<Fixture> {
 
 function operationInput(target: Fixture, label: string): CreateOperationInput {
   return {
+    ...operationProjectionFields(`lease:${label}`),
     actorSubjectHash: digest(`actor:${label}`),
     correlationId: randomUUID(),
     establishmentId: target.establishment.id,

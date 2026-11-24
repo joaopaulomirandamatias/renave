@@ -79,6 +79,7 @@ export {
   operationStatuses,
   OperationActiveConflictError,
   OperationIdempotencyConflictError,
+  OperationIdentifierConflictError,
   OperationInputError,
   OperationStorageError,
   type CreateOperationInput,

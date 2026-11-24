@@ -11,11 +11,14 @@ import {
   createOrReplayOperation,
   getOperation,
   OperationActiveConflictError,
+  OperationIdentifierConflictError,
   OperationIdempotencyConflictError,
+  OperationStorageError,
   type CreateOperationInput,
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
+import { operationProjectionFields } from "../helpers/operation-projection.js";
 
 const urls = inject("dbUrls");
 let appPool: Pool;
@@ -23,6 +26,7 @@ let migratorPool: Pool;
 let tenantA: Tenant;
 let tenantB: Tenant;
 let establishmentA: Establishment;
+let establishmentB: Establishment;
 
 function digest(value: string | Buffer): Buffer {
   return createHash("sha256").update(value).digest();
@@ -32,6 +36,7 @@ function operationInput(label: string): CreateOperationInput {
   const plaintext = Buffer.from(`{"label":${JSON.stringify(label)}}`, "utf8");
   const ciphertext = Buffer.from(`encrypted:${label}`);
   return {
+    ...operationProjectionFields(`repository:${label}`),
     actorSubjectHash: digest(`actor:${label}`),
     correlationId: randomUUID(),
     establishmentId: establishmentA.id,
@@ -63,6 +68,12 @@ beforeAll(async () => {
     createEstablishment(client, {
       cnpj: "11.222.333/0001-81",
       tradeName: "Repository A",
+    }),
+  );
+  establishmentB = await withTenant(appPool, tenantB.id, (client) =>
+    createEstablishment(client, {
+      cnpj: "12.ABC.345/01DE-35",
+      tradeName: "Repository B",
     }),
   );
 });
@@ -132,6 +143,12 @@ describe("operation repository integration", () => {
     }
     const rotated = {
       ...original,
+      reconciliationProjectionAuthTag: Buffer.alloc(16, 7),
+      reconciliationProjectionCiphertext: Buffer.from(
+        original.reconciliationProjectionCiphertext.map((byte) => byte ^ 0xaa),
+      ),
+      reconciliationProjectionKeyId: "projection-key-v2",
+      reconciliationProjectionNonce: Buffer.alloc(12, 6),
       requestAuthTag: Buffer.alloc(16, 9),
       requestCiphertext: rotatedCiphertext,
       requestKeyId: "repository-key-v2",
@@ -151,11 +168,21 @@ describe("operation repository integration", () => {
         request_key_id: string;
         request_nonce: Buffer;
         request_sha256: Buffer;
+        projection_auth_tag: Buffer;
+        projection_ciphertext: Buffer;
+        projection_key_id: string;
+        projection_nonce: Buffer;
       }>(
-        `select request_auth_tag, request_ciphertext, request_key_id,
-                request_nonce, request_sha256
-           from renave.operation
-          where id = $1`,
+        `select operation.request_auth_tag, operation.request_ciphertext,
+                operation.request_key_id, operation.request_nonce,
+                operation.request_sha256, projection.projection_auth_tag,
+                projection.projection_ciphertext, projection.projection_key_id,
+                projection.projection_nonce
+           from renave.operation operation
+           join renave.operation_reconciliation_projection projection
+             on projection.tenant_id = operation.tenant_id
+            and projection.operation_id = operation.id
+          where operation.id = $1`,
         [first.operation.id],
       ),
     );
@@ -178,6 +205,24 @@ describe("operation repository integration", () => {
     expect(stored.rows[0]!.request_ciphertext.equals(rotatedCiphertext)).toBe(
       false,
     );
+    expect(stored.rows[0]!.projection_key_id).toBe(
+      original.reconciliationProjectionKeyId,
+    );
+    expect(
+      stored.rows[0]!.projection_nonce.equals(
+        original.reconciliationProjectionNonce,
+      ),
+    ).toBe(true);
+    expect(
+      stored.rows[0]!.projection_auth_tag.equals(
+        original.reconciliationProjectionAuthTag,
+      ),
+    ).toBe(true);
+    expect(
+      stored.rows[0]!.projection_ciphertext.equals(
+        original.reconciliationProjectionCiphertext,
+      ),
+    ).toBe(true);
   });
 
   it("converte operação ativa do mesmo veículo em erro fechado", async () => {
@@ -195,5 +240,79 @@ describe("operation repository integration", () => {
         createOrReplayOperation(client, second),
       ),
     ).rejects.toBeInstanceOf(OperationActiveConflictError);
+  });
+
+  it("distingue colisão de operationId do conflito de veículo ativo", async () => {
+    const original = operationInput("operation-id-collision");
+    await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayOperation(client, original),
+    );
+    const collision = {
+      ...operationInput("operation-id-collision-second"),
+      operationId: original.operationId,
+    };
+
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        createOrReplayOperation(client, collision),
+      ),
+    ).rejects.toBeInstanceOf(OperationIdentifierConflictError);
+  });
+
+  it("impõe nonce global por chave e reverte toda a segunda criação", async () => {
+    const original = operationInput("projection-global-nonce-a");
+    await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayOperation(client, original),
+    );
+    const collision = {
+      ...operationInput("projection-global-nonce-b"),
+      establishmentId: establishmentB.id,
+      reconciliationProjectionKeyId: original.reconciliationProjectionKeyId,
+      reconciliationProjectionNonce: Buffer.from(
+        original.reconciliationProjectionNonce,
+      ),
+    };
+
+    await expect(
+      withTenant(appPool, tenantB.id, (client) =>
+        createOrReplayOperation(client, collision),
+      ),
+    ).rejects.toBeInstanceOf(OperationStorageError);
+    await expect(
+      withTenant(appPool, tenantB.id, (client) =>
+        getOperation(client, collision.operationId),
+      ),
+    ).resolves.toBeNull();
+  });
+
+  it("falha fechado no replay de estado legado sem projeção", async () => {
+    const original = operationInput("legacy-without-projection");
+    await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayOperation(client, original),
+    );
+
+    await expect(
+      withTenant(migratorPool, tenantA.id, async (client) => {
+        await client.query(
+          `alter table renave.operation_reconciliation_projection
+             disable trigger operation_reconciliation_projection_reject_update_delete`,
+        );
+        await client.query(
+          `delete from renave.operation_reconciliation_projection
+            where operation_id = $1`,
+          [original.operationId],
+        );
+        await createOrReplayOperation(client, original);
+      }),
+    ).rejects.toBeInstanceOf(OperationStorageError);
+
+    const projection = await withTenant(migratorPool, tenantA.id, (client) =>
+      client.query(
+        `select 1 from renave.operation_reconciliation_projection
+            where operation_id = $1`,
+        [original.operationId],
+      ),
+    );
+    expect(projection.rowCount).toBe(1);
   });
 });

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   OperationRequestCipher,
   OperationRequestDecryptionError,
+  OperationReconciliationProjectionCipher,
   type EncryptedOperationRequest,
   type OperationRequestBinding,
 } from "@seu-renave/protected-evidence";
@@ -37,12 +38,40 @@ function cipher(): OperationRequestCipher {
   });
 }
 
+function projectionCipher(): OperationReconciliationProjectionCipher {
+  return new OperationReconciliationProjectionCipher({
+    activeKeyId: "projection-key-2026-11",
+    environment: "homologation",
+    masterKeys: new Map([["projection-key-2026-11", Buffer.alloc(32, 8)]]),
+  });
+}
+
 function sha256(bytes: Uint8Array): Buffer {
   return createHash("sha256").update(bytes).digest();
 }
 
 async function preparedExact(): Promise<PreparedRenaveMutation> {
-  const exact = Buffer.from('{ "z":1,\n"a":"ação 🚗" }\n', "utf8");
+  const exact = Buffer.from(
+    JSON.stringify({
+      cpfOperadorResponsavel: "123.456.789-01",
+      dataCompra: "2026-11-24",
+      emailEstabelecimento: "loja@example.test",
+      emailVendedor: "vendedor@example.test",
+      valorCompra: 100,
+      veiculo: {
+        codigoSegurancaCrv: "12345678901",
+        dataHoraMedicaoHodometro: "2026-11-24T12:00:00-03:00",
+        documentoProprietarioAtual: "12345678901",
+        numeroCrv: "123456789012",
+        placa: "QTP4H82",
+        quilometragemHodometro: 10,
+        renavam: "10987654321",
+        tipoCrv: "DIGITAL",
+        tipoDocumentoProprietarioAtual: "CPF",
+      },
+    }),
+    "utf8",
+  );
   return restorePreparedRenaveMutation(
     "request-stock-entry",
     exact,
@@ -84,13 +113,43 @@ describe("buildCreateOperationInput", () => {
     const prepared = await preparedExact();
     const input = { ...metadata, prepared };
     const requestCipher = cipher();
+    const reconciliationCipher = projectionCipher();
 
-    const operation = buildCreateOperationInput(requestCipher, input);
+    const operation = buildCreateOperationInput(
+      requestCipher,
+      reconciliationCipher,
+      input,
+    );
     const restored = await requestCipher.decrypt(
       envelope(operation),
       binding(input),
     );
     const plaintext = restored.copyBodyBytes();
+    const restoredProjection = reconciliationCipher.decrypt(
+      {
+        authTag: Buffer.from(operation.reconciliationProjectionAuthTag),
+        ciphertext: Buffer.from(operation.reconciliationProjectionCiphertext),
+        generation: operation.reconciliationProjectionGeneration,
+        keyId: operation.reconciliationProjectionKeyId,
+        nonce: Buffer.from(operation.reconciliationProjectionNonce),
+        projectionByteLength: operation.reconciliationProjectionByteLength,
+        projectionKind: operation.reconciliationProjectionKind,
+        projectionSchemaVersion:
+          operation.reconciliationProjectionSchemaVersion,
+      },
+      {
+        environment: input.environment,
+        establishmentId: input.establishmentId,
+        generation: 1,
+        kind: "USED_STOCK_ENTRY",
+        mutationFamily: "STOCK_ENTRY",
+        operationId: operation.operationId,
+        requestSchemaVersion: 1,
+        sourceRequestSha256: operation.requestSha256.toString("hex"),
+        tenantId: input.tenantId,
+      },
+    );
+    const projectionPlaintext = restoredProjection.copyBodyBytes();
 
     expect(operation).toMatchObject({
       correlationId: metadata.correlationId,
@@ -111,6 +170,18 @@ describe("buildCreateOperationInput", () => {
     expect(Buffer.from(plaintext)).toEqual(
       Buffer.from(prepared.copyBodyBytes()),
     );
+    expect(JSON.parse(new TextDecoder().decode(projectionPlaintext))).toEqual({
+      cpfOperadorResponsavel: "12345678901",
+      schemaVersion: 1,
+      veiculo: {
+        codigoSegurancaCrv: "12345678901",
+        numeroCrv: "123456789012",
+        placa: "QTP4H82",
+        renavam: "10987654321",
+        tipoCrv: "DIGITAL",
+      },
+    });
+    restoredProjection.destroy();
   });
 
   it("devolve cópias defensivas dos metadados e do envelope", async () => {
@@ -122,7 +193,11 @@ describe("buildCreateOperationInput", () => {
       prepared,
       vehicleKeyDigest: Buffer.from(metadata.vehicleKeyDigest),
     };
-    const operation = buildCreateOperationInput(cipher(), input);
+    const operation = buildCreateOperationInput(
+      cipher(),
+      projectionCipher(),
+      input,
+    );
     input.actorSubjectHash.fill(0);
     input.idempotencyKeyDigest.fill(0);
     input.vehicleKeyDigest.fill(0);
@@ -138,8 +213,9 @@ describe("buildCreateOperationInput", () => {
     const prepared = await preparedExact();
     const input = { ...metadata, prepared };
     const requestCipher = cipher();
-    const first = buildCreateOperationInput(requestCipher, input);
-    const second = buildCreateOperationInput(requestCipher, input);
+    const projection = projectionCipher();
+    const first = buildCreateOperationInput(requestCipher, projection, input);
+    const second = buildCreateOperationInput(requestCipher, projection, input);
 
     expect(first.requestSha256).toEqual(second.requestSha256);
     expect(first.requestNonce.equals(second.requestNonce)).toBe(false);
@@ -173,13 +249,48 @@ describe("buildCreateOperationInput", () => {
       OperationRequestCipher.prototype,
     ) as OperationRequestCipher;
 
-    expect(() => buildCreateOperationInput(fake, input)).toThrow();
-    expect(() => buildCreateOperationInput(prototypeOnly, input)).toThrow();
+    expect(() =>
+      buildCreateOperationInput(fake, projectionCipher(), input),
+    ).toThrow();
+    expect(() =>
+      buildCreateOperationInput(prototypeOnly, projectionCipher(), input),
+    ).toThrow();
+
+    let projectionDispatchCalled = false;
+    const fakeProjection = {
+      encrypt: () => {
+        projectionDispatchCalled = true;
+        return {};
+      },
+    } as unknown as OperationReconciliationProjectionCipher;
+    const projectionPrototypeOnly = Object.create(
+      OperationReconciliationProjectionCipher.prototype,
+    ) as OperationReconciliationProjectionCipher;
+    const projectionProxy = new Proxy(projectionCipher(), {});
+    class ProjectionSubclass extends OperationReconciliationProjectionCipher {}
+    const projectionSubclassOnly = Object.create(
+      ProjectionSubclass.prototype,
+    ) as OperationReconciliationProjectionCipher;
+    for (const forged of [
+      fakeProjection,
+      projectionPrototypeOnly,
+      projectionProxy,
+      projectionSubclassOnly,
+    ]) {
+      expect(() => buildCreateOperationInput(cipher(), forged, input)).toThrow(
+        OperationRequestBuilderError,
+      );
+    }
+    expect(projectionDispatchCalled).toBe(false);
   });
 
   it("trocar hash ou ciphertext entre operações impede restauração", async () => {
     const firstPrepared = await preparedExact();
-    const secondBytes = Buffer.from('{"different":true}', "utf8");
+    const secondJson = JSON.parse(
+      new TextDecoder().decode(firstPrepared.copyBodyBytes()),
+    ) as { veiculo: { placa: string } };
+    secondJson.veiculo.placa = "ABC1D23";
+    const secondBytes = Buffer.from(JSON.stringify(secondJson), "utf8");
     const secondPrepared = await restorePreparedRenaveMutation(
       "request-stock-entry",
       secondBytes,
@@ -193,8 +304,17 @@ describe("buildCreateOperationInput", () => {
       idempotencyKeyDigest: Buffer.alloc(32, 4),
       prepared: secondPrepared,
     };
-    const first = buildCreateOperationInput(requestCipher, firstInput);
-    const second = buildCreateOperationInput(requestCipher, secondInput);
+    const projection = projectionCipher();
+    const first = buildCreateOperationInput(
+      requestCipher,
+      projection,
+      firstInput,
+    );
+    const second = buildCreateOperationInput(
+      requestCipher,
+      projection,
+      secondInput,
+    );
     const mixed = envelope(first);
     mixed.requestSha256 = second.requestSha256.toString("hex");
 
@@ -219,7 +339,7 @@ describe("buildCreateOperationInput", () => {
   ])("recusa metadado inválido: %s", async (_label, change) => {
     const prepared = await preparedExact();
     expect(() =>
-      buildCreateOperationInput(cipher(), {
+      buildCreateOperationInput(cipher(), projectionCipher(), {
         ...metadata,
         ...change,
         prepared,

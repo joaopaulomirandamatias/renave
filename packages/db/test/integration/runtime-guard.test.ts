@@ -880,8 +880,13 @@ describe("guard do banco de runtime", () => {
        ) returns table (
          outbox_id uuid,operation_id uuid,establishment_id uuid,
          correlation_id uuid,kind text,mutation_family text,
-         operation_version bigint,sent_at timestamptz,attempt_count integer,
-         lease_expires_at timestamptz
+         request_schema_version integer,operation_version bigint,
+         sent_at timestamptz,attempt_count integer,lease_expires_at timestamptz,
+         projection_kind text,projection_schema_version integer,
+         projection_generation bigint,source_request_sha256 bytea,
+         projection_size integer,projection_key_id text,
+         projection_nonce bytea,projection_auth_tag bytea,
+         projection_ciphertext bytea
        ) language plpgsql security definer set search_path=pg_catalog as $$
        begin return; end $$`,
     );
@@ -917,6 +922,99 @@ describe("guard do banco de runtime", () => {
       );
       await adminPool.query("drop role reconciliation_lease_acl_probe");
     }
+    await expectAppContractReady();
+  });
+
+  it("recusa ACL de qualquer grantee na projeção cifrada", async () => {
+    await adminPool.query("create role projection_acl_probe nologin");
+    await adminPool.query(
+      "grant select on renave.operation_reconciliation_projection to projection_acl_probe",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "revoke select on renave.operation_reconciliation_projection from projection_acl_probe",
+      );
+      await adminPool.query("drop role projection_acl_probe");
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa RLS ou policy adulterada na projeção cifrada", async () => {
+    await adminPool.query(
+      "alter table renave.operation_reconciliation_projection disable row level security",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "alter table renave.operation_reconciliation_projection enable row level security",
+      );
+    }
+    await expectAppContractReady();
+
+    await adminPool.query(`
+      drop policy operation_reconciliation_projection_isolation
+        on renave.operation_reconciliation_projection;
+      create policy operation_reconciliation_projection_isolation
+        on renave.operation_reconciliation_projection using (true) with check (true)
+    `);
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(`
+        drop policy operation_reconciliation_projection_isolation
+          on renave.operation_reconciliation_projection;
+        create policy operation_reconciliation_projection_isolation
+          on renave.operation_reconciliation_projection
+          using (tenant_id = (select renave.current_tenant_id()))
+          with check (tenant_id = (select renave.current_tenant_id()))
+      `);
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa unique global ou triggers adulterados da projeção", async () => {
+    await adminPool.query(`
+      alter table renave.operation_reconciliation_projection
+        drop constraint operation_reconciliation_projection_key_nonce_key
+    `);
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(`
+        alter table renave.operation_reconciliation_projection
+          add constraint operation_reconciliation_projection_key_nonce_key
+          unique (projection_key_id, projection_nonce)
+      `);
+    }
+    await expectAppContractReady();
+
+    for (const [table, trigger] of [
+      [
+        "renave.operation_reconciliation_projection",
+        "operation_reconciliation_projection_reject_update_delete",
+      ],
+      ["renave.operation", "operation_requires_reconciliation_projection"],
+    ] as const) {
+      await adminPool.query(`alter table ${table} disable trigger ${trigger}`);
+      try {
+        await expectAppContractRejected();
+      } finally {
+        await adminPool.query(`alter table ${table} enable trigger ${trigger}`);
+      }
+      await expectAppContractReady();
+    }
+  });
+
+  it("mantém a assinatura legada de criação ausente", async () => {
+    const { rows } = await adminPool.query<{ legacy: string | null }>(
+      `select to_regprocedure(
+        'renave.create_operation_with_outbox(uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid)'
+      )::text as legacy`,
+    );
+    expect(rows[0]?.legacy).toBeNull();
     await expectAppContractReady();
   });
 });

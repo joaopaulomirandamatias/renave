@@ -15,6 +15,7 @@ import {
   type OperationRequestBinding,
 } from "./operation-request-crypto.js";
 import {
+  encryptOperationReconciliationProjection,
   OperationReconciliationProjectionCipher,
   OperationReconciliationProjectionConfigurationError,
   OperationReconciliationProjectionDecryptionError,
@@ -549,6 +550,54 @@ describe("codec fechado da projeção de reconciliação", () => {
 });
 
 describe("cifra da projeção de reconciliação", () => {
+  it("helper nominal cifra sem despachar para o método público", async () => {
+    const { prepared, localBinding } = await preparedProjection();
+    const projectionCipher = cipher();
+    const encrypted = encryptOperationReconciliationProjection(
+      projectionCipher,
+      prepared,
+      localBinding,
+    );
+    expect(
+      projectionCipher.decrypt(encrypted, localBinding).copyBodyBytes(),
+    ).toEqual(prepared.copyBodyBytes());
+  });
+
+  it("helper nominal recusa fake, prototype, Proxy e subclass forjada", async () => {
+    const { prepared, localBinding } = await preparedProjection();
+    let virtualDispatchCalled = false;
+    const fake = {
+      encrypt() {
+        virtualDispatchCalled = true;
+        return {};
+      },
+    } as unknown as OperationReconciliationProjectionCipher;
+    const prototypeOnly = Object.create(
+      OperationReconciliationProjectionCipher.prototype,
+    ) as OperationReconciliationProjectionCipher;
+    const proxied = new Proxy(cipher(), {});
+    class Subclass extends OperationReconciliationProjectionCipher {}
+    const subclassPrototypeOnly = Object.create(
+      Subclass.prototype,
+    ) as OperationReconciliationProjectionCipher;
+
+    for (const candidate of [
+      fake,
+      prototypeOnly,
+      proxied,
+      subclassPrototypeOnly,
+    ]) {
+      expect(() =>
+        encryptOperationReconciliationProjection(
+          candidate,
+          prepared,
+          localBinding,
+        ),
+      ).toThrow(OperationReconciliationProjectionConfigurationError);
+    }
+    expect(virtualDispatchCalled).toBe(false);
+  });
+
   it("cifra e autentica sem expor hash do plaintext", async () => {
     const { prepared, localBinding } = await preparedProjection();
     const projectionCipher = cipher();

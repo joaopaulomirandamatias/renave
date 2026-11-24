@@ -1,11 +1,17 @@
+import { randomUUID } from "node:crypto";
+
 import type {
   CreateOperationInput,
   OperationKind,
   OperationMutationFamily,
 } from "@seu-renave/db";
 import {
+  encryptOperationReconciliationProjection,
   encryptOperationRequest,
+  OperationReconciliationProjectionCipher,
   OperationRequestCipher,
+  prepareOperationReconciliationProjection,
+  type EncryptedOperationReconciliationProjection,
   type EncryptedOperationRequest,
   type OperationRequestBinding,
 } from "@seu-renave/protected-evidence";
@@ -14,6 +20,7 @@ import type {
   RenaveEnvironment,
   RenaveMutationOperation,
 } from "@seu-renave/renave-connector";
+import { readPreparedRenaveMutation } from "@seu-renave/renave-connector";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -77,7 +84,11 @@ function definitionFor(
 
 function assertEncryptedOperation(
   encrypted: EncryptedOperationRequest,
-  prepared: PreparedRenaveMutation,
+  prepared: {
+    byteLength: number;
+    operation: RenaveMutationOperation;
+    requestSha256: string;
+  },
 ): void {
   if (
     encrypted.operation !== prepared.operation ||
@@ -95,57 +106,153 @@ function assertEncryptedOperation(
   }
 }
 
+function assertEncryptedProjection(
+  encrypted: EncryptedOperationReconciliationProjection,
+  operationId: string,
+): void {
+  if (
+    encrypted.projectionKind !== "STOCK_ENTRY_RECONCILIATION" ||
+    encrypted.projectionSchemaVersion !== 1 ||
+    encrypted.generation !== 1 ||
+    !KEY_ID_PATTERN.test(encrypted.keyId) ||
+    !(encrypted.nonce instanceof Uint8Array) ||
+    encrypted.nonce.byteLength !== 12 ||
+    !(encrypted.authTag instanceof Uint8Array) ||
+    encrypted.authTag.byteLength !== 16 ||
+    !(encrypted.ciphertext instanceof Uint8Array) ||
+    encrypted.projectionByteLength !== encrypted.ciphertext.byteLength ||
+    encrypted.projectionByteLength < 1 ||
+    encrypted.projectionByteLength > 4096 ||
+    !UUID_PATTERN.test(operationId)
+  ) {
+    throw new OperationRequestBuilderError();
+  }
+}
+
 /**
  * Monta de forma atômica o envelope coerente esperado pelo repositório.
  * Não persiste, não consulta identidade e não conhece transporte HTTP.
  */
 export function buildCreateOperationInput(
-  cipher: OperationRequestCipher,
+  requestCipher: OperationRequestCipher,
+  projectionCipher: OperationReconciliationProjectionCipher,
   input: BuildCreateOperationInput,
 ): CreateOperationInput {
-  const tenantId = uuid(input.tenantId);
-  const establishmentId = uuid(input.establishmentId);
-  const correlationId = uuid(input.correlationId);
-  const actorSubjectHash = digest(input.actorSubjectHash);
-  const idempotencyKeyDigest = digest(input.idempotencyKeyDigest);
-  const vehicleKeyDigest = digest(input.vehicleKeyDigest);
-  const definition = definitionFor(input.prepared.operation);
-  if (
-    (input.environment !== "homologation" &&
-      input.environment !== "production") ||
-    !SHA256_PATTERN.test(input.prepared.requestSha256)
-  ) {
+  let actorSubjectHash: Buffer | undefined;
+  let idempotencyKeyDigest: Buffer | undefined;
+  let vehicleKeyDigest: Buffer | undefined;
+  let encryptedRequest: EncryptedOperationRequest | undefined;
+  let encryptedProjection:
+    EncryptedOperationReconciliationProjection | undefined;
+  let preparedProjection:
+    ReturnType<typeof prepareOperationReconciliationProjection> | undefined;
+  try {
+    const captured = {
+      actorSubjectHash: input.actorSubjectHash,
+      correlationId: input.correlationId,
+      environment: input.environment,
+      establishmentId: input.establishmentId,
+      idempotencyKeyDigest: input.idempotencyKeyDigest,
+      prepared: input.prepared,
+      tenantId: input.tenantId,
+      vehicleKeyDigest: input.vehicleKeyDigest,
+    };
+    const tenantId = uuid(captured.tenantId);
+    const establishmentId = uuid(captured.establishmentId);
+    const correlationId = uuid(captured.correlationId);
+    actorSubjectHash = digest(captured.actorSubjectHash);
+    idempotencyKeyDigest = digest(captured.idempotencyKeyDigest);
+    vehicleKeyDigest = digest(captured.vehicleKeyDigest);
+    const trustedPrepared = readPreparedRenaveMutation(captured.prepared);
+    trustedPrepared.body.fill(0);
+    const definition = definitionFor(trustedPrepared.operation);
+    if (
+      (captured.environment !== "homologation" &&
+        captured.environment !== "production") ||
+      !SHA256_PATTERN.test(trustedPrepared.requestSha256)
+    ) {
+      throw new OperationRequestBuilderError();
+    }
+    const operationId = randomUUID();
+    const requestBinding: OperationRequestBinding = {
+      actorSubjectHash,
+      correlationId,
+      environment: captured.environment,
+      establishmentId,
+      idempotencyKeyDigest,
+      kind: definition.kind,
+      mutationFamily: definition.mutationFamily,
+      requestSchemaVersion: definition.requestSchemaVersion,
+      tenantId,
+      vehicleKeyDigest,
+    };
+    encryptedRequest = encryptOperationRequest(
+      requestCipher,
+      captured.prepared,
+      requestBinding,
+    );
+    assertEncryptedOperation(encryptedRequest, trustedPrepared);
+
+    preparedProjection = prepareOperationReconciliationProjection(
+      captured.prepared,
+    );
+    encryptedProjection = encryptOperationReconciliationProjection(
+      projectionCipher,
+      preparedProjection,
+      {
+        environment: captured.environment,
+        establishmentId,
+        generation: 1,
+        kind: definition.kind,
+        mutationFamily: definition.mutationFamily,
+        operationId,
+        requestSchemaVersion: definition.requestSchemaVersion,
+        sourceRequestSha256: trustedPrepared.requestSha256,
+        tenantId,
+      },
+    );
+    assertEncryptedProjection(encryptedProjection, operationId);
+
+    return {
+      actorSubjectHash: Buffer.from(actorSubjectHash),
+      correlationId,
+      establishmentId,
+      idempotencyKeyDigest: Buffer.from(idempotencyKeyDigest),
+      kind: definition.kind,
+      mutationFamily: definition.mutationFamily,
+      operationId,
+      reconciliationProjectionAuthTag: Buffer.from(encryptedProjection.authTag),
+      reconciliationProjectionByteLength:
+        encryptedProjection.projectionByteLength,
+      reconciliationProjectionCiphertext: Buffer.from(
+        encryptedProjection.ciphertext,
+      ),
+      reconciliationProjectionGeneration: encryptedProjection.generation,
+      reconciliationProjectionKeyId: encryptedProjection.keyId,
+      reconciliationProjectionKind: encryptedProjection.projectionKind,
+      reconciliationProjectionNonce: Buffer.from(encryptedProjection.nonce),
+      reconciliationProjectionSchemaVersion:
+        encryptedProjection.projectionSchemaVersion,
+      requestAuthTag: Buffer.from(encryptedRequest.authTag),
+      requestCiphertext: Buffer.from(encryptedRequest.ciphertext),
+      requestKeyId: encryptedRequest.keyId,
+      requestNonce: Buffer.from(encryptedRequest.nonce),
+      requestSchemaVersion: definition.requestSchemaVersion,
+      requestSha256: Buffer.from(encryptedRequest.requestSha256, "hex"),
+      vehicleKeyDigest: Buffer.from(vehicleKeyDigest),
+    };
+  } catch {
     throw new OperationRequestBuilderError();
+  } finally {
+    actorSubjectHash?.fill(0);
+    idempotencyKeyDigest?.fill(0);
+    vehicleKeyDigest?.fill(0);
+    preparedProjection?.destroy();
+    encryptedRequest?.authTag.fill(0);
+    encryptedRequest?.ciphertext.fill(0);
+    encryptedRequest?.nonce.fill(0);
+    encryptedProjection?.authTag.fill(0);
+    encryptedProjection?.ciphertext.fill(0);
+    encryptedProjection?.nonce.fill(0);
   }
-
-  const binding: OperationRequestBinding = {
-    actorSubjectHash,
-    correlationId,
-    environment: input.environment,
-    establishmentId,
-    idempotencyKeyDigest,
-    kind: definition.kind,
-    mutationFamily: definition.mutationFamily,
-    requestSchemaVersion: definition.requestSchemaVersion,
-    tenantId,
-    vehicleKeyDigest,
-  };
-  const encrypted = encryptOperationRequest(cipher, input.prepared, binding);
-  assertEncryptedOperation(encrypted, input.prepared);
-
-  return {
-    actorSubjectHash: Buffer.from(actorSubjectHash),
-    correlationId,
-    establishmentId,
-    idempotencyKeyDigest: Buffer.from(idempotencyKeyDigest),
-    kind: definition.kind,
-    mutationFamily: definition.mutationFamily,
-    requestAuthTag: Buffer.from(encrypted.authTag),
-    requestCiphertext: Buffer.from(encrypted.ciphertext),
-    requestKeyId: encrypted.keyId,
-    requestNonce: Buffer.from(encrypted.nonce),
-    requestSchemaVersion: definition.requestSchemaVersion,
-    requestSha256: Buffer.from(encrypted.requestSha256, "hex"),
-    vehicleKeyDigest: Buffer.from(vehicleKeyDigest),
-  };
 }

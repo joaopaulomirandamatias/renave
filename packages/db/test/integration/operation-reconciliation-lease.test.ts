@@ -13,6 +13,7 @@ import {
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
+import { operationProjectionFields } from "../helpers/operation-projection.js";
 
 const urls = inject("dbUrls");
 
@@ -45,7 +46,17 @@ interface BeginRow {
   operation_id: string;
   operation_version: string;
   outbox_id: string;
+  projection_auth_tag: Buffer;
+  projection_ciphertext: Buffer;
+  projection_generation: string;
+  projection_key_id: string;
+  projection_kind: string;
+  projection_nonce: Buffer;
+  projection_schema_version: number;
+  projection_size: number;
+  request_schema_version: number;
   sent_at: Date;
+  source_request_sha256: Buffer;
 }
 
 interface LeaseState {
@@ -86,6 +97,7 @@ async function createTarget(label: string, base?: Target): Promise<Target> {
     ));
   const correlationId = randomUUID();
   const input: CreateOperationInput = {
+    ...operationProjectionFields(`reconciliation:${label}:${sequence}`),
     actorSubjectHash: digest(`actor:${label}:${sequence}`),
     correlationId,
     establishmentId: establishment.id,
@@ -294,7 +306,7 @@ afterAll(async () => {
 });
 
 describe("operation reconciliation lease", () => {
-  it("claim e begin entregam somente metadados mínimos", async () => {
+  it("claim e begin entregam envelope cifrado e metadados mínimos", async () => {
     const target = await createTarget("happy");
     const claimed = await claim(target);
     expect(claimed.rows).toHaveLength(1);
@@ -317,7 +329,17 @@ describe("operation reconciliation lease", () => {
         "operation_id",
         "operation_version",
         "outbox_id",
+        "projection_auth_tag",
+        "projection_ciphertext",
+        "projection_generation",
+        "projection_key_id",
+        "projection_kind",
+        "projection_nonce",
+        "projection_schema_version",
+        "projection_size",
+        "request_schema_version",
         "sent_at",
+        "source_request_sha256",
       ].sort(),
     );
     expect(rows[0]).toMatchObject({
@@ -326,7 +348,20 @@ describe("operation reconciliation lease", () => {
       kind: "USED_STOCK_ENTRY",
       mutation_family: "STOCK_ENTRY",
       operation_id: target.operationId,
+      projection_generation: "1",
+      projection_key_id: "test-projection-key-v1",
+      projection_kind: "STOCK_ENTRY_RECONCILIATION",
+      projection_schema_version: 1,
+      request_schema_version: 1,
     });
+    expect(rows[0]!.projection_ciphertext).toHaveLength(
+      rows[0]!.projection_size,
+    );
+    expect(rows[0]!.projection_nonce).toHaveLength(12);
+    expect(rows[0]!.projection_auth_tag).toHaveLength(16);
+    expect(Object.keys(rows[0]!)).not.toEqual(
+      expect.arrayContaining(["lease_owner", "lease_token"]),
+    );
     const afterBegin = await leaseState(target);
     expect(afterBegin).toMatchObject({
       attempt_count: beforeBegin.attempt_count,

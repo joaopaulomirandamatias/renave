@@ -24,6 +24,7 @@ export {
   type OperationRequestBinding,
 } from "./operation-request-crypto.js";
 export {
+  encryptOperationReconciliationProjection,
   OperationReconciliationProjectionCipher,
   OperationReconciliationProjectionConfigurationError,
   OperationReconciliationProjectionDecryptionError,
