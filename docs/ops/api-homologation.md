@@ -112,9 +112,31 @@ Os seguintes comandos validam o código local e não autorizam tráfego SERPRO:
 
 ```bash
 pnpm check
+pnpm prehomologation:serpro
 pnpm --filter @seu-renave/renave-connector test
 pnpm --filter @seu-renave/api test
 ```
+
+### Pré-validação negativa H-04 a H-07
+
+O runner compila a aplicação e passa quatro diagnósticos brutos pelo mesmo normalizador usado pelo serviço. Assim, confirma os códigos seguros esperados sem usar `.env`, mTLS, CNPJ, placa ou RENAVAM:
+
+| Cenário | Mock oficial a reproduzir depois em homologação | Código seguro esperado |
+|---|---|---|
+| H-04 | `comRouboFurto` | `THEFT_OR_ROBBERY` |
+| H-05 | `comRestricaoPgfn` | `PGFN_RESTRICTION` |
+| H-06 | `comPendenciaEmissaoCrv` | `CRV_ISSUANCE_PENDING` |
+| H-07 | `jaBaixado` | `VEHICLE_WRITTEN_OFF` |
+
+Para gerar evidências locais consumíveis pela CI, escolha destinos novos. O runner recusa sobrescrita, symlink de destino, opções duplicadas e o mesmo caminho para os dois formatos:
+
+```bash
+pnpm prehomologation:serpro -- \
+  --json artifacts/serpro-prehomologation.json \
+  --junit artifacts/serpro-prehomologation.junit.xml
+```
+
+O código de saída é `0` somente quando os quatro casos passam, `1` quando um cenário ou a publicação do relatório falha e `2` para uso inválido. Não anexe respostas brutas do SERPRO a esses relatórios. A aprovação offline prepara a cerimônia, mas não marca H-04 a H-07 como homologados externamente.
 
 O relatório autenticado de prontidão também é local. Consultá-lo não deve
 resolver DNS, abrir socket ou consumir cota SERPRO. A probe pública

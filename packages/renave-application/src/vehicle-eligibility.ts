@@ -435,7 +435,7 @@ const ALL_IMPEDIMENT_FIELDS_MAPPED: Exclude<
   ? true
   : never = true;
 
-function summarizeEligibility(
+export function summarizeVehicleEligibilityResponse(
   response: VehicleEligibilityResponse,
 ): VehicleEligibilitySummary {
   const detranUnavailable = response.comunicacaoComDetranFalhou === true;
@@ -608,6 +608,6 @@ export class VehicleEligibilityService {
       outcome: "succeeded",
       responseSha256: sha256(response.result),
     });
-    return summarizeEligibility(response.result);
+    return summarizeVehicleEligibilityResponse(response.result);
   }
 }

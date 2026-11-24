@@ -60,11 +60,14 @@ pnpm format:check
 pnpm check
 pnpm test:integration
 pnpm contract:serpro
+pnpm prehomologation:serpro
 pnpm smoke:serpro:hml
 pnpm audit --audit-level=high
 ```
 
 `pnpm test:integration` cria bancos isolados para validar RLS, papéis, diretório, evidência, limitadores e a composição real da API. Os bancos são removidos ao final. Os papéis de teste são globais no cluster local e usam valores fixos sem valor fora do ambiente de desenvolvimento.
+
+`pnpm prehomologation:serpro` compila a aplicação e executa offline a pré-validação negativa H-04 a H-07. As respostas brutas de fixture passam pelo mesmo normalizador usado pelo serviço para confirmar os códigos seguros de roubo/furto, restrição PGFN, CRV pendente e veículo baixado, sem acessar rede, certificado ou dados reais. Essa pré-validação não substitui a execução dos mocks oficiais no ambiente SERPRO.
 
 ## Limites de segurança
 

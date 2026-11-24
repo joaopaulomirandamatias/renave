@@ -3,6 +3,7 @@ export {
   EligibilityVerifiedIdentityMismatchError,
   EstablishmentUnavailableError,
   InvalidEligibilityApplicationInputError,
+  summarizeVehicleEligibilityResponse,
   VehicleEligibilityService,
   type ApplicationEstablishment,
   type AuthorizationContextPort,

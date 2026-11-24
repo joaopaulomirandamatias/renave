@@ -83,6 +83,8 @@ gantt
 | H-23 | Verificação da cadeia de hash após adulteração simulada → alerta | Auditoria | Script |
 | H-24 | DR: restore + failover dentro do RTO | Continuidade | Game day |
 
+Os cenários negativos H-04 a H-07 possuem uma pré-validação offline determinística em `pnpm prehomologation:serpro`. As fixtures brutas passam pelo normalizador compilado que o serviço usa em produção; o gate exige resposta inapta, DETRAN disponível e exatamente um impedimento estruturado por cenário. Os relatórios opcionais JSON/JUnit contêm somente IDs, códigos controlados, estado e duração; a execução real dos mocks oficiais em homologação continua obrigatória para produzir evidência externa.
+
 ### Cobertura de testes por camada
 
 | Camada | Cenários |

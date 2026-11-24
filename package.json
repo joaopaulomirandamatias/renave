@@ -10,7 +10,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "api:test:integration": "pnpm db:up && pnpm --filter @seu-renave/api test:integration",
-    "check": "pnpm security:guards && pnpm typecheck && pnpm test && pnpm test:contract:serpro && pnpm test:smoke:serpro && pnpm build",
+    "check": "pnpm security:guards && pnpm typecheck && pnpm test && pnpm test:contract:serpro && pnpm test:smoke:serpro && pnpm test:prehomologation:serpro && pnpm build",
     "contract:serpro": "node scripts/check-serpro-contract.mjs && node scripts/check-serpro-first-slice.mjs && node scripts/check-serpro-guidance.mjs",
     "db:bootstrap": "pnpm --filter @seu-renave/db bootstrap",
     "db:down": "docker compose down",
@@ -25,6 +25,7 @@
     "dev": "pnpm --filter @seu-renave/db --filter @seu-renave/identity build && pnpm --parallel --filter @seu-renave/api --filter @seu-renave/web dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "prehomologation:serpro": "pnpm --filter @seu-renave/renave-application... build && node --conditions=production scripts/run-serpro-prehomologation-matrix.mjs",
     "reconciliation-worker:start": "pnpm --filter @seu-renave/reconciliation-worker-app start",
     "release:guard:api": "node scripts/check-api-release.mjs",
     "release:guard:reconciliation-worker": "node scripts/check-reconciliation-worker-release.mjs",
@@ -44,6 +45,7 @@
     "test:integration": "pnpm db:up && pnpm --filter @seu-renave/db test:integration && pnpm --filter @seu-renave/api test:integration && pnpm --filter @seu-renave/stock-entry-provisioning test:integration",
     "test:contract:serpro": "node --test scripts/check-serpro-*.test.mjs",
     "test:foundation": "pnpm --filter @seu-renave/api test && pnpm --filter @seu-renave/web test",
+    "test:prehomologation:serpro": "pnpm --filter @seu-renave/renave-application... build && node --conditions=production --test scripts/run-serpro-prehomologation-matrix.test.mjs",
     "test:smoke:serpro": "node --test scripts/smoke-serpro-homologation.test.mjs",
     "typecheck": "pnpm -r typecheck"
   },
