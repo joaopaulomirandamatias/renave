@@ -54,3 +54,11 @@ export {
   type RenavePrincipalPurpose,
   type RenavePrincipalPurposeConfig,
 } from "./renave-principal-crypto.js";
+export {
+  destroyStockEntryKeyBundle,
+  parseStockEntryKeyBundle,
+  StockEntryKeyBundleError,
+  type StockEntryKeyBundle,
+  type StockEntryKeyring,
+  type StockEntrySecretBundle,
+} from "./stock-entry-key-bundle.js";

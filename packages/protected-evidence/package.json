@@ -9,6 +9,11 @@
       "types": "./src/index.ts",
       "production": "./dist/index.js",
       "default": "./src/index.ts"
+    },
+    "./stock-entry-key-bundle": {
+      "types": "./src/stock-entry-key-bundle.ts",
+      "production": "./dist/stock-entry-key-bundle.js",
+      "default": "./src/stock-entry-key-bundle.ts"
     }
   },
   "scripts": {

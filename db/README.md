@@ -18,12 +18,21 @@ SQL versionado em `db/migrations/`; runner, helpers e testes em `packages/db`
 | `pnpm db:status-evidence`                         | Consulta heartbeat e backlog agregados, sem iniciar varredura. Requer `MAINTENANCE_DATABASE_URL`.                           |
 | `pnpm db:test`                                    | Sobe o Postgres e roda os testes de **integração** (banco descartável por execução).                                       |
 | `pnpm --filter @seu-renave/db test`               | Testes unitários (sem banco). Entram no `pnpm test` / `pnpm check`.                                                        |
+| `pnpm stock-entry:bundle:generate -- --generation-id <id> --output-dir <dir>` | Gera um bundle HELD_LOCAL novo, fora do repositório, sem sobrescrever arquivo existente. |
+| `pnpm stock-entry:pin:status`                     | Confere, como `renave_migrator`, se o pin write-once está ausente, compatível ou divergente.                               |
+| `pnpm stock-entry:pin:provision -- --confirm-generation <id> --confirm-fingerprint <hex>` | Faz o único `INSERT` do pin após backup/restauração e confirmação explícita. |
 
 A aplicação usa `DATABASE_URL` (papel `renave_app`) para os dados de negócio e
 `IDENTITY_DATABASE_URL` (papel `renave_identity_app`) para sessões. Nenhum segredo é versionado:
 a senha do superusuário no `compose.yaml` é um padrão local descartável
 (sobrescreva com `RENAVE_DB_SUPERUSER_PASSWORD`), e os papéis de aplicação só
 existem depois do `bootstrap`.
+
+O pin do bundle de entrada de estoque é deliberadamente **write-once**. O
+provisionador não aplica migrations, não ativa flags e não aceita `--force`.
+Perder o bundle depois do pin torna a retenção local indisponível; siga a
+cerimônia de backup e restauração em
+[`docs/ops/stock-entry-held-local-homologation.md`](../docs/ops/stock-entry-held-local-homologation.md).
 
 ## Papéis
 
