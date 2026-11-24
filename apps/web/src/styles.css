@@ -299,6 +299,104 @@ footer {
   border-radius: var(--sr-radius-card);
 }
 
+.stock-search {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-card);
+  box-shadow: var(--sr-shadow-card);
+}
+
+.stock-search__heading,
+.stock-search__form,
+.stock-search__result li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stock-search__heading p,
+.stock-search__field p,
+.stock-search__result p,
+.stock-search__result span {
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.stock-search__heading p,
+.stock-search__heading h2,
+.stock-search__field p,
+.stock-search__result p {
+  margin: 0;
+}
+
+.stock-search__heading > span {
+  color: var(--sr-color-brand);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.stock-search__field {
+  display: grid;
+  flex: 1 1 18rem;
+  gap: 0.35rem;
+}
+
+.stock-search__field label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.stock-search__field input {
+  min-height: var(--sr-touch-target-min);
+  padding: 0 0.75rem;
+  color: var(--sr-color-text);
+  font: inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-border-strong);
+  border-radius: var(--sr-radius-control);
+}
+
+.stock-search__field input:focus-visible {
+  outline: 3px solid var(--sr-color-focus);
+  outline-offset: 2px;
+}
+
+.stock-search__result {
+  min-height: 2.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sr-color-border);
+}
+
+.stock-search__result [role="alert"] {
+  color: var(--sr-color-danger);
+}
+
+.stock-search__result ul {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stock-search__result li {
+  padding: 0.75rem;
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-control);
+}
+
+.stock-search__result li > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
 @media (max-width: 46rem) {
   .dashboard-page__stats {
     grid-template-columns: 1fr;
@@ -316,5 +414,12 @@ footer {
 
   .dashboard-page__link .sr-button {
     grid-column: 1 / -1;
+  }
+
+  .stock-search__heading,
+  .stock-search__form,
+  .stock-search__result li {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

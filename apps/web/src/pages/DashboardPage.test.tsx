@@ -133,4 +133,39 @@ describe("DashboardPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
     expect(onRunPreflight).toHaveBeenCalledOnce();
   });
+
+  it("só mostra a consulta de estoque com seleção e vínculo confirmado", () => {
+    const onSearchStocks = vi.fn(async () => []);
+    const view = render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="pending"
+        onLogout={vi.fn()}
+        onSearchStocks={onSearchStocks}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Localizar estoque por placa" }),
+    ).toBeNull();
+
+    view.rerender(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="confirmed"
+        onLogout={vi.fn()}
+        onSearchStocks={onSearchStocks}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Localizar estoque por placa" }),
+    ).toBeVisible();
+  });
 });

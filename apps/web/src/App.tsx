@@ -47,6 +47,15 @@ export interface BrowserRenaveLink {
   status: BrowserRenaveLinkStatus;
 }
 
+export type BrowserStockState =
+  "SOLICITADO" | "TRANSFERIDO" | "CONFIRMADO" | "FINALIZADO";
+
+export interface BrowserStockSummary {
+  estado: BrowserStockState;
+  id: number;
+  placa: string;
+}
+
 export interface SessionClient {
   load(): Promise<BrowserSession>;
   loadEstablishments(
@@ -62,6 +71,11 @@ export interface SessionClient {
     tenantId: string,
     establishmentId: string,
   ): Promise<void>;
+  searchStocks(
+    tenantId: string,
+    establishmentId: string,
+    plate: string,
+  ): Promise<readonly BrowserStockSummary[]>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -161,6 +175,48 @@ function parseRenaveLink(value: unknown): BrowserRenaveLink {
   };
 }
 
+const stockStates = new Set<BrowserStockState>([
+  "SOLICITADO",
+  "TRANSFERIDO",
+  "CONFIRMADO",
+  "FINALIZADO",
+]);
+
+function parseStocks(value: unknown): readonly BrowserStockSummary[] {
+  if (!Array.isArray(value)) throw new Error("Resposta de estoque inválida");
+  const ids = new Set<number>();
+  return value.map((stock) => {
+    if (
+      !isRecord(stock) ||
+      Object.keys(stock).some(
+        (key) => key !== "estado" && key !== "id" && key !== "placa",
+      ) ||
+      !Number.isSafeInteger(stock.id) ||
+      (stock.id as number) <= 0 ||
+      ids.has(stock.id as number) ||
+      typeof stock.placa !== "string" ||
+      !/^[A-Z0-9]{7}$/u.test(stock.placa) ||
+      typeof stock.estado !== "string" ||
+      !stockStates.has(stock.estado as BrowserStockState)
+    ) {
+      throw new Error("Item de estoque inválido");
+    }
+    ids.add(stock.id as number);
+    return {
+      estado: stock.estado as BrowserStockState,
+      id: stock.id as number,
+      placa: stock.placa,
+    };
+  });
+}
+
+class StockSearchClientError extends Error {
+  constructor(readonly code?: string) {
+    super("Consulta de estoque não concluída");
+    this.name = "StockSearchClientError";
+  }
+}
+
 export const browserSessionClient: SessionClient = {
   async load() {
     const response = await fetch("/api/session", {
@@ -227,6 +283,30 @@ export const browserSessionClient: SessionClient = {
       },
     );
     if (!response.ok) throw new Error("Não foi possível verificar o vínculo");
+  },
+  async searchStocks(tenantId, establishmentId, plate) {
+    const response = await fetch(
+      `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/stocks/search`,
+      {
+        body: JSON.stringify({ plate }),
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      throw new StockSearchClientError(
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+      );
+    }
+    return parseStocks(value);
   },
 };
 
@@ -520,6 +600,13 @@ export function App({
       linkStatusError={renaveLinkView.status === "error"}
       linkStatusLoading={renaveLinkView.status === "loading"}
       onRunPreflight={() => void runPreflight()}
+      onSearchStocks={(plate) =>
+        client.searchStocks(
+          selectedTenantId,
+          activeEstablishmentId ?? "",
+          plate,
+        )
+      }
       onReloadLinkStatus={() => setLinkReloadVersion((current) => current + 1)}
       preflightAvailable={
         renaveLinkView.status === "ready" &&

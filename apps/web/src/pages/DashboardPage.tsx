@@ -3,6 +3,7 @@ import {
   type AppEnvironment,
   type AppShellEstablishment,
   Button,
+  type RenaveStockState,
 } from "@seu-renave/ui";
 import {
   AlertTriangle,
@@ -18,6 +19,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { BrowserRenaveLinkStatus } from "../App.js";
+import { StockSearchPanel } from "./StockSearchPanel.js";
 
 export interface DashboardPageProps {
   environment: AppEnvironment;
@@ -30,6 +32,11 @@ export interface DashboardPageProps {
   onLogout: () => void | Promise<void>;
   onReloadLinkStatus?: () => void;
   onRunPreflight?: () => void;
+  onSearchStocks?: (
+    plate: string,
+  ) => Promise<
+    readonly { estado: RenaveStockState; id: number; placa: string }[]
+  >;
   onTenantChange?: (tenantId: string) => void;
   selectedEstablishmentId?: string;
   selectedTenantId?: string;
@@ -94,6 +101,7 @@ export function DashboardPage({
   onLogout,
   onReloadLinkStatus,
   onRunPreflight,
+  onSearchStocks,
   onTenantChange,
   selectedEstablishmentId,
   selectedTenantId,
@@ -243,6 +251,17 @@ export function DashboardPage({
             </p>
           ) : null}
         </section>
+
+        {(linkStatus === "confirmed" || linkStatus === "enabled") &&
+        selectedTenantId &&
+        selectedEstablishmentId &&
+        onSearchStocks ? (
+          <StockSearchPanel
+            key={`${selectedTenantId}:${selectedEstablishmentId}`}
+            onSearch={onSearchStocks}
+            selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
+          />
+        ) : null}
 
         <section aria-labelledby="daily-summary-title">
           <div className="dashboard-page__section-heading">

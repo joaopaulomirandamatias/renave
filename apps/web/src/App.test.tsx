@@ -9,13 +9,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   App,
+  browserSessionClient,
   type BrowserEstablishment,
   type BrowserSession,
   type BrowserTenant,
   type SessionClient,
 } from "./App.js";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function clientFor(
   session: BrowserSession,
@@ -31,6 +35,7 @@ function clientFor(
     loadTenants: vi.fn(async () => tenants),
     logout: vi.fn(async () => ({})),
     runRenaveLinkPreflight: vi.fn(async () => undefined),
+    searchStocks: vi.fn(async () => []),
   };
 }
 
@@ -43,6 +48,62 @@ function deferred<T>() {
 }
 
 describe("App session boundary", () => {
+  it("envia a placa somente no corpo POST same-origin e minimiza a resposta", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json([{ estado: "CONFIRMADO", id: 71, placa: "ABC1D23" }]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.searchStocks("tenant-a", "store-a", "ABC1D23"),
+    ).resolves.toEqual([{ estado: "CONFIRMADO", id: 71, placa: "ABC1D23" }]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tenants/tenant-a/establishments/store-a/stocks/search",
+      expect.objectContaining({
+        body: JSON.stringify({ plate: "ABC1D23" }),
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "POST",
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("ABC1D23");
+  });
+
+  it("recusa resposta de estoque com campo extra ou id duplicado", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            cpfOperadorResponsavel: "12345678901",
+            estado: "CONFIRMADO",
+            id: 71,
+            placa: "ABC1D23",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        Response.json([
+          { estado: "CONFIRMADO", id: 71, placa: "ABC1D23" },
+          { estado: "FINALIZADO", id: 71, placa: "ABC1D23" },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        Response.json([{ estado: "DESCONHECIDO", id: 72, placa: "ABC1D23" }]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.searchStocks("tenant-a", "store-a", "ABC1D23"),
+    ).rejects.toThrow("Item de estoque inválido");
+    await expect(
+      browserSessionClient.searchStocks("tenant-a", "store-a", "ABC1D23"),
+    ).rejects.toThrow("Item de estoque inválido");
+    await expect(
+      browserSessionClient.searchStocks("tenant-a", "store-a", "ABC1D23"),
+    ).rejects.toThrow("Item de estoque inválido");
+  });
+
   it("não mostra login nem painel enquanto verifica a sessão", () => {
     const client: SessionClient = {
       load: vi.fn(() => new Promise<BrowserSession>(() => undefined)),
@@ -54,6 +115,7 @@ describe("App session boundary", () => {
       loadTenants: vi.fn(async () => []),
       logout: vi.fn(async () => ({})),
       runRenaveLinkPreflight: vi.fn(async () => undefined),
+      searchStocks: vi.fn(async () => []),
     };
     render(<App client={client} />);
 
