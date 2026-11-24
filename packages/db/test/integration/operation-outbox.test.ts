@@ -802,7 +802,9 @@ describe("fundação operation/outbox", () => {
     ).rejects.toMatchObject({ code: "42501" });
     await expect(
       withTenant(migratorPool, tenantA.id, (client) =>
-        client.query("truncate renave.operation_outbox"),
+        client.query(
+          "truncate renave.operation_promotion_decision, renave.operation_outbox",
+        ),
       ),
     ).rejects.toMatchObject({ code: "42501" });
     await expect(

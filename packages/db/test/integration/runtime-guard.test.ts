@@ -15,6 +15,7 @@ let appPool: Pool;
 let identityPool: Pool;
 let maintenancePool: Pool;
 let migratorPool: Pool;
+let operationPromoterPool: Pool;
 let operationWorkerPool: Pool;
 let platformReaderPool: Pool;
 
@@ -46,12 +47,29 @@ async function expectWorkerContractReady(): Promise<void> {
   ).resolves.toBeUndefined();
 }
 
+async function expectPromoterContractRejected(): Promise<void> {
+  await expect(
+    assertRuntimeDatabase(operationPromoterPool, {
+      expectedRole: "renave_operation_promoter",
+    }),
+  ).rejects.toBeInstanceOf(RuntimeDatabaseContractError);
+}
+
+async function expectPromoterContractReady(): Promise<void> {
+  await expect(
+    assertRuntimeDatabase(operationPromoterPool, {
+      expectedRole: "renave_operation_promoter",
+    }),
+  ).resolves.toBeUndefined();
+}
+
 beforeAll(() => {
   adminPool = createPool(urls.admin, { max: 1 });
   appPool = createPool(urls.app, { max: 1 });
   identityPool = createPool(urls.identity, { max: 1 });
   maintenancePool = createPool(urls.maintenance, { max: 1 });
   migratorPool = createPool(urls.migrator, { max: 1 });
+  operationPromoterPool = createPool(urls.operationPromoter, { max: 1 });
   operationWorkerPool = createPool(urls.operationWorker, { max: 1 });
   platformReaderPool = createPool(urls.platformReader, { max: 1 });
 });
@@ -63,6 +81,7 @@ afterAll(async () => {
     identityPool?.end(),
     maintenancePool?.end(),
     migratorPool?.end(),
+    operationPromoterPool?.end(),
     operationWorkerPool?.end(),
     platformReaderPool?.end(),
   ]);
@@ -81,6 +100,11 @@ describe("guard do banco de runtime", () => {
     await expect(
       assertRuntimeDatabase(maintenancePool, {
         expectedRole: "renave_maintenance_app",
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      assertRuntimeDatabase(operationPromoterPool, {
+        expectedRole: "renave_operation_promoter",
       }),
     ).resolves.toBeUndefined();
     await expect(
@@ -103,6 +127,12 @@ describe("guard do banco de runtime", () => {
       assertRuntimeDatabase(identityPool, { expectedRole: "renave_app" }),
       assertRuntimeDatabase(appPool, {
         expectedRole: "renave_maintenance_app",
+      }),
+      assertRuntimeDatabase(appPool, {
+        expectedRole: "renave_operation_promoter",
+      }),
+      assertRuntimeDatabase(operationPromoterPool, {
+        expectedRole: "renave_app",
       }),
       assertRuntimeDatabase(appPool, {
         expectedRole: "renave_operation_worker",
@@ -608,7 +638,8 @@ describe("guard do banco de runtime", () => {
       `grant temporary on database ${database} to
          renave_app,renave_credential_scope_provisioner,
          renave_identity_app,renave_maintenance_app,
-         renave_operation_worker,renave_profile_provisioner,
+         renave_operation_worker,renave_operation_promoter,
+         renave_profile_provisioner,
          renave_profile_reader,renave_platform_provisioner,
          renave_platform_reader`,
     );
@@ -634,6 +665,7 @@ describe("guard do banco de runtime", () => {
       maintenanceAppPassword: "renave_maintenance_app_it",
       migratorPassword: "renave_migrator_it",
       operationWorkerPassword: "renave_operation_worker_it",
+      operationPromoterPassword: "renave_operation_promoter_it",
       profileProvisionerPassword: "renave_profile_provisioner_it",
       profileReaderPassword: "renave_profile_reader_it",
       platformProvisionerPassword: "renave_platform_provisioner_it",
@@ -668,6 +700,7 @@ describe("guard do banco de runtime", () => {
           "renave_identity_app",
           "renave_maintenance_app",
           "renave_operation_worker",
+          "renave_operation_promoter",
           "renave_profile_provisioner",
           "renave_profile_reader",
           "renave_platform_provisioner",
@@ -675,7 +708,7 @@ describe("guard do banco de runtime", () => {
         ],
       ],
     );
-    expect(privileges.rows).toHaveLength(9);
+    expect(privileges.rows).toHaveLength(10);
     for (const privilege of privileges.rows) {
       expect(privilege).toMatchObject({
         can_connect: true,
@@ -701,12 +734,13 @@ describe("guard do banco de runtime", () => {
       [
         [
           "renave_credential_scope_provisioner",
+          "renave_operation_promoter",
           "renave_platform_provisioner",
           "renave_platform_reader",
         ],
       ],
     );
-    expect(platformRoles.rows).toHaveLength(3);
+    expect(platformRoles.rows).toHaveLength(4);
     for (const role of platformRoles.rows) {
       expect(role).toMatchObject({
         rolbypassrls: false,
@@ -728,6 +762,7 @@ describe("guard do banco de runtime", () => {
       [
         [
           "renave_credential_scope_provisioner",
+          "renave_operation_promoter",
           "renave_platform_provisioner",
           "renave_platform_reader",
         ],
@@ -986,11 +1021,17 @@ describe("guard do banco de runtime", () => {
   });
 
   it("recusa tabela UNLOGGED na fundação do outbox", async () => {
-    await adminPool.query("alter table renave.operation_outbox set unlogged");
+    await adminPool.query(
+      `alter table renave.operation_promotion_decision set unlogged;
+       alter table renave.operation_outbox set unlogged`,
+    );
     try {
       await expectAppContractRejected();
     } finally {
-      await adminPool.query("alter table renave.operation_outbox set logged");
+      await adminPool.query(
+        `alter table renave.operation_outbox set logged;
+         alter table renave.operation_promotion_decision set logged`,
+      );
     }
     await expectAppContractReady();
   });
@@ -1891,5 +1932,302 @@ describe("guard do banco de runtime", () => {
       `);
     }
     await expectAppContractReady();
+  });
+
+  it("recusa tamper do binding, da promoção e do contrato versionado", async () => {
+    const checksum = (
+      await adminPool.query<{ checksum: string }>(
+        `select checksum from renave.schema_migrations
+          where version='0072_held_local_regulatory_promotion'`,
+      )
+    ).rows[0]!.checksum;
+    const drifts = [
+      {
+        apply: () =>
+          adminPool.query(
+            `create policy operation_authorization_binding_permissive_probe
+               on renave.operation_authorization_binding
+               using (true) with check (true)`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `drop policy operation_authorization_binding_permissive_probe
+               on renave.operation_authorization_binding`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `alter table renave.operation_authorization_binding
+               disable trigger operation_authorization_binding_append_only`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `alter table renave.operation_authorization_binding
+               enable trigger operation_authorization_binding_append_only`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `grant select on renave.operation_authorization_binding
+               to renave_operation_promoter`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `revoke select on renave.operation_authorization_binding
+               from renave_operation_promoter`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `create policy operation_promotion_decision_permissive_probe
+               on renave.operation_promotion_decision
+               using (true) with check (true)`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `drop policy operation_promotion_decision_permissive_probe
+               on renave.operation_promotion_decision`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `alter table renave.operation_promotion_decision
+               disable trigger operation_promotion_decision_append_only`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `alter table renave.operation_promotion_decision
+               enable trigger operation_promotion_decision_append_only`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `grant select on renave.operation_promotion_decision
+               to renave_operation_promoter`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `revoke select on renave.operation_promotion_decision
+               from renave_operation_promoter`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `grant execute on function
+               renave_admin.promote_held_local_operation(uuid,bytea,bytea,bytea)
+             to renave_operation_worker`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `revoke execute on function
+               renave_admin.promote_held_local_operation(uuid,bytea,bytea,bytea)
+             from renave_operation_worker`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `alter function renave_admin.promote_held_local_operation(uuid,bytea,bytea,bytea)
+               security invoker`,
+          ),
+        restore: () =>
+          adminPool.query(
+            `alter function renave_admin.promote_held_local_operation(uuid,bytea,bytea,bytea)
+               security definer`,
+          ),
+      },
+      {
+        apply: () =>
+          adminPool.query(
+            `update renave.schema_migrations set checksum=$1
+              where version='0072_held_local_regulatory_promotion'`,
+            ["0".repeat(64)],
+          ),
+        restore: () =>
+          adminPool.query(
+            `update renave.schema_migrations set checksum=$1
+              where version='0072_held_local_regulatory_promotion'`,
+            [checksum],
+          ),
+      },
+    ];
+
+    for (const drift of drifts) {
+      await drift.apply();
+      try {
+        await Promise.all([
+          expectAppContractRejected(),
+          expectWorkerContractRejected(),
+          expectPromoterContractRejected(),
+        ]);
+      } finally {
+        await drift.restore();
+      }
+      await Promise.all([
+        expectAppContractReady(),
+        expectWorkerContractReady(),
+        expectPromoterContractReady(),
+      ]);
+    }
+  });
+
+  it("recusa elevação do papel promotor por BYPASSRLS", async () => {
+    await adminPool.query("alter role renave_operation_promoter bypassrls");
+    try {
+      await Promise.all([
+        expectAppContractRejected(),
+        expectPromoterContractRejected(),
+      ]);
+    } finally {
+      await adminPool.query("alter role renave_operation_promoter nobypassrls");
+    }
+    await Promise.all([
+      expectAppContractReady(),
+      expectPromoterContractReady(),
+    ]);
+  });
+
+  it("recusa helper de autorização adulterado para sempre autorizar", async () => {
+    const signature =
+      "renave_runtime.operation_authorization_binding_is_current(uuid,timestamptz)";
+    const original = await adminPool.query<{ definition: string }>(
+      "select pg_catalog.pg_get_functiondef($1::regprocedure) definition",
+      [signature],
+    );
+    await adminPool.query(
+      `create or replace function
+         renave_runtime.operation_authorization_binding_is_current(
+           p_operation_id uuid,p_authorization_now timestamptz)
+       returns boolean language sql stable security definer
+       set search_path=pg_catalog as 'select true'`,
+    );
+    try {
+      await Promise.all([
+        expectAppContractRejected(),
+        expectWorkerContractRejected(),
+        expectPromoterContractRejected(),
+      ]);
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await Promise.all([
+      expectAppContractReady(),
+      expectWorkerContractReady(),
+      expectPromoterContractReady(),
+    ]);
+  });
+
+  it("recusa constraint renomeada ou trigger de decisão neutralizado", async () => {
+    await adminPool.query(
+      `alter table renave.operation_promotion_decision
+         drop constraint operation_promotion_decision_digests_valid,
+         add constraint operation_promotion_decision_digests_probe check(
+           pg_catalog.octet_length(decision_ticket_digest)=32
+           and pg_catalog.octet_length(evidence_digest)=32
+           and pg_catalog.octet_length(changed_by_digest)=32)`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `alter table renave.operation_promotion_decision
+           drop constraint operation_promotion_decision_digests_probe,
+           add constraint operation_promotion_decision_digests_valid check(
+             pg_catalog.octet_length(decision_ticket_digest)=32
+             and pg_catalog.octet_length(evidence_digest)=32
+             and pg_catalog.octet_length(changed_by_digest)=32)`,
+      );
+    }
+    await expectAppContractReady();
+
+    const original = await adminPool.query<{ definition: string }>(
+      `select pg_catalog.pg_get_functiondef(
+         'renave.operation_promotion_decision_reject_change()'::regprocedure
+       ) definition`,
+    );
+    await adminPool.query(
+      `create or replace function
+         renave.operation_promotion_decision_reject_change()
+       returns trigger language plpgsql set search_path=pg_catalog
+       as $$begin return old; end$$`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa bridge histórico constante mesmo devolvendo o hash esperado", async () => {
+    const signature =
+      "renave_runtime.tenant_administration_catalog_fingerprint_v0048()";
+    const expectedHash = (
+      await adminPool.query<{ fingerprint: string }>(
+        `select ${signature} fingerprint`,
+      )
+    ).rows[0]!.fingerprint;
+    const original = await adminPool.query<{ definition: string }>(
+      "select pg_catalog.pg_get_functiondef($1::regprocedure) definition",
+      [signature],
+    );
+    await adminPool.query(
+      `create or replace function ${signature}
+       returns text language sql stable security definer
+       set search_path=pg_catalog as $function$
+         select '${expectedHash}'::text
+       $function$`,
+    );
+    try {
+      await Promise.all([
+        expectAppContractRejected(),
+        expectPromoterContractRejected(),
+      ]);
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await Promise.all([
+      expectAppContractReady(),
+      expectPromoterContractReady(),
+    ]);
+  });
+
+  it("recusa helper raw constante mesmo devolvendo o fingerprint esperado", async () => {
+    const signature =
+      "renave_runtime.tenant_administration_catalog_fingerprint_without_regulatory_sc()";
+    const expectedHash = (
+      await adminPool.query<{ fingerprint: string }>(
+        `select ${signature} fingerprint`,
+      )
+    ).rows[0]!.fingerprint;
+    const original = await adminPool.query<{ definition: string }>(
+      "select pg_catalog.pg_get_functiondef($1::regprocedure) definition",
+      [signature],
+    );
+    await adminPool.query(
+      `create or replace function ${signature}
+       returns text language sql stable security definer
+       set search_path=pg_catalog as $function$
+         select '${expectedHash}'::text
+       $function$`,
+    );
+    try {
+      await Promise.all([
+        expectAppContractRejected(),
+        expectPromoterContractRejected(),
+      ]);
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await Promise.all([
+      expectAppContractReady(),
+      expectPromoterContractReady(),
+    ]);
   });
 });

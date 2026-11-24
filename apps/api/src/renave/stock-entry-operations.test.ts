@@ -154,6 +154,10 @@ describe("parseStockEntryBusinessInput", () => {
     for (const forbidden of [
       "cpfOperadorResponsavel",
       "emailEstabelecimento",
+      "establishmentProfileId",
+      "establishmentProfileVersion",
+      "operatorProfileId",
+      "operatorProfileVersion",
       "subject",
     ]) {
       expect(
@@ -317,6 +321,11 @@ describe("POST entrada usada retida localmente", () => {
     for (const body of [
       { ...validBody, cpfOperadorResponsavel: "12345678901" },
       { ...validBody, emailEstabelecimento: "loja@example.test" },
+      { ...validBody, subject: "oidc|attacker" },
+      { ...validBody, operatorProfileId: OPERATION_ID },
+      { ...validBody, operatorProfileVersion: "999" },
+      { ...validBody, establishmentProfileId: OPERATION_ID },
+      { ...validBody, establishmentProfileVersion: "999" },
       {
         ...validBody,
         veiculo: { ...validBody.veiculo, extra: "injetado" },
@@ -468,6 +477,7 @@ describe("PostgresHeldStockEntryOperation", () => {
             binding: {
               establishmentId: ESTABLISHMENT_ID,
               profileId: "66666666-6666-4666-8666-666666666666",
+              profileVersion: "11",
               purpose: "establishment-email" as const,
               tenantId: TENANT_ID,
             },
@@ -476,6 +486,7 @@ describe("PostgresHeldStockEntryOperation", () => {
           operator: {
             binding: {
               profileId: "55555555-5555-4555-8555-555555555555",
+              profileVersion: "7",
               purpose: "operator-cpf" as const,
               subject: input.subject,
               tenantId: TENANT_ID,
@@ -499,7 +510,15 @@ describe("PostgresHeldStockEntryOperation", () => {
       actor: Buffer;
       correlationId: string;
       idempotency: Buffer;
-      liveInput: { actorSubjectHash: Buffer; requestCiphertext: Buffer };
+      liveInput: {
+        actorSubjectHash: Buffer;
+        establishmentProfileId?: string;
+        establishmentProfileVersion?: string;
+        operatorProfileId?: string;
+        operatorProfileVersion?: string;
+        requestCiphertext: Buffer;
+        subject?: string;
+      };
       vehicle: Buffer;
     }> = [];
     let conflictNext = false;
@@ -607,6 +626,30 @@ describe("PostgresHeldStockEntryOperation", () => {
     );
     expect(liveResolverDigests.every(allZero)).toBe(true);
     expect(storedInputs[0]!.vehicle).toEqual(storedInputs[1]!.vehicle);
+    expect(
+      storedInputs.map(({ liveInput }) => ({
+        establishmentProfileId: liveInput.establishmentProfileId,
+        establishmentProfileVersion: liveInput.establishmentProfileVersion,
+        operatorProfileId: liveInput.operatorProfileId,
+        operatorProfileVersion: liveInput.operatorProfileVersion,
+        subject: liveInput.subject,
+      })),
+    ).toEqual([
+      {
+        establishmentProfileId: "66666666-6666-4666-8666-666666666666",
+        establishmentProfileVersion: "11",
+        operatorProfileId: "55555555-5555-4555-8555-555555555555",
+        operatorProfileVersion: "7",
+        subject: SUBJECT,
+      },
+      {
+        establishmentProfileId: "66666666-6666-4666-8666-666666666666",
+        establishmentProfileVersion: "11",
+        operatorProfileId: "55555555-5555-4555-8555-555555555555",
+        operatorProfileVersion: "7",
+        subject: SUBJECT,
+      },
+    ]);
     expect(storedInputs[0]!.actor).not.toEqual(storedInputs[0]!.idempotency);
     expect(storedInputs[0]!.vehicle).not.toEqual(storedInputs[0]!.idempotency);
     expect(
@@ -742,6 +785,57 @@ describe("PostgresHeldStockEntryOperation", () => {
       message: "A operação local de entrada de estoque não pôde ser criada.",
     });
 
+    for (const [binding, profileVersion] of [
+      ["operator", undefined],
+      ["operator", "0"],
+      ["operator", "not-a-version"],
+      ["establishment", undefined],
+      ["establishment", "0"],
+      ["establishment", "not-a-version"],
+    ] as const) {
+      const decryptInvalidVersion = vi.fn();
+      const createInvalidVersion = vi.fn();
+      const invalidVersion = new PostgresHeldStockEntryOperation({
+        ...base,
+        createOperation: createInvalidVersion,
+        principalCrypto: {
+          decrypt: decryptInvalidVersion,
+        } as unknown as RenavePrincipalCrypto,
+        resolver: {
+          resolve: vi.fn(async () => ({
+            establishment: {
+              binding: {
+                establishmentId: ESTABLISHMENT_ID,
+                profileId: "66666666-6666-4666-8666-666666666666",
+                profileVersion:
+                  binding === "establishment" ? profileVersion : "11",
+                purpose: "establishment-email" as const,
+                tenantId: TENANT_ID,
+              },
+              envelope: envelope(8),
+            },
+            operator: {
+              binding: {
+                profileId: "55555555-5555-4555-8555-555555555555",
+                profileVersion: binding === "operator" ? profileVersion : "7",
+                purpose: "operator-cpf" as const,
+                subject: SUBJECT,
+                tenantId: TENANT_ID,
+              },
+              envelope: envelope(7),
+            },
+          })) as never,
+        },
+      });
+
+      await expect(invalidVersion.execute(input)).rejects.toMatchObject({
+        code: "STOCK_ENTRY_PRINCIPALS_UNAVAILABLE",
+        message: "A operação local de entrada de estoque não pôde ser criada.",
+      });
+      expect(decryptInvalidVersion).not.toHaveBeenCalled();
+      expect(createInvalidVersion).not.toHaveBeenCalled();
+    }
+
     const operatorEnvelope = envelope(7);
     const establishmentEnvelope = envelope(8);
     const cryptoFailure = new PostgresHeldStockEntryOperation({
@@ -764,6 +858,7 @@ describe("PostgresHeldStockEntryOperation", () => {
             binding: {
               establishmentId: ESTABLISHMENT_ID,
               profileId: "66666666-6666-4666-8666-666666666666",
+              profileVersion: "11",
               purpose: "establishment-email" as const,
               tenantId: TENANT_ID,
             },
@@ -772,6 +867,7 @@ describe("PostgresHeldStockEntryOperation", () => {
           operator: {
             binding: {
               profileId: "55555555-5555-4555-8555-555555555555",
+              profileVersion: "7",
               purpose: "operator-cpf" as const,
               subject: SUBJECT,
               tenantId: TENANT_ID,

@@ -25,7 +25,12 @@ const metadata = {
   correlationId: "33333333-3333-4333-8333-333333333333",
   environment: "homologation" as const,
   establishmentId: "22222222-2222-4222-8222-222222222222",
+  establishmentProfileId: "66666666-6666-4666-8666-666666666666",
+  establishmentProfileVersion: "11",
   idempotencyKeyDigest: Buffer.alloc(32, 2),
+  operatorProfileId: "55555555-5555-4555-8555-555555555555",
+  operatorProfileVersion: "7",
+  subject: "oidc|operation-builder",
   tenantId: "11111111-1111-4111-8111-111111111111",
   vehicleKeyDigest: Buffer.alloc(32, 3),
 };
@@ -176,10 +181,15 @@ describe("buildCreateOperationInput", () => {
     expect(operation).toMatchObject({
       correlationId: metadata.correlationId,
       establishmentId: metadata.establishmentId,
+      establishmentProfileId: metadata.establishmentProfileId,
+      establishmentProfileVersion: metadata.establishmentProfileVersion,
       kind: "USED_STOCK_ENTRY",
       mutationFamily: "STOCK_ENTRY",
+      operatorProfileId: metadata.operatorProfileId,
+      operatorProfileVersion: metadata.operatorProfileVersion,
       requestKeyId: "operation-key-2026-11",
       requestSchemaVersion: 1,
+      subject: metadata.subject,
     });
     expect(operation.requestCiphertext).toHaveLength(expectedByteLength);
     expect(operation.requestSha256).toEqual(sha256(plaintext));
@@ -371,6 +381,11 @@ describe("buildCreateOperationInput", () => {
     ["idempotência", { idempotencyKeyDigest: Buffer.alloc(31) }],
     ["veículo", { vehicleKeyDigest: Buffer.alloc(31) }],
     ["ambiente", { environment: "staging" }],
+    ["perfil do operador", { operatorProfileId: "inválido" }],
+    ["versão do operador", { operatorProfileVersion: "0" }],
+    ["perfil do estabelecimento", { establishmentProfileId: "inválido" }],
+    ["versão do estabelecimento", { establishmentProfileVersion: "0" }],
+    ["sujeito", { subject: "" }],
   ])("recusa metadado inválido: %s", async (_label, change) => {
     const prepared = await preparedExact();
     expect(() =>

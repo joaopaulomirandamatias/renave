@@ -3,17 +3,21 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createOrReplayHeldLocalOperation,
   createOrReplayOperation,
   getOperation,
   OperationActiveConflictError,
   OperationIdempotencyConflictError,
   OperationInputError,
+  OperationPromotionDeniedError,
   OperationStorageError,
+  promoteHeldLocalOperation,
+  type CreateHeldLocalOperationInput,
   type CreateOperationInput,
 } from "../../src/operations.js";
 import type { TenantClient } from "../../src/tenant-context.js";
 
-function input(): CreateOperationInput {
+function input(): CreateHeldLocalOperationInput {
   return {
     actorSubjectHash: Buffer.alloc(32, 1),
     correlationId: randomUUID(),
@@ -22,6 +26,10 @@ function input(): CreateOperationInput {
     kind: "USED_STOCK_ENTRY",
     mutationFamily: "STOCK_ENTRY",
     operationId: randomUUID(),
+    establishmentProfileId: randomUUID(),
+    establishmentProfileVersion: "1",
+    operatorProfileId: randomUUID(),
+    operatorProfileVersion: "1",
     reconciliationProjectionAuthTag: Buffer.alloc(16, 7),
     reconciliationProjectionByteLength: 21,
     reconciliationProjectionCiphertext: Buffer.alloc(21, 8),
@@ -36,7 +44,17 @@ function input(): CreateOperationInput {
     requestNonce: Buffer.alloc(12, 4),
     requestSchemaVersion: 1,
     requestSha256: Buffer.alloc(32, 5),
+    subject: "oidc|operations-unit",
     vehicleKeyDigest: Buffer.alloc(32, 6),
+  };
+}
+
+function promotionInput(operationId: string = randomUUID()) {
+  return {
+    changedByDigest: Buffer.alloc(32, 13),
+    decisionTicketDigest: Buffer.alloc(32, 11),
+    evidenceDigest: Buffer.alloc(32, 12),
+    operationId,
   };
 }
 
@@ -370,6 +388,193 @@ describe("operation repository", () => {
     ).resolves.toMatchObject({ replayed: false });
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]?.[1]?.[9]).toBe(candidate.requestKeyId);
+  });
+
+  it("serializa o snapshot regulatório completo ao criar HELD_LOCAL", async () => {
+    const candidate = input();
+    candidate.subject = "oidc|operator-123";
+    candidate.operatorProfileId = randomUUID();
+    candidate.operatorProfileVersion = "7";
+    candidate.establishmentProfileId = randomUUID();
+    candidate.establishmentProfileVersion = "11";
+    const operationId = randomUUID();
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ operation_id: operationId, replayed: false }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...summary(operationId, candidate),
+            status: "HELD_LOCAL",
+          },
+        ],
+      });
+
+    await expect(
+      createOrReplayHeldLocalOperation(clientWithQuery(query), candidate),
+    ).resolves.toMatchObject({
+      operation: { id: operationId, status: "HELD_LOCAL" },
+      replayed: false,
+    });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[0]?.[0]).toContain("create_held_local_operation");
+    expect(query.mock.calls[0]?.[1]?.slice(23)).toEqual([
+      candidate.subject,
+      candidate.operatorProfileId,
+      candidate.operatorProfileVersion,
+      candidate.establishmentProfileId,
+      candidate.establishmentProfileVersion,
+    ]);
+  });
+
+  it.each([
+    "subject",
+    "operatorProfileId",
+    "operatorProfileVersion",
+    "establishmentProfileId",
+    "establishmentProfileVersion",
+  ] as const)(
+    "recusa HELD_LOCAL sem snapshot %s antes do banco",
+    async (field) => {
+      const candidate = input();
+      candidate.subject = "oidc|operator-123";
+      candidate.operatorProfileId = randomUUID();
+      candidate.operatorProfileVersion = "7";
+      candidate.establishmentProfileId = randomUUID();
+      candidate.establishmentProfileVersion = "11";
+      delete candidate[field];
+      const query = vi.fn();
+
+      await expect(
+        createOrReplayHeldLocalOperation(clientWithQuery(query), candidate),
+      ).rejects.toBeInstanceOf(OperationInputError);
+      expect(query).not.toHaveBeenCalled();
+    },
+  );
+
+  it("mapeia a promoção sem expor o binding regulatório", async () => {
+    const candidate = input();
+    const operationId = randomUUID();
+    const outboxId = randomUUID();
+    const promotedAt = new Date("2026-11-24T12:00:00.000Z");
+    const promotion = promotionInput(operationId);
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            operation_id: operationId,
+            outbox_id: outboxId,
+            promoted_at: promotedAt,
+            replayed: false,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [summary(operationId, candidate)] });
+
+    await expect(
+      promoteHeldLocalOperation(clientWithQuery(query), promotion),
+    ).resolves.toEqual({
+      operation: expect.objectContaining({
+        id: operationId,
+        status: "PENDING_SEND",
+      }),
+      outboxId,
+      promotedAt,
+      replayed: false,
+    });
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      operationId,
+      promotion.decisionTicketDigest,
+      promotion.evidenceDigest,
+      promotion.changedByDigest,
+    ]);
+    for (const [index, source] of [
+      promotion.decisionTicketDigest,
+      promotion.evidenceDigest,
+      promotion.changedByDigest,
+    ].entries()) {
+      expect(query.mock.calls[0]?.[1]?.[index + 1]).not.toBe(source);
+    }
+  });
+
+  it.each([
+    ["decisionTicketDigest", Buffer.alloc(31)],
+    ["evidenceDigest", Buffer.alloc(33)],
+    ["changedByDigest", Buffer.alloc(0)],
+  ] as const)(
+    "recusa digest de promoção inválido em %s",
+    async (field, value) => {
+      const candidate = promotionInput();
+      candidate[field] = value;
+      const query = vi.fn();
+      await expect(
+        promoteHeldLocalOperation(clientWithQuery(query), candidate),
+      ).rejects.toBeInstanceOf(OperationInputError);
+      expect(query).not.toHaveBeenCalled();
+    },
+  );
+
+  it("mapeia somente a negativa exata da promoção e sanitiza o erro", async () => {
+    const leaked = "binding-regulatorio-secreto";
+    const exact = clientWithQuery(
+      vi.fn().mockRejectedValue({
+        code: "55000",
+        detail: leaked,
+        message: "operation promotion: indisponível",
+      }),
+    );
+    const denied = await promoteHeldLocalOperation(
+      exact,
+      promotionInput(),
+    ).catch((caught: unknown) => caught);
+    expect(denied).toBeInstanceOf(OperationPromotionDeniedError);
+    expectSanitizedError(denied, ["55000", leaked, "indisponível"]);
+
+    const approximate = clientWithQuery(
+      vi.fn().mockRejectedValue({
+        code: "55000",
+        detail: leaked,
+        message: "operation promotion: indisponível agora",
+      }),
+    );
+    const storage = await promoteHeldLocalOperation(
+      approximate,
+      promotionInput(),
+    ).catch((caught: unknown) => caught);
+    expect(storage).toBeInstanceOf(OperationStorageError);
+    expectSanitizedError(storage, ["55000", leaked, "indisponível"]);
+  });
+
+  it("fecha promoção com identificador ou resposta inválida sem consultar resumo", async () => {
+    const query = vi.fn();
+    await expect(
+      promoteHeldLocalOperation(
+        clientWithQuery(query),
+        promotionInput("invalid"),
+      ),
+    ).rejects.toBeInstanceOf(OperationInputError);
+    expect(query).not.toHaveBeenCalled();
+
+    const malformedQuery = vi.fn().mockResolvedValueOnce({
+      rows: [
+        {
+          operation_id: randomUUID(),
+          outbox_id: "invalid",
+          promoted_at: new Date(),
+          replayed: false,
+        },
+      ],
+    });
+    await expect(
+      promoteHeldLocalOperation(
+        clientWithQuery(malformedQuery),
+        promotionInput(),
+      ),
+    ).rejects.toBeInstanceOf(OperationStorageError);
+    expect(malformedQuery).toHaveBeenCalledTimes(1);
   });
 
   it.each([

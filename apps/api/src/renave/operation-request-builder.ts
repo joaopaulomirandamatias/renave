@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type {
-  CreateOperationInput,
+  CreateHeldLocalOperationInput,
   OperationKind,
   OperationMutationFamily,
 } from "@seu-renave/db/api-runtime";
@@ -46,12 +46,17 @@ export interface BuildCreateOperationInput {
   correlationId: string;
   environment: RenaveEnvironment;
   establishmentId: string;
+  establishmentProfileId: string;
+  establishmentProfileVersion: string;
   idempotencyKeyDigest: Uint8Array;
   /**
    * Recurso de uso único cujo ownership é transferido ao builder. A chamada
    * sempre o destrói antes de retornar ou lançar; o chamador não pode reutilizá-lo.
    */
   prepared: PreparedRenaveMutation;
+  operatorProfileId: string;
+  operatorProfileVersion: string;
+  subject: string;
   tenantId: string;
   vehicleKeyDigest: Uint8Array;
 }
@@ -142,7 +147,7 @@ export function buildCreateOperationInput(
   requestCipher: OperationRequestCipher,
   projectionCipher: OperationReconciliationProjectionCipher,
   input: BuildCreateOperationInput,
-): CreateOperationInput {
+): CreateHeldLocalOperationInput {
   let actorSubjectHash: Buffer | undefined;
   let idempotencyKeyDigest: Buffer | undefined;
   let vehicleKeyDigest: Buffer | undefined;
@@ -159,14 +164,31 @@ export function buildCreateOperationInput(
       correlationId: input.correlationId,
       environment: input.environment,
       establishmentId: input.establishmentId,
+      establishmentProfileId: input.establishmentProfileId,
+      establishmentProfileVersion: input.establishmentProfileVersion,
       idempotencyKeyDigest: input.idempotencyKeyDigest,
+      operatorProfileId: input.operatorProfileId,
+      operatorProfileVersion: input.operatorProfileVersion,
       prepared,
+      subject: input.subject,
       tenantId: input.tenantId,
       vehicleKeyDigest: input.vehicleKeyDigest,
     };
     const tenantId = uuid(captured.tenantId);
     const establishmentId = uuid(captured.establishmentId);
     const correlationId = uuid(captured.correlationId);
+    const operatorProfileId = uuid(captured.operatorProfileId);
+    const establishmentProfileId = uuid(captured.establishmentProfileId);
+    if (
+      typeof captured.subject !== "string" ||
+      captured.subject.trim() !== captured.subject ||
+      captured.subject.length < 1 ||
+      captured.subject.length > 255 ||
+      !/^[1-9][0-9]*$/u.test(captured.operatorProfileVersion) ||
+      !/^[1-9][0-9]*$/u.test(captured.establishmentProfileVersion)
+    ) {
+      throw new OperationRequestBuilderError();
+    }
     actorSubjectHash = digest(captured.actorSubjectHash);
     idempotencyKeyDigest = digest(captured.idempotencyKeyDigest);
     vehicleKeyDigest = digest(captured.vehicleKeyDigest);
@@ -224,10 +246,14 @@ export function buildCreateOperationInput(
       actorSubjectHash: Buffer.from(actorSubjectHash),
       correlationId,
       establishmentId,
+      establishmentProfileId,
+      establishmentProfileVersion: captured.establishmentProfileVersion,
       idempotencyKeyDigest: Buffer.from(idempotencyKeyDigest),
       kind: definition.kind,
       mutationFamily: definition.mutationFamily,
       operationId,
+      operatorProfileId,
+      operatorProfileVersion: captured.operatorProfileVersion,
       reconciliationProjectionAuthTag: Buffer.from(encryptedProjection.authTag),
       reconciliationProjectionByteLength:
         encryptedProjection.projectionByteLength,
@@ -246,6 +272,7 @@ export function buildCreateOperationInput(
       requestNonce: Buffer.from(encryptedRequest.nonce),
       requestSchemaVersion: definition.requestSchemaVersion,
       requestSha256: Buffer.from(encryptedRequest.requestSha256, "hex"),
+      subject: captured.subject,
       vehicleKeyDigest: Buffer.from(vehicleKeyDigest),
     };
   } catch {

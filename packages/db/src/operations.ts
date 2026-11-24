@@ -60,6 +60,14 @@ export interface CreateOperationInput {
   vehicleKeyDigest: Buffer;
 }
 
+export interface CreateHeldLocalOperationInput extends CreateOperationInput {
+  establishmentProfileId: string;
+  establishmentProfileVersion: string;
+  operatorProfileId: string;
+  operatorProfileVersion: string;
+  subject: string;
+}
+
 export interface CreateOperationResult {
   operation: OperationRecord;
   replayed: boolean;
@@ -138,6 +146,11 @@ interface NormalizedOperationInput {
   kind: OperationKind;
   mutationFamily: OperationMutationFamily;
   operationId: string;
+  subject?: string;
+  operatorProfileId?: string;
+  operatorProfileVersion?: string;
+  establishmentProfileId?: string;
+  establishmentProfileVersion?: string;
   reconciliationProjectionAuthTag: Buffer;
   reconciliationProjectionByteLength: number;
   reconciliationProjectionCiphertext: Buffer;
@@ -182,7 +195,10 @@ function copyProjectionCiphertext(value: unknown): Buffer {
   return Buffer.from(value);
 }
 
-function normalizeInput(input: CreateOperationInput): NormalizedOperationInput {
+function normalizeInput(
+  input: CreateOperationInput | CreateHeldLocalOperationInput,
+): NormalizedOperationInput {
+  const heldLocal = "subject" in input ? input : undefined;
   if (
     !input ||
     !isUuid(input.operationId) ||
@@ -218,6 +234,22 @@ function normalizeInput(input: CreateOperationInput): NormalizedOperationInput {
     kind: input.kind,
     mutationFamily: input.mutationFamily,
     operationId: input.operationId.toLowerCase(),
+    ...(heldLocal?.subject === undefined ? {} : { subject: heldLocal.subject }),
+    ...(heldLocal?.operatorProfileId === undefined
+      ? {}
+      : { operatorProfileId: heldLocal.operatorProfileId.toLowerCase() }),
+    ...(heldLocal?.operatorProfileVersion === undefined
+      ? {}
+      : { operatorProfileVersion: heldLocal.operatorProfileVersion }),
+    ...(heldLocal?.establishmentProfileId === undefined
+      ? {}
+      : {
+          establishmentProfileId:
+            heldLocal.establishmentProfileId.toLowerCase(),
+        }),
+    ...(heldLocal?.establishmentProfileVersion === undefined
+      ? {}
+      : { establishmentProfileVersion: heldLocal.establishmentProfileVersion }),
     reconciliationProjectionAuthTag: copyBuffer(
       input.reconciliationProjectionAuthTag,
       16,
@@ -281,7 +313,9 @@ function mapCreateError(error: unknown): never {
     code === "55000" &&
     (message === "operation: vínculo credencial não habilitado" ||
       message === "operation: escopo credencial não habilitado" ||
-      message === "operation: jurisdição regulatória não verificada")
+      message === "operation: jurisdição regulatória não verificada" ||
+      message === "operation: autorização indisponível" ||
+      message === "operation: selo regulatório ausente ou obsoleto")
   ) {
     throw new OperationCredentialLinkNotEnabledError();
   }
@@ -348,11 +382,25 @@ export async function getOperation(
 
 async function createOrReplayUsing(
   client: TenantClient,
-  input: CreateOperationInput,
+  input: CreateOperationInput | CreateHeldLocalOperationInput,
   functionName: "create_held_local_operation" | "create_operation_with_outbox",
 ): Promise<CreateOperationResult> {
   const operation = normalizeInput(input);
   let created: CreateOperationRow | undefined;
+  const heldLocal = functionName === "create_held_local_operation";
+  if (
+    heldLocal &&
+    (typeof operation.subject !== "string" ||
+      operation.subject.trim() !== operation.subject ||
+      operation.subject.length < 1 ||
+      operation.subject.length > 255 ||
+      !isUuid(operation.operatorProfileId) ||
+      !/^[1-9][0-9]*$/u.test(operation.operatorProfileVersion ?? "") ||
+      !isUuid(operation.establishmentProfileId) ||
+      !/^[1-9][0-9]*$/u.test(operation.establishmentProfileVersion ?? ""))
+  ) {
+    throw new OperationInputError();
+  }
   try {
     const { rows } = await client.query<CreateOperationRow>(
       `select operation_id, replayed
@@ -360,6 +408,7 @@ async function createOrReplayUsing(
            $1, $2, $3, $4, $5, $6, $7, $8,
            $9, $10, $11, $12, $13, $14, $15, $16,
            $17, $18, $19, $20, $21, $22, $23
+           ${heldLocal ? ", $24, $25, $26, $27, $28" : ""}
          )`,
       [
         operation.operationId,
@@ -385,6 +434,15 @@ async function createOrReplayUsing(
         operation.reconciliationProjectionNonce,
         operation.reconciliationProjectionAuthTag,
         operation.reconciliationProjectionCiphertext,
+        ...(heldLocal
+          ? [
+              operation.subject,
+              operation.operatorProfileId,
+              operation.operatorProfileVersion,
+              operation.establishmentProfileId,
+              operation.establishmentProfileVersion,
+            ]
+          : []),
       ],
     );
     created = rows[0];
@@ -417,7 +475,87 @@ export function createOrReplayOperation(
  */
 export function createOrReplayHeldLocalOperation(
   client: TenantClient,
-  input: CreateOperationInput,
+  input: CreateHeldLocalOperationInput,
 ): Promise<CreateOperationResult> {
   return createOrReplayUsing(client, input, "create_held_local_operation");
+}
+
+export class OperationPromotionDeniedError extends Error {
+  override name = "OperationPromotionDeniedError";
+  constructor() {
+    super("A operação local não está autorizada para promoção.");
+  }
+}
+
+export interface PromoteHeldLocalOperationResult {
+  operation: OperationRecord;
+  outboxId: string;
+  promotedAt: Date;
+  replayed: boolean;
+}
+
+export interface PromoteHeldLocalOperationInput {
+  changedByDigest: Buffer;
+  decisionTicketDigest: Buffer;
+  evidenceDigest: Buffer;
+  operationId: string;
+}
+
+interface PromotionRow {
+  operation_id: string;
+  outbox_id: string;
+  promoted_at: Date;
+  replayed: boolean;
+}
+
+export async function promoteHeldLocalOperation(
+  client: TenantClient,
+  input: PromoteHeldLocalOperationInput,
+): Promise<PromoteHeldLocalOperationResult> {
+  if (!input || !isUuid(input.operationId)) throw new OperationInputError();
+  const decisionTicketDigest = copyBuffer(input.decisionTicketDigest, 32);
+  const evidenceDigest = copyBuffer(input.evidenceDigest, 32);
+  const changedByDigest = copyBuffer(input.changedByDigest, 32);
+  let row: PromotionRow | undefined;
+  try {
+    const result = await client.query<PromotionRow>(
+      `select operation_id,outbox_id,promoted_at,replayed
+         from renave_admin.promote_held_local_operation($1,$2,$3,$4)`,
+      [
+        input.operationId.toLowerCase(),
+        decisionTicketDigest,
+        evidenceDigest,
+        changedByDigest,
+      ],
+    );
+    row = result.rows[0];
+  } catch (error) {
+    if (
+      databaseCode(error) === "55000" &&
+      databaseMessage(error) === "operation promotion: indisponível"
+    ) {
+      throw new OperationPromotionDeniedError();
+    }
+    throw new OperationStorageError();
+  }
+  if (
+    !row ||
+    !isUuid(row.operation_id) ||
+    !isUuid(row.outbox_id) ||
+    typeof row.replayed !== "boolean" ||
+    !(row.promoted_at instanceof Date) ||
+    !Number.isFinite(row.promoted_at.getTime())
+  ) {
+    throw new OperationStorageError();
+  }
+  const operation = await getOperation(client, row.operation_id);
+  if (!operation || operation.status !== "PENDING_SEND") {
+    throw new OperationStorageError();
+  }
+  return {
+    operation,
+    outboxId: row.outbox_id,
+    promotedAt: new Date(row.promoted_at),
+    replayed: row.replayed,
+  };
 }

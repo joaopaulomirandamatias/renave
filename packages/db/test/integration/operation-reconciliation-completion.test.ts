@@ -20,6 +20,7 @@ import {
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
+import { bindHistoricalOperationForDispatch } from "../helpers/operation-authorization.js";
 import { operationProjectionFields } from "../helpers/operation-projection.js";
 
 const urls = inject("dbUrls");
@@ -72,6 +73,13 @@ async function createTarget(label: string): Promise<Target> {
   };
   const created = await withTenant(migratorPool, tenant.id, (client) =>
     createOrReplayOperation(client, input),
+  );
+  await withTenant(migratorPool, tenant.id, (client) =>
+    bindHistoricalOperationForDispatch(client, {
+      establishmentId: establishment.id,
+      label: `reconciliation-completion:${label}:${sequence}`,
+      operationId: created.operation.id,
+    }),
   );
   const sendOwner = randomUUID();
   const pending = await withTenant(migratorPool, tenant.id, async (client) => {

@@ -13,6 +13,7 @@ import {
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
+import { bindHistoricalOperationForDispatch } from "../helpers/operation-authorization.js";
 import { operationProjectionFields } from "../helpers/operation-projection.js";
 
 const urls = inject("dbUrls");
@@ -103,6 +104,13 @@ async function fixture(label: string): Promise<Fixture> {
   const created = await withTenant(migratorPool, tenant.id, (client) =>
     createOrReplayOperation(client, input),
   );
+  await withTenant(migratorPool, tenant.id, (client) =>
+    bindHistoricalOperationForDispatch(client, {
+      establishmentId: establishment.id,
+      label: `recovery:${label}:${fixtureCounter}`,
+      operationId: created.operation.id,
+    }),
+  );
   return { establishment, operationId: created.operation.id, tenant };
 }
 
@@ -127,6 +135,13 @@ async function fixtureInTenant(
       requestSchemaVersion: 1,
       requestSha256: digest(`plaintext:${label}:${fixtureCounter}`),
       vehicleKeyDigest: digest(`vehicle:${label}:${fixtureCounter}`),
+    }),
+  );
+  await withTenant(migratorPool, target.tenant.id, (client) =>
+    bindHistoricalOperationForDispatch(client, {
+      establishmentId: target.establishment.id,
+      label: `recovery:${label}:${fixtureCounter}`,
+      operationId: created.operation.id,
     }),
   );
   return { ...target, operationId: created.operation.id };

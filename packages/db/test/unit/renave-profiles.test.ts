@@ -95,6 +95,7 @@ describe("renave profile status repository", () => {
       establishment_envelope_schema_version: 1,
       establishment_hmac_key_id: "email-hmac-v1",
       establishment_profile_id: randomUUID(),
+      establishment_profile_version: "1",
       operator_envelope_aad_sha256: Buffer.alloc(32, 7),
       operator_envelope_auth_tag: Buffer.alloc(16, 8),
       operator_envelope_ciphertext: operatorCiphertext,
@@ -104,6 +105,7 @@ describe("renave profile status repository", () => {
       operator_hmac_key_id: "cpf-hmac-v1",
       operator_identity_hmac: Buffer.alloc(32, 10),
       operator_profile_id: randomUUID(),
+      operator_profile_version: "1",
     };
     const query = vi.fn().mockResolvedValue({ rows: [row] });
     const idempotencyKeyDigest = Buffer.alloc(32, 11);

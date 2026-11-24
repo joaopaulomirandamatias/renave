@@ -335,37 +335,90 @@ describe("loadMigrations", () => {
     expect(allWithPlatformReaderProbe.at(-1)?.sql).toContain(
       "grant usage on schema renave_runtime to renave_platform_reader",
     );
-    expect(loaded.at(-6)?.version).toBe("0066_identity_issuer_recent_mfa");
-    expect(loaded.at(-6)?.sql).toContain("mfa_authenticated_at_ms");
-    expect(loaded.at(-6)?.sql).toContain("add column issuer text");
-    expect(loaded.at(-5)?.version).toBe(
-      "0067_runtime_contract_identity_recent_mfa",
+    const identityIssuer = loaded.find(
+      ({ version }) => version === "0066_identity_issuer_recent_mfa",
     );
-    expect(loaded.at(-5)?.sql).toContain(loaded.at(-6)?.checksum);
-    expect(loaded.at(-5)?.sql).toContain(
+    const identityRuntime = loaded.find(
+      ({ version }) => version === "0067_runtime_contract_identity_recent_mfa",
+    );
+    const platformRate = loaded.find(
+      ({ version }) => version === "0068_platform_console_rate_limit",
+    );
+    const platformRateRuntime = loaded.find(
+      ({ version }) =>
+        version === "0069_runtime_contract_platform_console_rate_limit",
+    );
+    const credentialScope = loaded.find(
+      ({ version }) => version === "0070_credential_service_scope",
+    );
+    const credentialScopeRuntime = loaded.find(
+      ({ version }) =>
+        version === "0071_runtime_contract_credential_service_scope",
+    );
+    const heldLocalPromotion = loaded.find(
+      ({ version }) => version === "0072_held_local_regulatory_promotion",
+    );
+    const heldLocalPromotionRuntime = loaded.find(
+      ({ version }) =>
+        version === "0073_runtime_contract_held_local_regulatory_promotion",
+    );
+
+    expect(identityIssuer?.sql).toContain("mfa_authenticated_at_ms");
+    expect(identityIssuer?.sql).toContain("add column issuer text");
+    expect(identityRuntime?.sql).toContain(identityIssuer?.checksum);
+    expect(identityRuntime?.sql).toContain(
       allWithPlatformReaderProbe.at(-1)?.checksum,
     );
-    expect(loaded.at(-5)?.sql).toContain(
+    expect(identityRuntime?.sql).toContain(
       "identity_recent_mfa_catalog_fingerprint_v0067",
     );
-    expect(loaded.at(-4)?.version).toBe("0068_platform_console_rate_limit");
-    expect(loaded.at(-4)?.sql).toContain("acquire_platform_console_permit");
-    expect(loaded.at(-4)?.sql).toContain(
+    expect(platformRate?.sql).toContain("acquire_platform_console_permit");
+    expect(platformRate?.sql).toContain(
       "platform_rate_catalog_fingerprint_v0068",
     );
-    expect(loaded.at(-3)?.version).toBe(
-      "0069_runtime_contract_platform_console_rate_limit",
+    expect(platformRateRuntime?.sql).toContain(platformRate?.checksum);
+    expect(platformRateRuntime?.sql).toContain(
+      "platform_rate_contract_ready_v0068",
     );
-    expect(loaded.at(-3)?.sql).toContain(loaded.at(-4)?.checksum);
-    expect(loaded.at(-3)?.sql).toContain("platform_rate_contract_ready_v0068");
-    expect(loaded.at(-2)?.version).toBe("0070_credential_service_scope");
-    expect(loaded.at(-2)?.sql).toContain(
+    expect(credentialScope?.sql).toContain(
       "establishment_regulatory_jurisdiction",
     );
-    expect(loaded.at(-1)?.version).toBe(
-      "0071_runtime_contract_credential_service_scope",
+    expect(credentialScopeRuntime?.sql).toContain(credentialScope?.checksum);
+    expect(heldLocalPromotion?.sql).toContain(
+      "operation_authorization_binding",
     );
-    expect(loaded.at(-1)?.sql).toContain(loaded.at(-2)?.checksum);
+    expect(heldLocalPromotion?.sql).toContain("operation_promotion_decision");
+    expect(heldLocalPromotion?.sql).toContain(
+      "promote_held_local_operation(p_operation_id uuid",
+    );
+    expect(heldLocalPromotion?.sql).toContain("p_decision_ticket_digest bytea");
+    expect(heldLocalPromotion?.sql).toContain(
+      "operation_authorization_binding_is_current",
+    );
+    expect(heldLocalPromotion?.sql).toContain(
+      "begin_operation_send_dispatch_without_authorization_v0029",
+    );
+    expect(heldLocalPromotion?.sql).toContain(
+      "alter table renave.operation_authorization_binding force row level security",
+    );
+    expect(heldLocalPromotion?.sql).toContain(
+      "alter table renave.operation_promotion_decision force row level security",
+    );
+    expect(heldLocalPromotion?.sql).not.toMatch(
+      /insert\s+into\s+renave\.operation_authorization_binding\s+select/iu,
+    );
+    expect(heldLocalPromotionRuntime?.sql).toContain(
+      heldLocalPromotion?.checksum,
+    );
+    expect(heldLocalPromotionRuntime?.sql).toContain(
+      "held_local_promotion_catalog_fingerprint_v0073",
+    );
+    expect(heldLocalPromotionRuntime?.sql).toContain(
+      "operation_promoter_contract_ready",
+    );
+    expect(heldLocalPromotionRuntime?.sql).toContain(
+      "renave_operation_promoter",
+    );
   });
 
   it("recusa lacuna na sequência e nome fora do padrão", async () => {

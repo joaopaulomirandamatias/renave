@@ -9,6 +9,7 @@ export const LOCAL_DEFAULTS = {
   identityAppPassword: "renave_identity_app_local",
   maintenanceAppPassword: "renave_maintenance_app_local",
   operationWorkerPassword: "renave_operation_worker_local",
+  operationPromoterPassword: "renave_operation_promoter_local",
   profileProvisionerPassword: "renave_profile_provisioner_local",
   credentialScopeProvisionerPassword:
     "renave_credential_scope_provisioner_local",

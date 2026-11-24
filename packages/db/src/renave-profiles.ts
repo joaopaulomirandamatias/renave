@@ -23,6 +23,7 @@ interface VerifiedPrincipalRow {
   establishment_envelope_schema_version: number;
   establishment_hmac_key_id: string;
   establishment_profile_id: string;
+  establishment_profile_version: string;
   operator_envelope_aad_sha256: Buffer;
   operator_envelope_auth_tag: Buffer;
   operator_envelope_ciphertext: Buffer;
@@ -32,6 +33,7 @@ interface VerifiedPrincipalRow {
   operator_hmac_key_id: string;
   operator_identity_hmac: Buffer;
   operator_profile_id: string;
+  operator_profile_version: string;
 }
 
 const UUID_PATTERN =
@@ -75,6 +77,7 @@ export interface ResolvedVerifiedRenavePrincipals {
     binding: {
       establishmentId: string;
       profileId: string;
+      profileVersion: string;
       purpose: "establishment-email";
       tenantId: string;
     };
@@ -83,6 +86,7 @@ export interface ResolvedVerifiedRenavePrincipals {
   operator: {
     binding: {
       profileId: string;
+      profileVersion: string;
       purpose: "operator-cpf";
       subject: string;
       tenantId: string;
@@ -238,7 +242,7 @@ export async function resolveVerifiedRenavePrincipals(
     );
     const result = await client.query<VerifiedPrincipalRow>(
       `select *
-         from renave.resolve_verified_renave_principals($1, $2, $3)`,
+         from renave.resolve_verified_renave_principals_v0072($1, $2, $3)`,
       [input.subject, input.establishmentId, idempotencyKeyDigest],
     );
     row = result.rows[0];
@@ -259,7 +263,9 @@ export async function resolveVerifiedRenavePrincipals(
     !row ||
     !UUID_PATTERN.test(row.active_tenant_id) ||
     !UUID_PATTERN.test(row.operator_profile_id) ||
-    !UUID_PATTERN.test(row.establishment_profile_id)
+    !UUID_PATTERN.test(row.establishment_profile_id) ||
+    !/^[1-9][0-9]*$/u.test(row.operator_profile_version) ||
+    !/^[1-9][0-9]*$/u.test(row.establishment_profile_version)
   ) {
     throw new RenavePrincipalResolutionStorageError();
   }
@@ -270,6 +276,7 @@ export async function resolveVerifiedRenavePrincipals(
       binding: {
         establishmentId: input.establishmentId.toLowerCase(),
         profileId: row.establishment_profile_id.toLowerCase(),
+        profileVersion: row.establishment_profile_version,
         purpose: "establishment-email",
         tenantId,
       },
@@ -278,6 +285,7 @@ export async function resolveVerifiedRenavePrincipals(
     operator: {
       binding: {
         profileId: row.operator_profile_id.toLowerCase(),
+        profileVersion: row.operator_profile_version,
         purpose: "operator-cpf",
         subject: input.subject,
         tenantId,

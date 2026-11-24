@@ -13,6 +13,7 @@ import {
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
+import { bindHistoricalOperationForDispatch } from "../helpers/operation-authorization.js";
 import { operationProjectionFields } from "../helpers/operation-projection.js";
 
 const urls = inject("dbUrls");
@@ -89,6 +90,7 @@ interface StateRow {
 let adminPool: Pool;
 let appPool: Pool;
 let migratorPool: Pool;
+let operationWorkerPool: Pool;
 let fixtureCounter = 0;
 
 const dispatchColumns = [
@@ -154,6 +156,13 @@ async function fixture(label: string): Promise<Fixture> {
   };
   const created = await withTenant(migratorPool, tenant.id, (client) =>
     createOrReplayOperation(client, input),
+  );
+  await withTenant(migratorPool, tenant.id, (client) =>
+    bindHistoricalOperationForDispatch(client, {
+      establishmentId: establishment.id,
+      label: `begin:${label}:${fixtureCounter}`,
+      operationId: created.operation.id,
+    }),
   );
   return {
     establishment,
@@ -347,10 +356,16 @@ beforeAll(() => {
   adminPool = createPool(urls.admin, { max: 1 });
   appPool = createPool(urls.app, { max: 8 });
   migratorPool = createPool(urls.migrator, { max: 32 });
+  operationWorkerPool = createPool(urls.operationWorker, { max: 1 });
 });
 
 afterAll(async () => {
-  await Promise.all([adminPool?.end(), appPool?.end(), migratorPool?.end()]);
+  await Promise.all([
+    adminPool?.end(),
+    appPool?.end(),
+    migratorPool?.end(),
+    operationWorkerPool?.end(),
+  ]);
 });
 
 describe("operation begin dispatch", () => {
@@ -743,12 +758,35 @@ describe("operation begin dispatch", () => {
   });
 
   it("permanece owner-only e sem grant para papéis de runtime", async () => {
+    const target = await fixture("worker-owner-boundary");
+    const owner = randomUUID();
+    const leased = await claim(target, owner);
+    const before = await state(target, leased.outbox_id);
+    await expect(
+      withTenant(operationWorkerPool, target.tenant.id, (client) =>
+        client.query(
+          "select * from renave.begin_operation_send_dispatch($1,$2,$3)",
+          [leased.outbox_id, owner, leased.lease_token],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      withTenant(operationWorkerPool, target.tenant.id, (client) =>
+        client.query(
+          "select request_ciphertext from renave.operation where id=$1",
+          [target.operationId],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+    expect(await state(target, leased.outbox_id)).toEqual(before);
+
     const { rows } = await adminPool.query<{
       app_execute: boolean;
       identity_execute: boolean;
       maintenance_execute: boolean;
       migrator_execute: boolean;
       public_execute: boolean;
+      worker_execute: boolean;
     }>(
       `select
          has_function_privilege('renave_app',
@@ -760,7 +798,9 @@ describe("operation begin dispatch", () => {
          has_function_privilege('renave_migrator',
            'renave.begin_operation_send_dispatch(uuid,uuid,uuid)', 'execute') as migrator_execute,
          has_function_privilege('public',
-           'renave.begin_operation_send_dispatch(uuid,uuid,uuid)', 'execute') as public_execute`,
+           'renave.begin_operation_send_dispatch(uuid,uuid,uuid)', 'execute') as public_execute,
+         has_function_privilege('renave_operation_worker',
+           'renave.begin_operation_send_dispatch(uuid,uuid,uuid)', 'execute') as worker_execute`,
     );
     expect(rows[0]).toEqual({
       app_execute: false,
@@ -768,6 +808,7 @@ describe("operation begin dispatch", () => {
       maintenance_execute: false,
       migrator_execute: true,
       public_execute: false,
+      worker_execute: false,
     });
   });
 });

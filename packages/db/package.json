@@ -15,6 +15,11 @@
       "production": "./dist/operation-worker.js",
       "default": "./src/operation-worker.ts"
     },
+    "./operation-promoter": {
+      "types": "./src/operation-promoter.ts",
+      "production": "./dist/operation-promoter.js",
+      "default": "./src/operation-promoter.ts"
+    },
     "./api-runtime": {
       "types": "./src/api-runtime.ts",
       "production": "./dist/api-runtime.js",

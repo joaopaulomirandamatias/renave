@@ -10,6 +10,8 @@ export const IDENTITY_APP_ROLE = "renave_identity_app";
 export const MAINTENANCE_APP_ROLE = "renave_maintenance_app";
 /** Papel exclusivo do worker de operações; somente EXECUTE em rotinas fechadas. */
 export const OPERATION_WORKER_ROLE = "renave_operation_worker";
+/** Papel offline que promove HELD_LOCAL após revalidar o selo regulatório. */
+export const OPERATION_PROMOTER_ROLE = "renave_operation_promoter";
 /** Papel administrativo mínimo: somente EXECUTE nas rotinas de perfis RENAVE. */
 export const PROFILE_PROVISIONER_ROLE = "renave_profile_provisioner";
 /** Papel offline exclusivo para jurisdição e escopos Credencia. */

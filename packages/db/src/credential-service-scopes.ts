@@ -54,6 +54,7 @@ export interface CredentialServiceScope {
   establishmentId: string;
   expiresAt: Date;
   generation: string;
+  jurisdictionGeneration: string | null;
   jurisdictionUf: BrazilianJurisdictionUf;
   serviceNature: CredentialServiceNature;
   status: CredentialServiceScopeStatus;
@@ -102,6 +103,7 @@ interface CredentialServiceScopeRow {
   establishment_id: string;
   expires_at: Date;
   generation: string;
+  jurisdiction_generation: string | null;
   jurisdiction_uf: BrazilianJurisdictionUf;
   service_nature: CredentialServiceNature;
   status: CredentialServiceScopeStatus;
@@ -124,7 +126,7 @@ interface EstablishmentRegulatoryJurisdictionRow {
 }
 
 const COLUMNS =
-  "scope.tenant_id, scope.establishment_id, scope.service_nature, scope.jurisdiction_uf, scope.status, scope.version, scope.generation, scope.valid_from, scope.expires_at, scope.updated_at";
+  "scope.tenant_id, scope.establishment_id, scope.service_nature, scope.jurisdiction_uf, scope.status, scope.version, scope.generation, scope.jurisdiction_generation, scope.valid_from, scope.expires_at, scope.updated_at";
 const JURISDICTION_COLUMNS =
   "tenant_id, establishment_id, jurisdiction_uf, status, version, generation, valid_from, expires_at, updated_at";
 
@@ -133,6 +135,7 @@ function toScope(row: CredentialServiceScopeRow): CredentialServiceScope {
     establishmentId: row.establishment_id,
     expiresAt: row.expires_at,
     generation: row.generation,
+    jurisdictionGeneration: row.jurisdiction_generation,
     jurisdictionUf: row.jurisdiction_uf,
     serviceNature: row.service_nature,
     status: row.status,
@@ -184,14 +187,15 @@ export async function getCredentialServiceScope(
   const { rows } = await client.query<CredentialServiceScopeRow>(
     `with effective_jurisdictions as (
        select jurisdiction.tenant_id,jurisdiction.establishment_id,
-              jurisdiction.jurisdiction_uf
+              jurisdiction.jurisdiction_uf,jurisdiction.generation
          from renave.establishment_regulatory_jurisdiction jurisdiction
         where jurisdiction.establishment_id = $1
           and jurisdiction.status = 'verified'
           and jurisdiction.valid_from <= pg_catalog.statement_timestamp()
           and jurisdiction.expires_at > pg_catalog.statement_timestamp()
      ), single_jurisdiction as (
-       select min(jurisdiction_uf) as jurisdiction_uf
+       select min(jurisdiction_uf) as jurisdiction_uf,
+              min(generation) as generation
          from effective_jurisdictions
        having count(*) = 1
      )
@@ -200,6 +204,7 @@ export async function getCredentialServiceScope(
        join renave.credential_service_scope scope
          on scope.establishment_id = $1
         and scope.jurisdiction_uf = jurisdiction.jurisdiction_uf
+        and scope.jurisdiction_generation = jurisdiction.generation
       where scope.service_nature = $2
         and scope.status = 'enabled'
         and scope.valid_from <= pg_catalog.statement_timestamp()
@@ -220,7 +225,8 @@ export async function transitionCredentialServiceScope(
 ): Promise<CredentialServiceScope> {
   const { rows } = await client.query<CredentialServiceScopeRow>(
     `select tenant_id, establishment_id, service_nature, jurisdiction_uf,
-            status, version, generation, valid_from, expires_at, updated_at
+            status, version, generation, jurisdiction_generation,
+            valid_from, expires_at, updated_at
        from renave_admin.transition_credential_service_scope(
          $1,$2,$3,$4,$5,$6,$7,$8,$9
        )`,

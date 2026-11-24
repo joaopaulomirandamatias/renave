@@ -4,7 +4,7 @@ import {
   assertStockEntryRuntimeKeyGeneration,
   createOrReplayHeldLocalOperation,
   resolveVerifiedRenavePrincipals,
-  type CreateOperationInput,
+  type CreateHeldLocalOperationInput,
   type CreateOperationResult,
   type TenantClient,
 } from "@seu-renave/db/api-runtime";
@@ -133,7 +133,7 @@ export interface StockEntryBusinessInput {
 }
 
 export interface ResolvedPrincipal {
-  binding: RenavePrincipalBinding;
+  binding: RenavePrincipalBinding & { profileVersion: string };
   envelope: ProtectedRenavePrincipal;
 }
 
@@ -562,7 +562,7 @@ export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCa
     let actorDigest: Buffer | undefined;
     let idempotencyDigest: Buffer | undefined;
     let vehicleDigest: Buffer | undefined;
-    let operationInput: CreateOperationInput | undefined;
+    let operationInput: CreateHeldLocalOperationInput | undefined;
     let principals: ResolvedVerifiedRenavePrincipals | undefined;
     let generationFingerprint: Buffer | undefined;
     try {
@@ -588,6 +588,16 @@ export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCa
         idempotencyKeyDigest: idempotencyDigest,
         subject: input.session.subject,
       });
+      if (
+        !UUID.test(principals.operator.binding.profileId) ||
+        !/^[1-9][0-9]*$/u.test(principals.operator.binding.profileVersion) ||
+        !UUID.test(principals.establishment.binding.profileId) ||
+        !/^[1-9][0-9]*$/u.test(principals.establishment.binding.profileVersion)
+      ) {
+        throw new StockEntryOperationError(
+          "STOCK_ENTRY_PRINCIPALS_UNAVAILABLE",
+        );
+      }
       operatorSecret = this.options.principalCrypto.decrypt(
         principals.operator.envelope,
         principals.operator.binding,
@@ -622,8 +632,14 @@ export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCa
           correlationId: randomUUID(),
           environment: this.options.environment,
           establishmentId: input.establishmentId,
+          establishmentProfileId: principals.establishment.binding.profileId,
+          establishmentProfileVersion:
+            principals.establishment.binding.profileVersion,
           idempotencyKeyDigest: idempotencyDigest,
+          operatorProfileId: principals.operator.binding.profileId,
+          operatorProfileVersion: principals.operator.binding.profileVersion,
           prepared,
+          subject: input.session.subject,
           tenantId: input.tenantId,
           vehicleKeyDigest: vehicleDigest,
         },

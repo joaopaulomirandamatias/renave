@@ -20,11 +20,12 @@ import {
 } from "../../src/renave-profiles.js";
 import {
   createOrReplayHeldLocalOperation,
-  type CreateOperationInput,
+  type CreateHeldLocalOperationInput,
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
 import { operationProjectionFields } from "../helpers/operation-projection.js";
+import type { OperationAuthorizationSnapshot } from "../helpers/operation-authorization.js";
 
 const urls = inject("dbUrls");
 const READY = "oidc|principal-resolution-ready";
@@ -53,6 +54,7 @@ let storeConfirmedLinkA: Establishment;
 let storeDeactivatedLinkA: Establishment;
 let storeRejectedLinkA: Establishment;
 let storeB: Establishment;
+let readyAuthorization: OperationAuthorizationSnapshot;
 
 function digest(value: string | Buffer): Buffer {
   return createHash("sha256").update(value).digest();
@@ -63,10 +65,13 @@ function cnpj(index: number): string {
   return `${base}${computeCnpjCheckDigits(base)}`;
 }
 
-function operationInput(label: string): CreateOperationInput {
+function operationInput(label: string): CreateHeldLocalOperationInput {
+  if (!readyAuthorization)
+    throw new Error("missing operation authorization fixture");
   const plaintext = Buffer.from(JSON.stringify({ label }), "utf8");
   return {
     ...operationProjectionFields(`principal-resolution:${label}`),
+    ...readyAuthorization,
     actorSubjectHash: digest(`actor:${label}`),
     correlationId: randomUUID(),
     establishmentId: storeA.id,
@@ -394,6 +399,21 @@ beforeAll(async () => {
     ),
     seedEstablishmentProfile(tenantB.id, storeB.id, "verified", "store-b"),
   ]);
+  const resolvedReady = await withTenant(appPool, tenantA.id, (client) =>
+    resolveVerifiedRenavePrincipals(client, {
+      establishmentId: storeA.id,
+      idempotencyKeyDigest: digest("principal-resolution-operation-fixture"),
+      subject: READY,
+    }),
+  );
+  readyAuthorization = {
+    establishmentProfileId: resolvedReady.establishment.binding.profileId,
+    establishmentProfileVersion:
+      resolvedReady.establishment.binding.profileVersion,
+    operatorProfileId: resolvedReady.operator.binding.profileId,
+    operatorProfileVersion: resolvedReady.operator.binding.profileVersion,
+    subject: READY,
+  };
   await withTenant(migratorPool, tenantA.id, async (client) => {
     await client.query(
       `update renave.tenant_user set status = 'suspended'

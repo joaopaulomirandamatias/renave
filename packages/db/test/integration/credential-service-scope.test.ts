@@ -17,11 +17,15 @@ import {
 import {
   createOrReplayHeldLocalOperation,
   OperationCredentialLinkNotEnabledError,
-  type CreateOperationInput,
+  type CreateHeldLocalOperationInput,
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
 import { operationProjectionFields } from "../helpers/operation-projection.js";
+import {
+  type OperationAuthorizationSnapshot,
+  seedVerifiedOperationPrincipals,
+} from "../helpers/operation-authorization.js";
 
 const urls = inject("dbUrls");
 let admin: Pool;
@@ -33,6 +37,10 @@ let tenantB: Tenant;
 let storeA: Establishment;
 let storeB: Establishment;
 let storeRace: Establishment;
+const authorizationByEstablishment = new Map<
+  string,
+  OperationAuthorizationSnapshot
+>();
 
 const digest = (value: string): Buffer =>
   createHash("sha256").update(value).digest();
@@ -54,9 +62,13 @@ function decision(establishmentId: string, suffix: string) {
 function operationInput(
   establishmentId: string,
   label: string,
-): CreateOperationInput {
+): CreateHeldLocalOperationInput {
+  const authorization = authorizationByEstablishment.get(establishmentId);
+  if (!authorization)
+    throw new Error("missing operation authorization fixture");
   return {
     ...operationProjectionFields(`scope:${label}`),
+    ...authorization,
     actorSubjectHash: digest(`actor:${label}`),
     correlationId: randomUUID(),
     establishmentId,
@@ -95,6 +107,18 @@ beforeAll(async () => {
   storeRace = await withTenant(app, tenantA.id, (client) =>
     createEstablishment(client, { cnpj: cnpj(3), tradeName: "Scope Race" }),
   );
+  for (const [establishment, label] of [
+    [storeA, "scope-a"],
+    [storeRace, "scope-race"],
+  ] as const) {
+    const snapshot = await withTenant(migrator, tenantA.id, (client) =>
+      seedVerifiedOperationPrincipals(client, {
+        establishmentId: establishment.id,
+        label,
+      }),
+    );
+    authorizationByEstablishment.set(establishment.id, snapshot);
+  }
   await withTenant(app, tenantA.id, async (client) => {
     const common = {
       changedBySubject: "oidc|scope-test",
@@ -348,7 +372,7 @@ describe("credential service scope", () => {
         const result = await client.query<{ ready: boolean }>(
           "select renave_runtime.api_contract_ready() ready",
         );
-        expect(result.rows[0]?.ready).toBe(false);
+        expect(result.rows[0]?.ready, sql).toBe(false);
       } finally {
         await client.query("rollback");
         client.release();

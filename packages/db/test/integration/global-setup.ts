@@ -8,6 +8,7 @@ import {
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
+  OPERATION_PROMOTER_ROLE,
   OPERATION_WORKER_ROLE,
   PLATFORM_PROVISIONER_ROLE,
   PLATFORM_READER_ROLE,
@@ -27,6 +28,7 @@ export interface DbUrls {
   identity: string;
   maintenance: string;
   operationWorker: string;
+  operationPromoter: string;
   profileProvisioner: string;
   profileReader: string;
   platformProvisioner: string;
@@ -55,6 +57,7 @@ const TEST_CREDENTIAL_SCOPE_PROVISIONER_PASSWORD =
 const TEST_IDENTITY_APP_PASSWORD = "renave_identity_app_it";
 const TEST_MAINTENANCE_APP_PASSWORD = "renave_maintenance_app_it";
 const TEST_OPERATION_WORKER_PASSWORD = "renave_operation_worker_it";
+const TEST_OPERATION_PROMOTER_PASSWORD = "renave_operation_promoter_it";
 const TEST_PROFILE_PROVISIONER_PASSWORD = "renave_profile_provisioner_it";
 const TEST_PROFILE_READER_PASSWORD = "renave_profile_reader_it";
 const TEST_PLATFORM_PROVISIONER_PASSWORD = "renave_platform_provisioner_it";
@@ -93,6 +96,7 @@ export default async function setup(
     identityAppPassword: TEST_IDENTITY_APP_PASSWORD,
     maintenanceAppPassword: TEST_MAINTENANCE_APP_PASSWORD,
     operationWorkerPassword: TEST_OPERATION_WORKER_PASSWORD,
+    operationPromoterPassword: TEST_OPERATION_PROMOTER_PASSWORD,
     profileProvisionerPassword: TEST_PROFILE_PROVISIONER_PASSWORD,
     profileReaderPassword: TEST_PROFILE_READER_PASSWORD,
     platformProvisionerPassword: TEST_PLATFORM_PROVISIONER_PASSWORD,
@@ -124,6 +128,11 @@ export default async function setup(
     OPERATION_WORKER_ROLE,
     TEST_OPERATION_WORKER_PASSWORD,
   );
+  const operationPromoter = withCredentials(
+    admin,
+    OPERATION_PROMOTER_ROLE,
+    TEST_OPERATION_PROMOTER_PASSWORD,
+  );
   const profileProvisioner = withCredentials(
     admin,
     PROFILE_PROVISIONER_ROLE,
@@ -154,6 +163,7 @@ export default async function setup(
     identity,
     maintenance: maintenanceApp,
     operationWorker,
+    operationPromoter,
     profileProvisioner,
     profileReader,
     platformProvisioner,

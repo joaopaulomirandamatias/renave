@@ -19,11 +19,15 @@ import {
   OperationActiveConflictError,
   OperationCredentialLinkNotEnabledError,
   OperationIdempotencyConflictError,
-  type CreateOperationInput,
+  type CreateHeldLocalOperationInput,
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
 import { operationProjectionFields } from "../helpers/operation-projection.js";
+import {
+  type OperationAuthorizationSnapshot,
+  seedVerifiedOperationPrincipals,
+} from "../helpers/operation-authorization.js";
 
 const urls = inject("dbUrls");
 
@@ -40,6 +44,10 @@ let deactivatedA: Establishment;
 let absentA: Establishment;
 let raceA: Establishment;
 let enabledB: Establishment;
+const authorizationByEstablishment = new Map<
+  string,
+  OperationAuthorizationSnapshot
+>();
 
 function digest(value: string | Buffer): Buffer {
   return createHash("sha256").update(value).digest();
@@ -53,11 +61,15 @@ function cnpj(index: number): string {
 function operationInput(
   label: string,
   establishmentId: string,
-): CreateOperationInput {
+): CreateHeldLocalOperationInput {
+  const authorization = authorizationByEstablishment.get(establishmentId);
+  if (!authorization)
+    throw new Error("missing operation authorization fixture");
   const plaintext = Buffer.from(`{"label":${JSON.stringify(label)}}`, "utf8");
   const ciphertext = Buffer.from(`encrypted:${label}`, "utf8");
   return {
     ...operationProjectionFields(`held:${label}`),
+    ...authorization,
     actorSubjectHash: digest(`actor:${label}`),
     correlationId: randomUUID(),
     establishmentId,
@@ -111,9 +123,9 @@ async function createTestEstablishment(
 async function authorizeService(
   tenantId: string,
   establishmentId: string,
+  expiresAt = new Date(Date.now() + 3_600_000),
 ): Promise<void> {
   const validFrom = new Date(Date.now() - 60_000);
-  const expiresAt = new Date(Date.now() + 3_600_000);
   const common = {
     changedByDigest: digest(`scope-actor:${establishmentId}`),
     decisionTicketDigest: digest(`scope-ticket:${establishmentId}`),
@@ -134,6 +146,18 @@ async function authorizeService(
       status: "enabled",
     });
   });
+}
+
+async function waitForDatabaseTime(target: Date): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const { rows } = await adminPool.query<{ reached: boolean }>(
+      "select pg_catalog.clock_timestamp() >= $1::timestamptz reached",
+      [target],
+    );
+    if (rows[0]!.reached) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error("database clock did not reach creation expiry");
 }
 
 beforeAll(async () => {
@@ -163,6 +187,29 @@ beforeAll(async () => {
     createTestEstablishment(tenantA.id, 5, "Race A"),
   ]);
   enabledB = await createTestEstablishment(tenantB.id, 1, "Enabled B");
+  const principalFixtures: readonly (readonly [
+    string,
+    Establishment,
+    string,
+  ])[] = [
+    [tenantA.id, enabledA, "enabled-a"],
+    [tenantA.id, confirmedA, "confirmed-a"],
+    [tenantA.id, deactivatedA, "deactivated-a"],
+    [tenantA.id, absentA, "absent-a"],
+    [tenantA.id, raceA, "race-a"],
+    [tenantB.id, enabledB, "enabled-b"],
+  ];
+  await Promise.all(
+    principalFixtures.map(async ([tenantId, establishment, label]) => {
+      const snapshot = await withTenant(migratorPool, tenantId, (client) =>
+        seedVerifiedOperationPrincipals(client, {
+          establishmentId: establishment.id,
+          label,
+        }),
+      );
+      authorizationByEstablishment.set(establishment.id, snapshot);
+    }),
+  );
   await Promise.all([
     establishLink(tenantA.id, enabledA.id, "enabled"),
     establishLink(tenantA.id, confirmedA.id, "confirmed"),
@@ -299,14 +346,14 @@ describe("held local operation integration", () => {
     ).rejects.toBeInstanceOf(OperationActiveConflictError);
   });
 
-  it("mantém HELD_LOCAL terminal e não permite promoção direta a PENDING_SEND", async () => {
+  it("mantém promoção direta fora do runtime da API", async () => {
     const input = operationInput("terminal-held", enabledA.id);
     const created = await withTenant(appPool, tenantA.id, (client) =>
       createOrReplayHeldLocalOperation(client, input),
     );
 
     await expect(
-      withTenant(migratorPool, tenantA.id, (client) =>
+      withTenant(appPool, tenantA.id, (client) =>
         client.query(
           `update renave.operation
               set status = 'PENDING_SEND',
@@ -316,7 +363,7 @@ describe("held local operation integration", () => {
           [created.operation.id],
         ),
       ),
-    ).rejects.toMatchObject({ code: "23000" });
+    ).rejects.toMatchObject({ code: "42501" });
 
     const persisted = await withTenant(
       migratorPool,
@@ -422,6 +469,119 @@ describe("held local operation integration", () => {
     ).resolves.toBeNull();
   });
 
+  it("revalida expiração após cada fence e row lock de criação sem efeito parcial", async () => {
+    const waits = [250025, 700069, 700070, 170017, "scope-row"] as const;
+    for (const [index, wait] of waits.entries()) {
+      const establishment = await createTestEstablishment(
+        tenantA.id,
+        20 + index,
+        `Expiry fence ${wait}`,
+      );
+      const snapshot = await withTenant(migratorPool, tenantA.id, (client) =>
+        seedVerifiedOperationPrincipals(client, {
+          establishmentId: establishment.id,
+          label: `expiry-${wait}`,
+        }),
+      );
+      authorizationByEstablishment.set(establishment.id, snapshot);
+      await establishLink(tenantA.id, establishment.id, "enabled");
+      const expiresAt = new Date(Date.now() + 1_500);
+      await authorizeService(tenantA.id, establishment.id, expiresAt);
+      const input = operationInput(`expiry-${wait}`, establishment.id);
+
+      const blocker = await migratorPool.connect();
+      let blockerOpen = false;
+      let creation:
+        ReturnType<typeof createOrReplayHeldLocalOperation> | undefined;
+      try {
+        await blocker.query("begin");
+        blockerOpen = true;
+        await blocker.query("select set_config('renave.tenant_id',$1,true)", [
+          tenantA.id,
+        ]);
+        if (wait === "scope-row") {
+          await blocker.query(
+            `select 1 from renave.credential_service_scope
+              where tenant_id=$1 and establishment_id=$2
+                and service_nature='establishment' and jurisdiction_uf='PA'
+              for update`,
+            [tenantA.id, establishment.id],
+          );
+        } else {
+          const key =
+            wait === 250025
+              ? `${tenantA.id}:${input.idempotencyKeyDigest.toString("hex")}`
+              : wait === 700070
+                ? `${tenantA.id}:${establishment.id}:establishment:PA`
+                : `${tenantA.id}:${establishment.id}`;
+          await blocker.query(
+            "select pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended($1,$2))",
+            [key, wait],
+          );
+        }
+        creation = withTenant(appPool, tenantA.id, (client) =>
+          createOrReplayHeldLocalOperation(client, input),
+        );
+        let blocked = false;
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          const { rows } = await adminPool.query<{ blocked: boolean }>(
+            `select exists(select 1 from pg_catalog.pg_stat_activity
+              where wait_event_type='Lock'
+                and query like '%create_held_local_operation%') blocked`,
+          );
+          if (rows[0]!.blocked) {
+            blocked = true;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        expect(blocked).toBe(true);
+        await waitForDatabaseTime(expiresAt);
+        await blocker.query("commit");
+        blockerOpen = false;
+        await expect(creation).rejects.toBeInstanceOf(
+          OperationCredentialLinkNotEnabledError,
+        );
+        const { rows } = await withTenant(migratorPool, tenantA.id, (client) =>
+          client.query<{
+            binding: number;
+            evidence: number;
+            operations: number;
+            outbox: number;
+            transitions: number;
+          }>(
+            `select
+                (select count(*)::int from renave.operation
+                  where establishment_id=$1) operations,
+                (select count(*)::int from renave.operation_authorization_binding binding
+                  join renave.operation operation on operation.id=binding.operation_id
+                  where operation.establishment_id=$1) binding,
+                (select count(*)::int from renave.operation_outbox outbox
+                  join renave.operation operation on operation.id=outbox.operation_id
+                  where operation.establishment_id=$1) outbox,
+                (select count(*)::int from renave.operation_transition transition
+                  join renave.operation operation on operation.id=transition.operation_id
+                  where operation.establishment_id=$1) transitions,
+                (select count(*)::int from renave.protected_evidence
+                  where establishment_id=$1) evidence`,
+            [establishment.id],
+          ),
+        );
+        expect(rows[0]).toEqual({
+          binding: 0,
+          evidence: 0,
+          operations: 0,
+          outbox: 0,
+          transitions: 0,
+        });
+      } finally {
+        if (blockerOpen) await blocker.query("rollback").catch(() => undefined);
+        if (creation) await creation.catch(() => undefined);
+        blocker.release();
+      }
+    }
+  });
+
   it("concede somente ao app a função sanitizada e mantém runtime pronto", async () => {
     const { rows } = await adminPool.query<{
       app_executes: boolean;
@@ -435,7 +595,7 @@ describe("held local operation integration", () => {
       `select
          has_function_privilege(
            'renave_app',
-           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea)',
+           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint)',
            'execute'
          ) as app_executes,
          has_function_privilege(
@@ -450,22 +610,22 @@ describe("held local operation integration", () => {
          ) as legacy_migrator_executes,
          has_function_privilege(
            'renave_identity_app',
-           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea)',
+           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint)',
            'execute'
          ) as identity_executes,
          has_function_privilege(
            'renave_maintenance_app',
-           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea)',
+           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint)',
            'execute'
          ) as maintenance_executes,
          has_function_privilege(
            'renave_operation_worker',
-           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea)',
+           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint)',
            'execute'
          ) as worker_executes,
          has_function_privilege(
            'public',
-           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea)',
+           'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint)',
            'execute'
          ) as public_executes`,
     );

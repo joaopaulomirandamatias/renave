@@ -945,10 +945,15 @@ describe("composição PostgreSQL real da API", () => {
         correlationId: randomUUID(),
         environment: "homologation",
         establishmentId: operatorStore.id,
+        establishmentProfileId: "66666666-6666-4666-8666-666666666666",
+        establishmentProfileVersion: "11",
         idempotencyKeyDigest: createHash("sha256")
           .update(`idempotency:${suffix}`)
           .digest(),
+        operatorProfileId: "55555555-5555-4555-8555-555555555555",
+        operatorProfileVersion: "7",
         prepared,
+        subject: "oidc|postgres-composition",
         tenantId: tenant.id,
         vehicleKeyDigest: createHash("sha256").update(plate).digest(),
       });
