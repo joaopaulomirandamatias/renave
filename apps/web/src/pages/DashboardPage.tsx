@@ -6,7 +6,6 @@ import {
   type RenaveStockState,
 } from "@seu-renave/ui";
 import {
-  ClipboardCheck,
   LayoutDashboard,
   LogOut,
   ShieldAlert,
@@ -25,6 +24,7 @@ import type {
   EstablishmentManagementCapability,
 } from "../App.js";
 import { ActivationPage } from "./ActivationPage.js";
+import { AttentionPanel } from "./AttentionPanel.js";
 import { EstablishmentCreationPanel } from "./EstablishmentCreationPanel.js";
 import { HomologationReadinessPanel } from "./HomologationReadinessPanel.js";
 import { EligibilityPanel } from "./EligibilityPanel.js";
@@ -319,11 +319,13 @@ export function DashboardPage({
         />
 
         {onCreateEstablishment && selectedTenantId ? (
-          <EstablishmentCreationPanel
-            capability={establishmentManagement}
-            onCreate={onCreateEstablishment}
-            selectionKey={selectedTenantId}
-          />
+          <div id="establishment-creation">
+            <EstablishmentCreationPanel
+              capability={establishmentManagement}
+              onCreate={onCreateEstablishment}
+              selectionKey={selectedTenantId}
+            />
+          </div>
         ) : null}
 
         {onCreateStockEntry && selectedTenantId && selectedEstablishmentId ? (
@@ -368,19 +370,24 @@ export function DashboardPage({
           </div>
         </section>
 
-        <section
-          className="dashboard-page__empty"
-          aria-labelledby="attention-title"
-        >
-          <ClipboardCheck size={28} aria-hidden="true" />
-          <div>
-            <h2 id="attention-title">O que precisa da sua atenção agora</h2>
-            <p>
-              Nenhuma tarefa foi carregada. Quando a integração estiver
-              validada, pendências e próximos passos aparecerão aqui.
-            </p>
-          </div>
-        </section>
+        <AttentionPanel
+          canCreateEstablishment={Boolean(
+            onCreateEstablishment && selectedTenantId,
+          )}
+          canReloadLinkStatus={Boolean(onReloadLinkStatus)}
+          contextError={contextError}
+          contextLoading={contextLoading}
+          establishmentManagement={establishmentManagement}
+          hasEstablishment={Boolean(selectedEstablishmentId)}
+          linkStatusError={linkStatusError}
+          linkStatusLoading={linkStatusLoading}
+          preflightAvailable={preflightAvailable}
+          readinessError={readinessError}
+          readinessLoading={readinessLoading}
+          {...(linkStatus ? { linkStatus } : {})}
+          {...(onReloadLinkStatus ? { onReloadLinkStatus } : {})}
+          {...(readiness ? { readiness } : {})}
+        />
       </div>
     </AppShell>
   );
