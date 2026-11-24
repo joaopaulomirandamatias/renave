@@ -5,6 +5,7 @@ import {
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
+  PROFILE_PROVISIONER_ROLE,
 } from "./config.js";
 
 export interface BootstrapOptions {
@@ -15,6 +16,7 @@ export interface BootstrapOptions {
   identityAppPassword: string;
   maintenanceAppPassword: string;
   operationWorkerPassword: string;
+  profileProvisionerPassword: string;
 }
 
 /**
@@ -39,7 +41,8 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
     options.appPassword === "" ||
     options.identityAppPassword === "" ||
     options.maintenanceAppPassword === "" ||
-    options.operationWorkerPassword === ""
+    options.operationWorkerPassword === "" ||
+    options.profileProvisionerPassword === ""
   ) {
     throw new Error("Senhas dos papéis não podem ser vazias.");
   }
@@ -61,6 +64,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
       [IDENTITY_APP_ROLE, options.identityAppPassword],
       [MAINTENANCE_APP_ROLE, options.maintenanceAppPassword],
       [OPERATION_WORKER_ROLE, options.operationWorkerPassword],
+      [PROFILE_PROVISIONER_ROLE, options.profileProvisionerPassword],
     ] as const) {
       const exists = await client.query(
         "select 1 from pg_roles where rolname = $1",
@@ -86,6 +90,9 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
     await client.query(
       `alter role ${OPERATION_WORKER_ROLE} set idle_in_transaction_session_timeout = '30s'`,
     );
+    await client.query(
+      `alter role ${PROFILE_PROVISIONER_ROLE} set idle_in_transaction_session_timeout = '30s'`,
+    );
 
     // Privilégios por banco (escopo da conexão administrativa).
     await client.query(`
@@ -98,10 +105,12 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
         execute format('revoke all on database %I from ${IDENTITY_APP_ROLE}', db);
         execute format('revoke all on database %I from ${MAINTENANCE_APP_ROLE}', db);
         execute format('revoke all on database %I from ${OPERATION_WORKER_ROLE}', db);
+        execute format('revoke all on database %I from ${PROFILE_PROVISIONER_ROLE}', db);
         execute format('grant connect on database %I to ${APP_ROLE}', db);
         execute format('grant connect on database %I to ${IDENTITY_APP_ROLE}', db);
         execute format('grant connect on database %I to ${MAINTENANCE_APP_ROLE}', db);
         execute format('grant connect on database %I to ${OPERATION_WORKER_ROLE}', db);
+        execute format('grant connect on database %I to ${PROFILE_PROVISIONER_ROLE}', db);
       end $$`);
     await client.query("revoke all on schema public from public");
     await client.query(`revoke all on schema public from ${APP_ROLE}`);
@@ -112,11 +121,15 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
     await client.query(
       `revoke all on schema public from ${OPERATION_WORKER_ROLE}`,
     );
+    await client.query(
+      `revoke all on schema public from ${PROFILE_PROVISIONER_ROLE}`,
+    );
     for (const member of [
       APP_ROLE,
       IDENTITY_APP_ROLE,
       MAINTENANCE_APP_ROLE,
       OPERATION_WORKER_ROLE,
+      PROFILE_PROVISIONER_ROLE,
     ]) {
       for (const parent of [
         MIGRATOR_ROLE,
@@ -124,6 +137,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
         IDENTITY_APP_ROLE,
         MAINTENANCE_APP_ROLE,
         OPERATION_WORKER_ROLE,
+        PROFILE_PROVISIONER_ROLE,
       ]) {
         if (member !== parent) {
           await client.query(`revoke ${parent} from ${member}`);

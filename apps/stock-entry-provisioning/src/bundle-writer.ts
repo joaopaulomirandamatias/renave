@@ -72,7 +72,7 @@ async function hasGitMarker(
   }
 }
 
-async function secureOutputDirectory(
+export async function secureOutputDirectory(
   directory: string,
   filesystem: BundleWriterFilesystem,
 ): Promise<string> {
@@ -110,7 +110,7 @@ function outputExists(error: unknown): boolean {
   }
 }
 
-async function syncDirectory(
+export async function syncDirectory(
   directory: string,
   filesystem: BundleWriterFilesystem,
 ): Promise<void> {

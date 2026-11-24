@@ -449,7 +449,7 @@ describe("guard do banco de runtime", () => {
     await adminPool.query(
       `grant temporary on database ${database} to
          renave_app,renave_identity_app,renave_maintenance_app,
-         renave_operation_worker`,
+         renave_operation_worker,renave_profile_provisioner`,
     );
     await adminPool.query(
       `grant create on database ${database} to renave_operation_worker`,
@@ -462,6 +462,7 @@ describe("guard do banco de runtime", () => {
       maintenanceAppPassword: "renave_maintenance_app_it",
       migratorPassword: "renave_migrator_it",
       operationWorkerPassword: "renave_operation_worker_it",
+      profileProvisionerPassword: "renave_profile_provisioner_it",
     };
     await bootstrapRoles(options);
     await bootstrapRoles(options);
@@ -491,10 +492,11 @@ describe("guard do banco de runtime", () => {
           "renave_identity_app",
           "renave_maintenance_app",
           "renave_operation_worker",
+          "renave_profile_provisioner",
         ],
       ],
     );
-    expect(privileges.rows).toHaveLength(4);
+    expect(privileges.rows).toHaveLength(5);
     for (const privilege of privileges.rows) {
       expect(privilege).toMatchObject({
         can_connect: true,
@@ -505,7 +507,7 @@ describe("guard do banco de runtime", () => {
     await expectWorkerContractReady();
   });
 
-  it("contrato efetivo recusa CREATE via PUBLIC e nova função PUBLIC", async () => {
+  it("contrato efetivo recusa CREATE via PUBLIC e função inesperada", async () => {
     await migratorPool.query("grant create on schema renave_runtime to public");
     try {
       await expectWorkerContractRejected();
@@ -528,7 +530,7 @@ describe("guard do banco de runtime", () => {
            'renave_runtime.operation_worker_public_probe()','EXECUTE'
          ) as allowed`,
       );
-      expect(publicExecute.rows[0]?.allowed).toBe(true);
+      expect(publicExecute.rows[0]?.allowed).toBe(false);
       await expectWorkerContractRejected();
     } finally {
       await migratorPool.query(

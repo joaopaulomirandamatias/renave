@@ -79,7 +79,7 @@ describe.sequential("limite distribuído de entrada de estoque", () => {
          renave_runtime.api_contract_ready() as ready`,
     );
     expect(result.rows[0]?.fingerprint).toBe(
-      "897a6e253a32b4f6a43996a590132f94557cfe4d2505c75781a535cc611e9a22",
+      "d5226c15ac4b48dbf8fb60c0d448f30f8d5af98ed56cf9f561d09f25d8b36d9a",
     );
     expect(result.rows[0]?.ready).toBe(true);
   });

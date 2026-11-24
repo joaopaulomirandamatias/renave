@@ -40,6 +40,7 @@ export {
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
+  PROFILE_PROVISIONER_ROLE,
   SCHEMA,
   TENANT_SETTING,
   isLoopbackUrl,
@@ -120,6 +121,25 @@ export {
   type ResolvedVerifiedRenavePrincipals,
   type RenaveProfileStatusValue,
 } from "./renave-profiles.js";
+export {
+  assertProfileProvisionerSession,
+  getAdminEstablishmentRenaveProfileStatus,
+  getAdminOperatorRenaveProfileStatus,
+  stageEstablishmentRenaveProfile,
+  stageOperatorRenaveProfile,
+  suspendEstablishmentRenaveProfile,
+  suspendOperatorRenaveProfile,
+  RenaveProfileAdministrationContractError,
+  type AdminRenaveProfileStatus,
+  type AdminRenaveProfileStatusResult,
+  type KeyedDigestInput,
+  type ProfileEnvelopeInput,
+  type RenaveProfileAdministrationResult,
+  type StageEstablishmentRenaveProfileInput,
+  type StageOperatorRenaveProfileInput,
+  type SuspendEstablishmentRenaveProfileInput,
+  type SuspendOperatorRenaveProfileInput,
+} from "./renave-profile-administration.js";
 export {
   beginOperationReconciliation,
   claimOperationReconciliations,
