@@ -1,4 +1,4 @@
-import { PostgresStockEntryRateLimiter } from "@seu-renave/db";
+import { PostgresStockEntryRateLimiter } from "@seu-renave/db/api-runtime";
 import {
   OperationReconciliationProjectionCipher,
   OperationRequestCipher,

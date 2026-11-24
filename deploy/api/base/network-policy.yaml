@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: renave-api-default-deny
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: api
+      app.kubernetes.io/name: seu-renave
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: renave-api-postgres-placeholder
+  annotations:
+    seu-renave.io/replace-before-use: database-cidr
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: api
+      app.kubernetes.io/name: seu-renave
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        # TEST-NET-1 e deliberadamente inoperante. Substitua pelo CIDR exato do DB.
+        - ipBlock:
+            cidr: 192.0.2.10/32
+      ports:
+        - port: 5432
+          protocol: TCP
+
+# Nao existe regra DNS, OIDC ou SERPRO nesta base. A API permanece dormente e
+# sem egress externo ate um overlay futuro, revisado separadamente.

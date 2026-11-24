@@ -7,7 +7,7 @@ import {
   type CreateOperationInput,
   type CreateOperationResult,
   type TenantClient,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import type { AuthenticatedSession } from "@seu-renave/identity";
 import {
   type DecryptedRenavePrincipal,

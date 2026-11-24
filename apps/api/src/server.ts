@@ -5,6 +5,7 @@ import {
   type CertificateExpiryEvent,
 } from "./renave/certificate-expiry-monitor.js";
 import { createRuntime } from "./runtime.js";
+import { installApiGracefulShutdown } from "./shutdown.js";
 
 const config = loadConfig();
 const runtime = await createRuntime(config);
@@ -65,7 +66,9 @@ const certificateMonitor = runtime.certificateTemporalStatus
     })
   : undefined;
 let stopCertificateMonitor: (() => void) | undefined;
+const removeShutdownHandlers = installApiGracefulShutdown(app);
 app.addHook("onClose", async () => {
+  removeShutdownHandlers();
   stopCertificateMonitor?.();
   await runtime.close();
 });

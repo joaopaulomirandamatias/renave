@@ -1,4 +1,4 @@
-import { parseCnpj, type TenantClient } from "@seu-renave/db";
+import { parseCnpj, type TenantClient } from "@seu-renave/db/api-runtime";
 import type { FastifyInstance } from "fastify";
 
 import type {

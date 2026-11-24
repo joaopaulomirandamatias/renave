@@ -9,7 +9,7 @@ const db = vi.hoisted(() => ({
   withTenant: vi.fn(),
 }));
 
-vi.mock("@seu-renave/db", () => db);
+vi.mock("@seu-renave/db/api-runtime", () => db);
 
 import {
   publicCertificateReadiness,

@@ -1,6 +1,8 @@
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 
+import { assertRuntimeEsmImports } from "./runtime-imports.mjs";
+
 const root = resolve(process.argv[2] ?? "");
 if (!process.argv[2] || root === "/") {
   throw new Error("runtime directory required");
@@ -15,6 +17,7 @@ const operationWorkerDbFiles = new Set([
   "runtime-guard.js",
   "serpro-query-limiter.js",
   "tenant-context.js",
+  "tenant-runtime.js",
 ]);
 const forbiddenFile = (name) =>
   /\.(?:test|spec)\./u.test(name) ||
@@ -107,5 +110,7 @@ for (const required of [
 ]) {
   await readFile(join(root, required));
 }
+
+await assertRuntimeEsmImports(root);
 
 if (basename(root) === "") throw new Error("invalid runtime directory");

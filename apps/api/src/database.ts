@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { createPool } from "@seu-renave/db";
+import { createPool } from "@seu-renave/db/api-runtime";
 import type { Pool } from "pg";
 
 export interface RuntimePoolOptions {

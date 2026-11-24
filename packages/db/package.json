@@ -14,6 +14,16 @@
       "types": "./src/operation-worker.ts",
       "production": "./dist/operation-worker.js",
       "default": "./src/operation-worker.ts"
+    },
+    "./api-runtime": {
+      "types": "./src/api-runtime.ts",
+      "production": "./dist/api-runtime.js",
+      "default": "./src/api-runtime.ts"
+    },
+    "./tenant-runtime": {
+      "types": "./src/tenant-runtime.ts",
+      "production": "./dist/tenant-runtime.js",
+      "default": "./src/tenant-runtime.ts"
     }
   },
   "scripts": {

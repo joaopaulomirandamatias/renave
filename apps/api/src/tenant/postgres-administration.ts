@@ -1,7 +1,7 @@
 import {
   PostgresTenantAdministration,
   type TenantClient,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 
 import type { TenantEstablishmentAdministration } from "./admin-establishments.js";
 

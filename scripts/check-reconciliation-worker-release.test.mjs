@@ -5,6 +5,7 @@ import {
   checkDockerfile,
   checkDockerignore,
   checkManifest,
+  checkRuntimePreparation,
   checkWorkflow,
 } from "./check-reconciliation-worker-release.mjs";
 
@@ -89,6 +90,30 @@ jobs:
 function ids(issues) {
   return issues.map(({ id }) => id);
 }
+
+describe("guard do pruning runtime", () => {
+  const safe = `
+const operationWorkerDbFiles = new Set(["tenant-runtime.js"]);
+await assertRuntimeEsmImports(root);
+`;
+
+  it("exige contrato tenant mínimo e valida o grafo ESM", () => {
+    assert.deepEqual(checkRuntimePreparation(safe), []);
+    const found = ids(
+      checkRuntimePreparation("const operationWorkerDbFiles = new Set([]);"),
+    );
+    assert.ok(found.includes("WORKER_TENANT_RUNTIME_REQUIRED"));
+    assert.ok(found.includes("WORKER_RUNTIME_IMPORT_GRAPH_REQUIRED"));
+  });
+
+  it("recusa carregar a superfície ampla da API", () => {
+    assert.ok(
+      ids(checkRuntimePreparation(`${safe}\n"api-runtime.js"`)).includes(
+        "WORKER_API_RUNTIME_FORBIDDEN",
+      ),
+    );
+  });
+});
 
 describe("guard do Dockerfile", () => {
   it("aceita imagem multi-stage pinada e runtime mínimo", () => {

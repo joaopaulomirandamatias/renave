@@ -4,7 +4,7 @@ import type {
   CreateOperationInput,
   OperationKind,
   OperationMutationFamily,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import {
   encryptOperationReconciliationProjection,
   encryptOperationRequest,

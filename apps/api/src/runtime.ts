@@ -12,7 +12,7 @@ import {
   PostgresLoginRateLimiter,
   PostgresSerproQueryLimiter,
   PostgresTenantAdminRateLimiter,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import {
   decodeEvidenceKeyBase64,
   EvidenceCipher,

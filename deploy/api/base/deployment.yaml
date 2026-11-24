@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: renave-api
+  labels:
+    app.kubernetes.io/component: api
+    app.kubernetes.io/name: seu-renave
+spec:
+  # A base e apenas auditavel: nenhum overlay desta entrega pode iniciar Pods.
+  replicas: 0
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: api
+      app.kubernetes.io/name: seu-renave
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: api
+        app.kubernetes.io/name: seu-renave
+      annotations:
+        linkerd.io/inject: disabled
+        sidecar.istio.io/inject: "false"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Always
+      serviceAccountName: renave-api
+      shareProcessNamespace: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: ghcr.io/REPLACE_OWNER/seu-renave-api@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: APP_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: APP_ENVIRONMENT
+            - name: AUTH_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: AUTH_MODE
+            - name: HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: HOST
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: PORT
+            - name: PROXY_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: PROXY_MODE
+            - name: RENAVE_INTEGRATION_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: RENAVE_INTEGRATION_ENABLED
+            - name: RENAVE_STOCK_ENTRY_LOCAL_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: RENAVE_STOCK_ENTRY_LOCAL_ENABLED
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+          startupProbe:
+            exec:
+              command:
+                - /nodejs/bin/node
+                - dist/health-probe.js
+                - health
+            failureThreshold: 30
+            periodSeconds: 2
+            timeoutSeconds: 2
+          livenessProbe:
+            exec:
+              command:
+                - /nodejs/bin/node
+                - dist/health-probe.js
+                - health
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 2
+          readinessProbe:
+            exec:
+              command:
+                - /nodejs/bin/node
+                - dist/health-probe.js
+                - readiness
+            failureThreshold: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi

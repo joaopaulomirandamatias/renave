@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: renave-api
+data:
+  APP_ENVIRONMENT: homologation
+  AUTH_MODE: disabled
+  HOST: 127.0.0.1
+  PORT: "3000"
+  PROXY_MODE: direct
+  RENAVE_INTEGRATION_ENABLED: "false"
+  RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "false"

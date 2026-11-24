@@ -6,7 +6,7 @@ import {
   getEstablishment,
   listEstablishments,
   withTenant,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import type { Pool } from "pg";
 
 import type { TenantDirectory } from "./routes.js";

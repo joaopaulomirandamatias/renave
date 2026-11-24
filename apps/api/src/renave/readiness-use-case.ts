@@ -12,7 +12,7 @@ import {
   type CredentialLinkStatus,
   type RenaveProfileStatusValue,
   type TenantClient,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import type { MtlsCertificateTemporalStatus } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
 

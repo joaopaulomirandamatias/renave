@@ -8,7 +8,7 @@ import {
   getCredentialLink,
   getEstablishment,
   withTenant,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import { PostgresProtectedEvidenceStore } from "@seu-renave/protected-evidence";
 import {
   VehicleEligibilityService,

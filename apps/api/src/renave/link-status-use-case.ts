@@ -8,7 +8,7 @@ import {
   getEstablishment,
   withTenant,
   type CredentialLinkStatus,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import type { Pool } from "pg";
 
 export type PublicRenaveLinkStatus = "not_started" | CredentialLinkStatus;

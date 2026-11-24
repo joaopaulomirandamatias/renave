@@ -521,6 +521,27 @@ export function checkWorkflow(source, file = ".github/workflows/ci.yml") {
   return issues;
 }
 
+export function checkRuntimePreparation(
+  source,
+  file = "apps/reconciliation-worker/scripts/prepare-runtime.mjs",
+) {
+  const issues = [];
+  if (!/["']tenant-runtime\.js["']/u.test(source)) {
+    issues.push(violation(file, source, "WORKER_TENANT_RUNTIME_REQUIRED"));
+  }
+  if (!/assertRuntimeEsmImports\s*\(\s*root\s*\)/u.test(source)) {
+    issues.push(
+      violation(file, source, "WORKER_RUNTIME_IMPORT_GRAPH_REQUIRED"),
+    );
+  }
+  if (/["']api-runtime\.js["']/u.test(source)) {
+    issues.push(
+      violation(file, source, "WORKER_API_RUNTIME_FORBIDDEN", /api-runtime/u),
+    );
+  }
+  return issues;
+}
+
 async function manifestFiles(root) {
   const directory = join(root, "deploy");
   if ((await stat(directory).catch(() => null))?.isDirectory() !== true) {
@@ -548,6 +569,10 @@ export async function checkRepositoryRelease(root = repositoryRoot) {
   const inputs = [
     ["apps/reconciliation-worker/Dockerfile", checkDockerfile],
     ["apps/reconciliation-worker/Dockerfile.dockerignore", checkDockerignore],
+    [
+      "apps/reconciliation-worker/scripts/prepare-runtime.mjs",
+      checkRuntimePreparation,
+    ],
     [".dockerignore", checkDockerignore],
     [".github/workflows/ci.yml", checkWorkflow],
   ];

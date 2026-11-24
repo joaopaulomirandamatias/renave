@@ -12,6 +12,188 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  api-image-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.1
+
+      - name: Validate API release policy
+        run: |
+          node --test scripts/check-api-release.test.mjs apps/api/scripts/runtime-imports.test.mjs
+          node scripts/check-api-release.mjs
+
+      - name: Build local API image
+        run: >-
+          docker build
+          --no-cache
+          --tag seu-renave/api:ci
+          --file apps/api/Dockerfile
+          .
+
+      - name: Inspect immutable API runtime metadata
+        run: |
+          docker image inspect seu-renave/api:ci > /tmp/renave-api-image.json
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+
+          const [image] = JSON.parse(
+            readFileSync("/tmp/renave-api-image.json", "utf8"),
+          );
+          assert.match(image.Config.User, /^[1-9][0-9]*(?::[1-9][0-9]*)?$/);
+          assert.deepEqual(image.Config.Entrypoint, [
+            "/nodejs/bin/node",
+            "dist/server.js",
+          ]);
+          assert.deepEqual(image.Config.Cmd ?? null, null);
+          assert.deepEqual(image.Config.Healthcheck?.Test, [
+            "CMD",
+            "/nodejs/bin/node",
+            "dist/health-probe.js",
+            "readiness",
+          ]);
+          const environment = new Map(
+            (image.Config.Env ?? []).map((item) => {
+              const separator = item.indexOf("=");
+              return [item.slice(0, separator), item.slice(separator + 1)];
+            }),
+          );
+          assert.equal(environment.get("APP_ENVIRONMENT"), "homologation");
+          assert.equal(environment.get("AUTH_MODE"), "disabled");
+          assert.equal(environment.get("HOST"), "127.0.0.1");
+          assert.equal(environment.get("RENAVE_INTEGRATION_ENABLED"), "false");
+          assert.equal(
+            environment.get("RENAVE_STOCK_ENTRY_LOCAL_ENABLED"),
+            "false",
+          );
+          for (const forbidden of [
+            "DATABASE_URL",
+            "IDENTITY_DATABASE_URL",
+            "LOGIN_RATE_LIMIT_HMAC_KEY_BASE64",
+            "OIDC_CLIENT_SECRET",
+            "RENAVE_EVIDENCE_KEY_BASE64",
+            "RENAVE_MTLS_KEY_PASSPHRASE",
+            "SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64",
+            "TENANT_ADMIN_HMAC_KEY_BASE64",
+          ]) {
+            assert.equal(environment.has(forbidden), false);
+          }
+          NODE
+
+      - name: Inspect API layers and runtime filesystem
+        run: |
+          set -euo pipefail
+          docker history --no-trunc --format '{{.CreatedBy}}' \
+            seu-renave/api:ci > /tmp/renave-api-history.txt
+          if rg -n -i 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|RENAVE_RELEASE_SENTINEL_DO_NOT_SHIP' /tmp/renave-api-history.txt; then
+            exit 1
+          fi
+
+          docker create --name renave-api-rootfs seu-renave/api:ci >/dev/null
+          docker export renave-api-rootfs --output /tmp/renave-api-rootfs.tar
+          workdir="$(docker image inspect --format '{{.Config.WorkingDir}}' seu-renave/api:ci)"
+          workdir="${workdir#/}"
+          tar --list --file /tmp/renave-api-rootfs.tar > /tmp/renave-api-files.txt
+          if rg -n '^(?:bin/(?:sh|bash)|usr/bin/(?:apt|apt-get|dpkg)|usr/local/bin/(?:npm|npx|pnpm|corepack)|nodejs/bin/(?:npm|npx|pnpm|corepack))$' /tmp/renave-api-files.txt; then
+            exit 1
+          fi
+          if rg -n -i '(^|/)(\.env(?:\.|$)|\.npmrc$|[^/]+\.(?:key|pem|p12|pfx))' /tmp/renave-api-files.txt; then
+            exit 1
+          fi
+          rootfs=/tmp/renave-api-rootfs
+          mkdir --parents "$rootfs"
+          tar --extract --file /tmp/renave-api-rootfs.tar --directory "$rootfs"
+          application_root="$rootfs/$workdir"
+          if find "$application_root" -type f \
+            \( -name '*.ts' -o -name '*.tsx' -o -name '*.mts' -o -name '*.cts' \
+            -o -name '*.map' -o -name '*.test.*' -o -name '*.spec.*' \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if find "$application_root" -type d \
+            \( -name src -o -name test -o -name tests -o -name __tests__ \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if find "$application_root/node_modules/.pnpm" -type f \
+            -path '*/node_modules/@seu-renave/db/dist/*' \
+            \( -name 'bootstrap.js' -o -name 'cli.js' -o -name 'index.js' \
+            -o -name 'local-defaults.js' -o -name 'migrate.js' \
+            -o -name 'operation-worker.js' \
+            -o -name 'operation-reconciliation.js' \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if rg -uuu -l -i 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|RENAVE_RELEASE_SENTINEL_DO_NOT_SHIP' "$application_root"; then
+            exit 1
+          fi
+          own_code=("$application_root/dist")
+          while IFS= read -r package_dist; do
+            own_code+=("$package_dist")
+          done < <(
+            find "$application_root/node_modules/.pnpm" -type d \
+              -path '*/node_modules/@seu-renave/*/dist'
+          )
+          if rg -uuu -l -i \
+            'postgres(?:ql)?://[^[:space:]@/:]+:[^[:space:]@/]+@' \
+            "${own_code[@]}"; then
+            exit 1
+          fi
+
+      - name: Run dormant API image in hardened sandbox
+        run: |
+          set -euo pipefail
+          docker run --detach --name renave-api-disabled \
+            --network none \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            seu-renave/api:ci >/dev/null
+          for attempt in $(seq 1 30); do
+            test "$(docker inspect --format '{{.State.Running}}' renave-api-disabled)" = true
+            status="$(docker inspect --format '{{.State.Health.Status}}' renave-api-disabled)"
+            if test "$status" = healthy; then
+              break
+            fi
+            test "$status" != unhealthy
+            sleep 1
+          done
+          test "$(docker inspect --format '{{.State.Running}}' renave-api-disabled)" = true
+          test "$(docker inspect --format '{{.State.Health.Status}}' renave-api-disabled)" = healthy
+          test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' renave-api-disabled)" = none
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' renave-api-disabled)" = true
+          test "$(docker inspect --format '{{.HostConfig.Privileged}}' renave-api-disabled)" = false
+          docker inspect --format '{{json .HostConfig.CapDrop}}' renave-api-disabled | \
+            jq -e 'index("ALL") != null'
+          docker inspect --format '{{json .HostConfig.SecurityOpt}}' renave-api-disabled | \
+            jq -e 'index("no-new-privileges") != null'
+          docker stop --time 10 renave-api-disabled >/dev/null
+          test "$(docker inspect --format '{{.State.ExitCode}}' renave-api-disabled)" -eq 0
+
+      - name: Remove local API smoke artifacts
+        if: always()
+        run: |
+          docker rm --force renave-api-disabled renave-api-rootfs 2>/dev/null || true
+          docker image rm --force seu-renave/api:ci 2>/dev/null || true
+          rm -f /tmp/renave-api-image.json \
+            /tmp/renave-api-history.txt \
+            /tmp/renave-api-rootfs.tar \
+            /tmp/renave-api-files.txt
+          if test -d /tmp/renave-api-rootfs; then
+            chmod --recursive u+w /tmp/renave-api-rootfs
+            find /tmp/renave-api-rootfs -depth -delete
+          fi
+
   reconciliation-worker-image-smoke:
     # Pendente: SBOM/vulnerability scan somente após escolher uma ferramenta
     # com binário/action pinado por digest e baseline de exceções versionado.

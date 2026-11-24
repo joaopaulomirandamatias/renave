@@ -11,7 +11,7 @@ import {
   getEstablishment,
   rejectCredentialLinkFromPreflight,
   withTenant,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import {
   EvidenceCipher,
   PostgresProtectedEvidenceStore,

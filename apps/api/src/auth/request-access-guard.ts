@@ -7,7 +7,7 @@ import {
   getAuthorizationContext,
   withTenant,
   type TenantClient,
-} from "@seu-renave/db";
+} from "@seu-renave/db/api-runtime";
 import {
   cookieNames,
   readCookie,
