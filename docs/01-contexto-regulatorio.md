@@ -50,6 +50,8 @@ O **Registro Nacional de Veículos em Estoque (Renave)** é o sistema eletrônic
 - **Obrigatória** para quem comercializa **veículos novos**: sem entrada prévia no Renave, o 0 km não pode ser registrado, licenciado nem emplacado (Art. 7º §2º).
 - A SENATRAN analisa em até **30 dias** (prorrogáveis uma vez). Pendência suspende o prazo; se não for sanada em 30 dias, o pedido é **indeferido** (Art. 10).
 
+> ⚠️ **Tensão normativa a resolver formalmente:** o Art. 9º, §§1º a 3º, prevê autorização complementar do DETRAN para a integradora atuar na respectiva circunscrição, com hipóteses de dispensa pela SENATRAN. O Anexo, em "Competências e abrangência de atuação", afirma atuação nacional e veda autorização, credenciamento ou habilitação estadual adicional. O produto deve modelar ambos os estados e não liberar produção com base em interpretação própria; a aplicabilidade deve ser confirmada com a SENATRAN e assessoria jurídica.
+
 ## 1.5 Conteúdo mínimo de cada registro
 
 | Operação | Dados mínimos exigidos | Artigo |
@@ -69,7 +71,7 @@ O **Registro Nacional de Veículos em Estoque (Renave)** é o sistema eletrônic
 1. Validado o contrato, inicia-se a venda e o Renave anota **"veículo consignado em processo de transferência"** (§4º).
 2. A propriedade só se transfere após o **consignante assinar a ATPV-e** (§6º).
 3. Se o consignante **não assinar em 30 dias**, ou cancelar o contrato, **a venda é cancelada** e a anotação é baixada. Restrições de financiamento permanecem até a restituição à credora (§7º).
-4. O contrato pode ser cancelado **por qualquer das partes** antes da assinatura da ATPV-e e, se houver financiamento com alienação fiduciária, antes da formalização do financiamento (§8º).
+4. O contrato pode ser cancelado **por ambas as partes** antes da assinatura da ATPV-e e, se houver financiamento com alienação fiduciária, antes da formalização do financiamento (§8º). O cancelamento pelo consignante previsto no §7º é hipótese distinta; não se presume cancelamento unilateral pelo estabelecimento.
 5. O cancelamento é comunicado de forma **instantânea e simultânea** ao estabelecimento, ao consignante e à credora (§9º).
 6. Depois do cancelamento, o estabelecimento emite **NF-e de devolução** e **registra a saída** no Renave (§10).
 
@@ -126,7 +128,7 @@ O **Registro Nacional de Veículos em Estoque (Renave)** é o sistema eletrônic
 **Vedações cruzadas posteriores** (ver doc 13):
 - **Res. CONTRAN 1.027/2026**, Anexos I e II, item 1.2.1.5: integradoras Renave **não podem** ser plataformas de transferência eletrônica nem de assinatura eletrônica.
 - **Res. CONTRAN 1.032/2026**, item 1.3.2.7: integradoras Renave **não podem** ser integradoras de vistoria veicular.
-- O Seu Renave **integra-se** a essas plataformas (comunicação de venda automática, art. 6º da Res. 1.027), mas **não as opera**.
+- O Seu Renave **integra-se** a essas plataformas. A comunicação de venda **poderá** ser realizada automaticamente por integração entre o Renave e plataformas homologadas, condicionada aos requisitos da SENATRAN (Res. 1.027, Art. 28 §6º), mas o Seu Renave **não as opera**.
 
 A vedação alcança também quem tenha **participação societária ou controle** nessas empresas.
 
@@ -143,14 +145,14 @@ A vedação alcança também quem tenha **participação societária ou controle
 | Requisito do Anexo | Tradução para o sistema |
 |---|---|
 | SGSI formal com **ISO/IEC 27001** vigente, em até **270 dias** da publicação, ou seja, até **27/03/2027** | Programa de segurança, políticas, evidências e auditoria de certificação |
-| e-CNPJ e tecnologia **ICP-Brasil** | mTLS por estabelecimento; assinatura ICP |
+| e-CNPJ válido e tecnologia **ICP-Brasil** | Certificado e transações ICP-Brasil. O mecanismo de transporte e identidade — hoje mTLS com e-CNPJ da integradora e identificação da loja no cabeçalho — decorre do manual SERPRO, não desta Resolução (doc 14) |
 | Infraestrutura **redundante** | Multi-AZ, sem ponto único de falha |
 | **RTO ≤ 4 horas** | DR testado e documentado |
 | **Rastreabilidade integral e imutável**: usuário, **IP de origem**, horário sincronizado com a **Hora Legal Brasileira (Observatório Nacional)**, operação, **dados de entrada e saída**, **hash de integridade** | Log de auditoria append-only com encadeamento de hash; NTP do ON (`ntp.on.br`) |
 | Disponível para auditoria dos órgãos por **no mínimo 5 anos** | Retenção ≥ 5 anos; exportação para fiscalização |
 | Prevenção a fraudes e monitoramento contínuo | Regras antifraude, detecção de anomalias, SOC/alertas |
 | **Processamento primário em datacenter no Brasil**; backup no exterior só com LGPD/ANPD | Região brasileira (ex.: `sa-east-1` / `southamerica-east1`) |
-| Mesmo sistema de integração durante todo o ciclo de um veículo | Não trocar de conector no meio de uma operação |
+| Mesmo sistema de integração durante todo o ciclo de um veículo, salvo mudança de integradora pelo estabelecimento | Não trocar de conector no meio de uma operação; em migração legítima, preservar continuidade, histórico e evidências |
 | Responsável técnico formal por segurança e continuidade | Papel organizacional + registro no sistema |
 | Suporte em **horário comercial ampliado** | Central de atendimento, SLA, chamados ligados à operação |
 | Programa de integridade, política de privacidade, termo de sigilo | Governança/compliance documental |
@@ -161,7 +163,7 @@ A vedação alcança também quem tenha **participação societária ou controle
 - A integradora encerrada deve fazer **exportação íntegra, autenticada, rastreável e auditável** dos dados e depois a **eliminação segura**.
 - **Implicação:** é preciso um **exportador padronizado de dados por estabelecimento** desde o MVP. Isso também ajuda na venda, porque o cliente sabe que não fica preso à plataforma.
 
-## 1.11 Prazos — situação em 23/11/2026
+## 1.11 Prazos — situação em 24/11/2026
 
 | Marco | Data | Situação |
 |---|---|---|
@@ -172,7 +174,7 @@ A vedação alcança também quem tenha **participação societária ou controle
 | Migração em caso de descontinuidade | 60 dias do ato | Por evento |
 | Balanço anual | 150 dias após o exercício | Anual |
 
-> ⚠️ **Cronograma de implantação a confirmar.** Fontes de terceiros citam uma **Circular SENATRAN nº 2/2026** (30/09 ou 01/10/2026) que escalona a implantação:
+> ⚠️ **Cronograma não revalidado nesta rodada.** O doc 13 registra a **Circular SENATRAN nº 2/2026** como fonte oficial a partir da pesquisa anterior. Como seu texto não integra os PDFs fornecidos em 24/11/2026, as datas abaixo continuam sujeitas ao Regulatory Watch:
 > - Credencia para integradoras: 1 a 15/10;
 > - indicação da integradora pelas lojas: 9 a 20/10;
 > - consignado: 15 a 30/10;
@@ -180,7 +182,7 @@ A vedação alcança também quem tenha **participação societária ou controle
 > - assinaturas e transferência: 9 a 20/11;
 > - **controle de conformidade a partir de 20/11/2026**.
 >
-> Citam também uma **Res. CONTRAN 1.027/2026** (transferência e assinatura eletrônica). **Nenhum dos dois textos oficiais foi lido.** Obter e analisar esses atos é a **primeira tarefa da Fase 0** (`09-roadmap-riscos.md`).
+> A **Res. CONTRAN 1.027/2026** foi lida integralmente no PDF oficial fornecido em 24/11/2026 e suas regras relevantes estão consolidadas abaixo e no doc 13. O texto da Circular não integra o conjunto de PDFs fornecido nesta revisão; seu cronograma continua sujeito ao Regulatory Watch.
 
 ## 1.11a Situação da API RENAVE-WS em relação à norma (lacunas)
 
@@ -193,9 +195,21 @@ A leitura do Swagger de produção e de homologação, em 23/11/2026, mostra que
 | Termos de entrega para entrada e saída (assinatura do proprietário) | Só os termos de entrada/saída do estoque (o de saída "deve ser extinto") | Acompanhar o Regulatory Watch |
 | Contrato eletrônico de consignação | **Só em homologação** (`/api/consignados/*` + mocks de DETRAN); sem contrato | Implementar contra a homologação, atrás de feature flag |
 | Integradora identificada na API | Em homologação, `cliente-autenticado` passou a ter `cnpjIntegradora` e `nomeIntegradora` | Indica o modelo de integradora em transição |
-| Base legal do ATPV-e "gerado pelo RENAVE" | O manual ainda cita as Res. 797/2020 e 818/2021, **revogadas** | Validar com a SENATRAN |
+| ATPV-e gerada pelo órgão máximo executivo de trânsito | Base normativa confirmada pela Res. 1.027, Art. 27 §1º; o manual ainda cita normas revogadas e a API não expõe toda a jornada | O Seu Renave não gera a ATPV-e; recebe e acompanha por integração. Só poderá solicitá-la se houver autorização técnica e normativa expressa no canal SERPRO |
 
 > **Conclusão:** a arquitetura precisa de **adapters versionados por capacidade** e **feature flags por data de vigência**, porque a norma está à frente da API.
+
+## 1.11b Regras confirmadas da transferência eletrônica (Res. 1.027)
+
+| Regra | Impacto no produto | Fonte |
+|---|---|---|
+| A ATPV-e é gerada **exclusivamente** pelo órgão máximo executivo de trânsito e disponibilizada por integração | Tratar o documento como recurso externo; guardar identificador, versão, eventos e evidências, sem geração local | Art. 27 §1º |
+| Só pode existir **uma ATPV-e ativa por veículo** | Bloqueio de duplicidade e reconciliação antes de nova solicitação | Art. 27 §5º |
+| Na ATPV-e são admitidas somente assinaturas eletrônicas avançadas ou qualificadas; cada assinatura é registrada imediatamente no Renavam | Máquina de estados por evento, sem aceitar upload de assinatura manuscrita como conclusão do fluxo eletrônico | Art. 28 §§1º e 2º |
+| Depois das duas assinaturas e validações, a comunicação de venda é gerada automaticamente | O estado local só avança após confirmação sistêmica; assinatura isolada não equivale a comunicação de venda | Art. 28 §4º |
+| Em operações com estabelecimento do art. 330, a integração Renave ↔ plataformas homologadas **poderá** automatizar a comunicação | Capacidade condicionada aos requisitos e à disponibilidade técnica da SENATRAN; não prometer automação universal | Art. 28 §6º |
+| Após a comunicação de venda, o cancelamento da ATPV-e fica restrito a decisão judicial, fraude, erro material ou distrato formal bilateral, preservando histórico e efeitos perante terceiros | Fluxo excepcional, auditado e sem exclusão de evidências | Art. 29 §§2º a 4º |
+| Operações com estabelecimento aderente ao Renave devem ser processadas preferencialmente por transferência eletrônica | Priorizar a jornada eletrônica, mantendo fallback somente quando normativamente admitido | Art. 37 VI |
 
 ## 1.12 Decisões de produto derivadas da norma
 

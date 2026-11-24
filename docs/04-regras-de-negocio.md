@@ -155,7 +155,7 @@
 | RN-CON-05 | Validado o contrato e iniciada a venda, o veículo fica em **"Consignado em processo de transferência"**. | 🔵 | RES art. 20 §4º |
 | RN-CON-06 | Iniciada a venda, o **consignante tem 30 dias** para assinar a ATPV-e. O sistema mostra contagem regressiva e alerta em D-10, D-5 e D-1. | 🟠 | RES art. 20 §7º |
 | RN-CON-07 | Sem assinatura em 30 dias, ou com cancelamento pelo consignante, a **venda é cancelada** e a anotação é baixada. Restrições de financiamento permanecem até a restituição à credora. | 🔴 | RES art. 20 §7º |
-| RN-CON-08 | **Qualquer parte** pode cancelar o contrato **antes da assinatura da ATPV-e** e, se houver financiamento com alienação fiduciária, **antes da formalização do financiamento**. Depois disso, a ação **não aparece**. | 🔴 | RES art. 20 §8º |
+| RN-CON-08 | O contrato pode ser cancelado **por ambas as partes** antes da assinatura da ATPV-e e, se houver financiamento com alienação fiduciária, **antes da formalização do financiamento**. O cancelamento pelo consignante do §7º é hipótese distinta; o sistema não oferece cancelamento unilateral pelo estabelecimento sem nova base normativa. | 🔴 | RES art. 20 §§7º e 8º |
 | RN-CON-09 | Cancelado o contrato, o sistema **exige** a NF-e de **devolução de mercadoria em consignação** e o **registro de saída**, e notifica simultaneamente estabelecimento, consignante e credora (se houver). | 🔴 | RES art. 20 §9º, §10 |
 | RN-CON-10 | Em falência do estabelecimento, os consignados **não integram a massa falida**: os contratos são cancelados e a posse é restituída. | 🔴 | RES art. 21 §1º |
 

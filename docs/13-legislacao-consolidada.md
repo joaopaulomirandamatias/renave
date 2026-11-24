@@ -1,4 +1,4 @@
-# 13 — Legislação consolidada do RENAVE (situação em 23/11/2026)
+# 13 — Legislação consolidada do RENAVE (situação em 24/11/2026)
 
 > Pesquisa nos textos oficiais (DOU / gov.br / planalto.gov.br) e em fontes secundárias.
 > **Rótulos:** **[OF]** fonte oficial · **[IMP]** imprensa ou terceiro · **[INF]** inferência.
@@ -10,7 +10,7 @@
 
 | Tema | Situação | Impacto no Seu Renave |
 |---|---|---|
-| Norma-base | **Res. CONTRAN 1.026/2026** (DOU 30/06/2026; também no DOU 01/07/2026) [OF] | Somos o *sistema de integração* operado por **integradora autorizada** |
+| Norma-base | **Res. CONTRAN 1.026/2026** (DOU 30/06/2026) [OF] | Somos o *sistema de integração* operado por **integradora autorizada** |
 | Obrigatoriedade | Todas as operações (entrada, saída, transferência, consignação) passam por integradora autorizada; o RENAVE é o **único** meio de escrituração [OF] | Mercado obrigatório |
 | Prazo de escrituração | **No mesmo dia** da entrada ou saída (CTB art. 330 §3º) [OF] | SLA interno: **D+0**; alertas intradiários |
 | Multa | Gravíssima, **R$ 293,47** (CTB art. 258 I, combinado com art. 330 §5º). A integradora responde **solidariamente** se a falha for dela (Res. 1.026 art. 25 §2º) [OF] | Trilha de prova e evidência de causa externa |
@@ -31,7 +31,7 @@
 | Lei 14.063/2020 | — | Vigente | Assinaturas eletrônicas (avançada / qualificada) |
 | Lei 13.709/2018 (LGPD) | — | Vigente | Proteção de dados |
 | **Res. CONTRAN 1.026/2026** | 26/06/2026 · DOU 30/06 | **Vigente** | Institui o Renave; integradoras; adesão; conteúdo dos registros; consignação; sanções; preço público; Anexo de requisitos |
-| **Res. CONTRAN 1.027/2026** | 17/08/2026 · DOU 18/08 | **Vigente** (alterada pela 1.032) | Registro, licenciamento e **transferência eletrônica**; ATPV-e; assinaturas; plataformas homologadas; comunicação de venda **automática** via integração Renave ↔ plataformas (art. 6º); 1º registro de 0 km interoperável com a saída do estoque Renave (art. 5º I); vedação cruzada com integradoras Renave |
+| **Res. CONTRAN 1.027/2026** | 17/08/2026 · DOU 18/08 | **Vigente** (alterada pela 1.032) | Registro, licenciamento e **transferência eletrônica**; ATPV-e; assinaturas; plataformas homologadas; possibilidade condicionada de comunicação de venda automática via integração Renave ↔ plataformas (Art. 28 §6º); 1º registro de 0 km interoperável com a saída do estoque Renave (Art. 5º I); vedação cruzada com integradoras Renave |
 | **Res. CONTRAN 1.032/2026** | 22/10/2026 · DOU 28/10 | **Vigente** | Vistoria de identificação veicular (SISV); **dispensa vistoria** na transferência destinada à **entrada em estoque Renave** (art. 35 §1º II); identificação prévia substituível por vistoria (§§2º–3º); vedação cruzada (item 1.3.2.7) |
 | Res. CONTRAN 807/2020 | — | Vigente, alterada pela 1.026 | Registro de contratos e **apontamento**: vedado se o beneficiário for estabelecimento e o veículo não estiver no estoque Renave |
 | **Circular SENATRAN 2/2026** | 30/09/2026 · DOU Extra C | Vigente | Cronograma de implantação (art. 33 §4º) |
@@ -44,6 +44,10 @@
 | **Ato de preço público das integradoras** (Res. 1.026 art. 32) | — | **Não publicado** | Mínimo e máximo por operação [INF: a SENATRAN indicou na consulta pública "regras específicas de acordo com a operação"] |
 | Especificação da identificação prévia; modelo do contrato de consignação | — | Não localizados | Provavelmente no manual SERPRO e no Credencia |
 | Atos estaduais (ex.: Portaria DETRAN/AL 739/2026, ainda baseada na Res. 797) | — | A reavaliar | Procedimentos locais e autorização complementar |
+
+**Proveniência dos PDFs oficiais lidos em 24/11/2026:** Res. 1.026, DOU 30/06/2026, Edição 120-C, págs. 6–9, SHA-256 `458360e3efcfc002f16ca947ec8addbede792615b2df14f08382d27c2362c081`; Res. 1.027, DOU 18/08/2026, Edição 155-B, Seção 1 Extra B, pág. 10, SHA-256 `ff396591cb2c185ba6e918241799cf84e2b78269094a7a5228222282b27efc75`. Os hashes identificam os arquivos analisados sem substituir a verificação no DOU.
+
+> ⚠️ **Divergência interna da Res. 1.026:** o Art. 9º, §§1º a 3º, prevê autorização estadual complementar, enquanto o Anexo declara atuação nacional e veda habilitação estadual adicional. A operação em produção depende de confirmação formal da SENATRAN/assessoria jurídica; a plataforma não resolverá essa antinomia por inferência.
 
 ## 13.3 Cronograma de implantação (Circular SENATRAN 2/2026)
 
@@ -97,7 +101,7 @@
 | Multa de R$ 293,47 e responsabilidade solidária | Doc 01 / doc 04 |
 | Vedações das Res. 1.027 e 1.032 (não operar transferência, assinatura nem vistoria) | Doc 01 §1.10, doc 03 §3.6, riscos (doc 09) |
 | Dispensa de vistoria na entrada em estoque (Res. 1.032) e identificação prévia | RN-ENT-04 |
-| Comunicação de venda automática via integração Renave ↔ plataformas homologadas (Res. 1.027) | Integração com plataformas de transferência e assinatura (doc 07) |
+| Comunicação de venda potencialmente automática via integração Renave ↔ plataformas homologadas, condicionada aos requisitos da SENATRAN (Res. 1.027, Art. 28 §6º) | Integração com plataformas de transferência e assinatura (doc 07) |
 | Tarifa SERPRO de R$ 5,48 e faixa SENATRAN pendente | Doc 11 §11.4 / §11.4a |
 | Procuração eletrônica em vez de certificado da loja | Doc 07 §7.9 e doc 14 (integração SERPRO) |
 | Cronograma da Circular 2/2026 | Doc 01 §1.11 |
