@@ -29,6 +29,7 @@ function digest(value: string | Buffer): Buffer {
 }
 
 function operationInput(label: string): CreateOperationInput {
+  const plaintext = Buffer.from(`{"label":${JSON.stringify(label)}}`, "utf8");
   const ciphertext = Buffer.from(`encrypted:${label}`);
   return {
     actorSubjectHash: digest(`actor:${label}`),
@@ -42,7 +43,7 @@ function operationInput(label: string): CreateOperationInput {
     requestKeyId: "repository-key-v1",
     requestNonce: Buffer.alloc(12, 4),
     requestSchemaVersion: 1,
-    requestSha256: digest(ciphertext),
+    requestSha256: digest(plaintext),
     vehicleKeyDigest: digest(`vehicle:${label}`),
   };
 }
@@ -110,7 +111,7 @@ describe("operation repository integration", () => {
     const changed = {
       ...original,
       requestCiphertext: changedCiphertext,
-      requestSha256: digest(changedCiphertext),
+      requestSha256: digest("plaintext-alterado"),
     };
 
     await expect(
@@ -118,6 +119,65 @@ describe("operation repository integration", () => {
         createOrReplayOperation(client, changed),
       ),
     ).rejects.toBeInstanceOf(OperationIdempotencyConflictError);
+  });
+
+  it("replay após rotação preserva o primeiro envelope cifrado", async () => {
+    const original = operationInput("replay-key-rotation");
+    const first = await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayOperation(client, original),
+    );
+    const rotatedCiphertext = Buffer.from(original.requestCiphertext);
+    for (let index = 0; index < rotatedCiphertext.length; index += 1) {
+      rotatedCiphertext[index] = rotatedCiphertext[index]! ^ 0xff;
+    }
+    const rotated = {
+      ...original,
+      requestAuthTag: Buffer.alloc(16, 9),
+      requestCiphertext: rotatedCiphertext,
+      requestKeyId: "repository-key-v2",
+      requestNonce: Buffer.alloc(12, 8),
+    };
+
+    const replay = await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayOperation(client, rotated),
+    );
+    expect(replay.replayed).toBe(true);
+    expect(replay.operation.id).toBe(first.operation.id);
+
+    const stored = await withTenant(migratorPool, tenantA.id, async (client) =>
+      client.query<{
+        request_auth_tag: Buffer;
+        request_ciphertext: Buffer;
+        request_key_id: string;
+        request_nonce: Buffer;
+        request_sha256: Buffer;
+      }>(
+        `select request_auth_tag, request_ciphertext, request_key_id,
+                request_nonce, request_sha256
+           from renave.operation
+          where id = $1`,
+        [first.operation.id],
+      ),
+    );
+    expect(stored.rowCount).toBe(1);
+    expect(stored.rows[0]).toMatchObject({
+      request_key_id: original.requestKeyId,
+    });
+    expect(stored.rows[0]!.request_nonce.equals(original.requestNonce)).toBe(
+      true,
+    );
+    expect(
+      stored.rows[0]!.request_auth_tag.equals(original.requestAuthTag),
+    ).toBe(true);
+    expect(
+      stored.rows[0]!.request_ciphertext.equals(original.requestCiphertext),
+    ).toBe(true);
+    expect(stored.rows[0]!.request_sha256.equals(original.requestSha256)).toBe(
+      true,
+    );
+    expect(stored.rows[0]!.request_ciphertext.equals(rotatedCiphertext)).toBe(
+      false,
+    );
   });
 
   it("converte operação ativa do mesmo veículo em erro fechado", async () => {

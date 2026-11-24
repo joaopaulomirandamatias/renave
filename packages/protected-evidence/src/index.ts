@@ -14,3 +14,12 @@ export {
   ProtectedEvidenceTransitionError,
   type ProtectedEvidenceContext,
 } from "./store.js";
+export {
+  encryptOperationRequest,
+  OperationRequestCipher,
+  OperationRequestConfigurationError,
+  OperationRequestDecryptionError,
+  OperationRequestInputError,
+  type EncryptedOperationRequest,
+  type OperationRequestBinding,
+} from "./operation-request-crypto.js";

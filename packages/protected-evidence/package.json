@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@seu-renave/db": "workspace:*",
+    "@seu-renave/renave-connector": "workspace:*",
     "pg": "8.23.1"
   },
   "devDependencies": {

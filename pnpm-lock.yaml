@@ -160,6 +160,9 @@ importers:
       "@seu-renave/db":
         specifier: workspace:*
         version: link:../db
+      "@seu-renave/renave-connector":
+        specifier: workspace:*
+        version: link:../renave-connector
       pg:
         specifier: 8.23.1
         version: 8.23.1
