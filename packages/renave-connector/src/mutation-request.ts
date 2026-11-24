@@ -11,6 +11,13 @@ interface PreparedState {
   requestSha256: string;
 }
 
+export interface PreparedRenaveMutationSnapshot {
+  readonly body: OwnedBytes;
+  readonly byteLength: number;
+  readonly operation: RenaveMutationOperation;
+  readonly requestSha256: string;
+}
+
 const CONSTRUCTION_TOKEN = Symbol("PreparedRenaveMutation");
 const states = new WeakMap<PreparedRenaveMutation, PreparedState>();
 
@@ -198,12 +205,27 @@ export function restorePreparedRenaveMutation(
   return PreparedRenaveMutation.restore(operation, body, expectedSha256);
 }
 
+/**
+ * Fronteira nominal para consumidores confiáveis do envelope preparado.
+ * Lê o estado diretamente do WeakMap e nunca invoca propriedades do argumento.
+ */
+export function readPreparedRenaveMutation(
+  prepared: PreparedRenaveMutation,
+): PreparedRenaveMutationSnapshot {
+  const state = preparedState(prepared);
+  const body = new Uint8Array(state.body.byteLength);
+  body.set(state.body);
+  return Object.freeze({
+    body,
+    byteLength: state.byteLength,
+    operation: state.operation,
+    requestSha256: state.requestSha256,
+  });
+}
+
 /** Uso interno do transporte; não é reexportado pelo pacote. */
 export function copyPreparedRenaveMutationBody(
   prepared: PreparedRenaveMutation,
 ): OwnedBytes {
-  const { body } = preparedState(prepared);
-  const copy = new Uint8Array(body.byteLength);
-  copy.set(body);
-  return copy;
+  return readPreparedRenaveMutation(prepared).body;
 }

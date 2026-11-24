@@ -6,6 +6,7 @@ import {
   InvalidPreparedRenaveMutationError,
   PreparedRenaveMutation,
   prepareRenaveMutation,
+  readPreparedRenaveMutation,
   restorePreparedRenaveMutation,
 } from "./index.js";
 
@@ -155,6 +156,33 @@ describe("PreparedRenaveMutation", () => {
     expect(() => prototypeOnly.operation).toThrow(
       InvalidPreparedRenaveMutationError,
     );
+  });
+
+  it("expõe snapshot nominal sem confiar em shadows ou Proxy", async () => {
+    const prepared = await prepareRenaveMutation("request-stock-entry", {
+      placa: "QTP4H82",
+    });
+    const snapshot = readPreparedRenaveMutation(prepared);
+    snapshot.body.fill(0);
+    expect(
+      new TextDecoder().decode(readPreparedRenaveMutation(prepared).body),
+    ).toBe('{"placa":"QTP4H82"}');
+
+    const shadowed = Object.create(PreparedRenaveMutation.prototype) as
+      PreparedRenaveMutation | Record<string, unknown>;
+    Object.defineProperties(shadowed, {
+      copyBodyBytes: { value: () => Buffer.from("{}") },
+      operation: { value: "request-stock-entry" },
+      requestSha256: { value: "0".repeat(64) },
+    });
+    expect(() =>
+      readPreparedRenaveMutation(shadowed as PreparedRenaveMutation),
+    ).toThrow(InvalidPreparedRenaveMutationError);
+    expect(() =>
+      readPreparedRenaveMutation(
+        new Proxy(prepared, {}) as PreparedRenaveMutation,
+      ),
+    ).toThrow(InvalidPreparedRenaveMutationError);
   });
 
   it("serializa somente metadados, nunca o corpo nem dados pessoais", async () => {

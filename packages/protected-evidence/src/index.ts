@@ -23,3 +23,14 @@ export {
   type EncryptedOperationRequest,
   type OperationRequestBinding,
 } from "./operation-request-crypto.js";
+export {
+  OperationReconciliationProjectionCipher,
+  OperationReconciliationProjectionConfigurationError,
+  OperationReconciliationProjectionDecryptionError,
+  OperationReconciliationProjectionInputError,
+  PreparedOperationReconciliationProjection,
+  prepareOperationReconciliationProjection,
+  type EncryptedOperationReconciliationProjection,
+  type OperationReconciliationProjectionBinding,
+  type StockEntryReconciliationProjectionV1,
+} from "./operation-reconciliation-projection.js";

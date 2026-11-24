@@ -59,8 +59,10 @@ export {
   InvalidPreparedRenaveMutationError,
   PreparedRenaveMutation,
   prepareRenaveMutation,
+  readPreparedRenaveMutation,
   restorePreparedRenaveMutation,
   type InvalidPreparedRenaveMutationReason,
+  type PreparedRenaveMutationSnapshot,
 } from "./mutation-request.js";
 export { InvalidStockPlateQueryError, normalizeStockPlate } from "./plate.js";
 export {
