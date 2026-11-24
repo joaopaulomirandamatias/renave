@@ -21,6 +21,7 @@ const apiRuntimeDbFiles = new Set(
     "establishments",
     "login-rate-limiter",
     "operations",
+    "platform-console-access",
     "platform-console-rate-limiter",
     "platform-console-reader",
     "platform-digests",
