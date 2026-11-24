@@ -35,6 +35,157 @@ function sha256(bytes: Uint8Array): string {
 }
 
 describe("HttpRenaveTransport", () => {
+  it("consulta veículo por placa na rota canônica e projeta resposta congelada", async () => {
+    const request = vi.fn(async () =>
+      Response.json({
+        chassi: "9BWZZZ377VT004251",
+        dataPreCadastro: "2024-02-29",
+        placa: "qtp4h82",
+        renavam: "00607701676",
+        restricoes: [
+          { codigoTipo: "1", segredo: "descartar", tipo: "JUDICIAL" },
+        ],
+        segredo: "descartar",
+        veiculoAcabado: true,
+      }),
+    );
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    const vehicle = await transport.getVehicleByPlate(headers, "QTP4H82");
+
+    expect(vehicle).toEqual({
+      chassi: "9BWZZZ377VT004251",
+      dataPreCadastro: "2024-02-29",
+      placa: "QTP4H82",
+      renavam: "00607701676",
+      restricoes: [{ codigoTipo: "1", tipo: "JUDICIAL" }],
+      veiculoAcabado: true,
+    });
+    expect(request).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledWith(
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/veiculos?placa=QTP4H82",
+      expect.objectContaining({
+        headers: { accept: "application/json", ...headers },
+        method: "GET",
+        redirect: "error",
+      }),
+    );
+    expect(Object.isFrozen(vehicle)).toBe(true);
+    expect(Object.isFrozen(vehicle.restricoes)).toBe(true);
+    expect(Object.isFrozen(vehicle.restricoes[0])).toBe(true);
+  });
+
+  it("normaliza restrições ausentes para lista congelada vazia", async () => {
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(async () => Response.json({ placa: "QTP4H82" })),
+    });
+
+    await expect(
+      transport.getVehicleByPlate(headers, "QTP4H82"),
+    ).resolves.toEqual({ placa: "QTP4H82", restricoes: [] });
+  });
+
+  it("bloqueia consulta direta de veículo em produção antes da rede", async () => {
+    const request = vi.fn();
+    const transport = new HttpRenaveTransport({
+      environment: "production",
+      request,
+    });
+
+    await expect(
+      transport.getVehicleByPlate(headers, "QTP4H82"),
+    ).rejects.toBeInstanceOf(RenaveProductionBlockedError);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["placa ausente", { restricoes: [] }],
+    ["placa divergente", { placa: "ABC1D23" }],
+    [
+      "data civil inexistente",
+      { placa: "QTP4H82", dataPreCadastro: "2023-02-29" },
+    ],
+    [
+      "data com horário",
+      { placa: "QTP4H82", dataPreCadastro: "2024-01-01T00:00:00Z" },
+    ],
+    ["chassi inválido", { placa: "QTP4H82", chassi: "CURTO" }],
+    ["renavam inválido", { placa: "QTP4H82", renavam: "ABC" }],
+    ["booleano inválido", { placa: "QTP4H82", veiculoAcabado: "sim" }],
+    ["restrição inválida", { placa: "QTP4H82", restricoes: [null] }],
+    [
+      "campo longo",
+      { placa: "QTP4H82", restricoes: [{ codigoTipo: "x".repeat(65) }] },
+    ],
+  ])("recusa Veiculo incompatível: %s", async (_label, body) => {
+    const request = vi.fn(async () => Response.json(body));
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await expect(
+      transport.getVehicleByPlate(headers, "QTP4H82"),
+    ).rejects.toMatchObject({
+      code: "RENAVE_PROTOCOL_ERROR",
+      operation: "get-vehicle-by-plate",
+    });
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("não repete consulta nem vaza corpo de erro upstream", async () => {
+    const request = vi.fn(async () =>
+      Response.json(
+        { detalhe: "CPF 123.456.789-00", mensagem: "segredo" },
+        { status: 503 },
+      ),
+    );
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    const error = await transport
+      .getVehicleByPlate(headers, "QTP4H82")
+      .catch((candidate: unknown) => candidate);
+    expect(error).toMatchObject({
+      code: "RENAVE_HTTP_ERROR",
+      operation: "get-vehicle-by-plate",
+      status: 503,
+    });
+    expect(String(error)).not.toContain("123.456.789-00");
+    expect(String(error)).not.toContain("segredo");
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("sanitiza falha de leitura do corpo 200", async () => {
+    const secret = "conteúdo upstream sigiloso";
+    const body = new ReadableStream({
+      pull(controller) {
+        controller.error(new Error(secret));
+      },
+    });
+    const request = vi.fn(async () => new Response(body, { status: 200 }));
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    const error = await transport
+      .getVehicleByPlate(headers, "QTP4H82")
+      .catch((candidate: unknown) => candidate);
+    expect(error).toMatchObject({
+      code: "RENAVE_PROTOCOL_ERROR",
+      operation: "get-vehicle-by-plate",
+    });
+    expect(String(error)).not.toContain(secret);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
   it("consulta a identidade no host fixo do ambiente com o CNPJ autorizado", async () => {
     const request = vi.fn(async () =>
       Response.json({

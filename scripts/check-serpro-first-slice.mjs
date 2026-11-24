@@ -105,6 +105,55 @@ requireProperties(
   "DiagnosticoAptidaoEstoque",
 );
 
+const vehicles = operation(document, "/api/veiculos", "get");
+const vehicleParameters = new Map(
+  vehicles.parameters?.map((parameter) => [parameter.name, parameter]),
+);
+requireValue(
+  vehicleParameters.size === 3 &&
+    ["chassi", "placa", "renavam"].every((name) => vehicleParameters.has(name)),
+  "veiculos divergiu dos parâmetros chassi/placa/renavam",
+);
+requireValue(
+  vehicleParameters.get("placa")?.in === "query" &&
+    vehicleParameters.get("placa")?.type === "string" &&
+    vehicleParameters.get("placa")?.pattern ===
+      "[A-Za-z]{3}[0-9][A-Za-z0-9][0-9]{2}",
+  "veiculos.placa divergiu do formato oficial",
+);
+requireValue(
+  vehicles.responses?.["200"]?.schema?.$ref === "#/definitions/Veiculo",
+  "veiculos não retorna Veiculo",
+);
+const vehicleDefinition = definition(document, "Veiculo");
+requireProperties(
+  vehicleDefinition,
+  [
+    "chassi",
+    "dataPreCadastro",
+    "placa",
+    "renavam",
+    "restricoes",
+    "veiculoAcabado",
+  ],
+  "Veiculo",
+);
+requireValue(
+  vehicleDefinition.properties.dataPreCadastro.format === "date",
+  "Veiculo.dataPreCadastro deixou de ser data civil",
+);
+requireValue(
+  vehicleDefinition.properties.restricoes.type === "array" &&
+    vehicleDefinition.properties.restricoes.items?.$ref ===
+      "#/definitions/Restricao",
+  "Veiculo.restricoes não referencia Restricao",
+);
+requireProperties(
+  definition(document, "Restricao"),
+  ["codigoTipo", "tipo"],
+  "Restricao",
+);
+
 const stocks = operation(document, "/api/estoques", "get");
 const stockParameters = new Map(
   stocks.parameters?.map((parameter) => [parameter.name, parameter]),

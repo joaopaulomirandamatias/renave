@@ -31,6 +31,8 @@ export {
   type OwnerDocumentType,
   type RenaveMutationOperation,
   type RenaveStockState,
+  type RenaveVehicle,
+  type RenaveVehicleRestriction,
   type StockEntryRequest,
   type StockEntryResponse,
   type StockEntryVehicle,
@@ -43,6 +45,7 @@ export {
 } from "./operations.js";
 export {
   InvalidVehicleEligibilityQueryError,
+  InvalidVehiclePlateQueryError,
   RenaveConnector,
   RenaveQueryConnector,
   RenaveEnvironmentMismatchError,
@@ -53,6 +56,8 @@ export {
   RenaveReconciliationReadError,
   RenaveReconciliationReader,
   RenaveStockQueryResultError,
+  RenaveVehicleLookupConnector,
+  RenaveProtocolCapabilityError,
   type AuthenticatedClientIdentity,
   type EstablishmentHeaders,
   type IdentityMismatchReason,
@@ -65,6 +70,7 @@ export {
   type RenaveReconciliationReaderOptions,
   type RenaveServerContext,
   type RenaveTransport,
+  type RenaveVehicleLookupTransport,
   type StockQueryResult,
   type StockSummary,
   type ReconciliationReadErrorCategory,

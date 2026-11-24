@@ -5,6 +5,7 @@ import type {
   RenaveQueryTransport,
   RenaveReadOptions,
   RenaveTransport,
+  RenaveVehicleLookupTransport,
 } from "./connector.js";
 import { RenaveProductionBlockedError } from "./connector.js";
 import {
@@ -14,6 +15,8 @@ import {
 import {
   renaveMutationRoutes,
   type RenaveMutationOperation,
+  type RenaveVehicle,
+  type RenaveVehicleRestriction,
   type VehicleEligibilityQuery,
   type VehicleEligibilityResponse,
 } from "./operations.js";
@@ -75,6 +78,7 @@ const httpReadOnlyTransportStates = new WeakMap<
 type RenaveHttpOperation =
   | "get-authenticated-client"
   | "get-vehicle-eligibility"
+  | "get-vehicle-by-plate"
   | "find-stocks-by-plate"
   | RenaveMutationOperation;
 
@@ -87,6 +91,9 @@ const STOCK_STATES = new Set([
 const CRV_TYPES = new Set(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
 const TRACE_ID_PATTERN = /^[0-9a-f]{32}$/u;
 const MAX_INTERNAL_ERROR_BODY_BYTES = 16 * 1_024;
+const MAX_RESTRICTIONS = 256;
+const MAX_RESTRICTION_CODE_LENGTH = 64;
+const MAX_RESTRICTION_TYPE_LENGTH = 256;
 const ABSOLUTE_DATE_TIME_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/u;
 
@@ -488,6 +495,112 @@ function identityFrom(value: unknown): AuthenticatedClientIdentity {
   };
 }
 
+function optionalBoundedString(
+  value: unknown,
+  maximumLength: number,
+  pattern?: RegExp,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length < 1 ||
+    value.length > maximumLength ||
+    (pattern !== undefined && !pattern.test(value))
+  ) {
+    throw new RenaveProtocolError("get-vehicle-by-plate");
+  }
+  return value;
+}
+
+function civilDate(value: unknown): string | undefined {
+  const date = optionalBoundedString(value, 10, /^\d{4}-\d{2}-\d{2}$/u);
+  if (date === undefined) return undefined;
+  const [year, month, day] = date.split("-").map(Number);
+  const instant = new Date(Date.UTC(year!, month! - 1, day!));
+  if (
+    instant.getUTCFullYear() !== year ||
+    instant.getUTCMonth() !== month! - 1 ||
+    instant.getUTCDate() !== day
+  ) {
+    throw new RenaveProtocolError("get-vehicle-by-plate");
+  }
+  return date;
+}
+
+function vehicleFrom(value: unknown, expectedPlate: string): RenaveVehicle {
+  const candidate = requireObject(value, "get-vehicle-by-plate");
+  const rawPlate = optionalBoundedString(
+    candidate.placa,
+    7,
+    /^[A-Za-z]{3}[0-9][A-Za-z0-9][0-9]{2}$/u,
+  );
+  if (rawPlate === undefined || rawPlate.toUpperCase() !== expectedPlate) {
+    throw new RenaveProtocolError("get-vehicle-by-plate");
+  }
+  const chassi = optionalBoundedString(
+    candidate.chassi,
+    21,
+    /^[A-HJ-NPR-Za-hj-npr-z0-9]{17,21}$/u,
+  )?.toUpperCase();
+  const renavam = optionalBoundedString(candidate.renavam, 11, /^\d{9,11}$/u);
+  const dataPreCadastro = civilDate(candidate.dataPreCadastro);
+  if (
+    candidate.veiculoAcabado !== undefined &&
+    typeof candidate.veiculoAcabado !== "boolean"
+  ) {
+    throw new RenaveProtocolError("get-vehicle-by-plate");
+  }
+  if (
+    candidate.restricoes !== undefined &&
+    (!Array.isArray(candidate.restricoes) ||
+      candidate.restricoes.length > MAX_RESTRICTIONS)
+  ) {
+    throw new RenaveProtocolError("get-vehicle-by-plate");
+  }
+  const restrictions = (candidate.restricoes ?? []).map(
+    (value: unknown): RenaveVehicleRestriction => {
+      const restriction = requireObject(value, "get-vehicle-by-plate");
+      const codigoTipo = optionalBoundedString(
+        restriction.codigoTipo,
+        MAX_RESTRICTION_CODE_LENGTH,
+      );
+      const tipo = optionalBoundedString(
+        restriction.tipo,
+        MAX_RESTRICTION_TYPE_LENGTH,
+      );
+      return Object.freeze({
+        ...(codigoTipo === undefined ? {} : { codigoTipo }),
+        ...(tipo === undefined ? {} : { tipo }),
+      });
+    },
+  );
+  return Object.freeze({
+    ...(chassi === undefined ? {} : { chassi }),
+    ...(dataPreCadastro === undefined ? {} : { dataPreCadastro }),
+    placa: expectedPlate,
+    ...(renavam === undefined ? {} : { renavam }),
+    restricoes: Object.freeze(restrictions),
+    ...(candidate.veiculoAcabado === undefined
+      ? {}
+      : { veiculoAcabado: candidate.veiculoAcabado }),
+  });
+}
+
+async function vehicleResponseFrom(
+  response: Response,
+  expectedPlate: string,
+): Promise<RenaveVehicle> {
+  try {
+    return vehicleFrom(
+      await parseJson(response, "get-vehicle-by-plate"),
+      expectedPlate,
+    );
+  } catch (error) {
+    if (error instanceof RenaveProtocolError) throw error;
+    throw new RenaveProtocolError("get-vehicle-by-plate");
+  }
+}
+
 function stockRecordFrom(value: unknown): RenaveStockRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new RenaveProtocolError("find-stocks-by-plate");
@@ -614,7 +727,9 @@ function mutationResultFrom(
   }
 }
 
-export class HttpRenaveTransport implements RenaveTransport {
+export class HttpRenaveTransport
+  implements RenaveTransport, RenaveVehicleLookupTransport
+{
   constructor(options: HttpRenaveTransportOptions) {
     if (new.target !== HttpRenaveTransport) {
       throw new RenaveProtocolError("get-authenticated-client");
@@ -715,6 +830,45 @@ export class HttpRenaveTransport implements RenaveTransport {
     return vehicleEligibilityFrom(
       await parseJson(response, "get-vehicle-eligibility"),
     );
+  }
+
+  async getVehicleByPlate(
+    headers: EstablishmentHeaders,
+    plate: string,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveVehicle> {
+    const state = httpTransportState(this, "get-vehicle-by-plate");
+    if (state.environment === "production") {
+      throw new RenaveProductionBlockedError();
+    }
+    const normalizedPlate = normalizeStockPlate(plate);
+    if (!/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/u.test(normalizedPlate)) {
+      throw new RenaveProtocolError("get-vehicle-by-plate");
+    }
+    const search = new URLSearchParams({ placa: normalizedPlate });
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls[state.environment]}/api/veiculos?${search.toString()}`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "get-vehicle-by-plate");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "get-vehicle-by-plate");
+    }
+    return vehicleResponseFrom(response, normalizedPlate);
   }
 
   async findStocksByPlate(
@@ -824,7 +978,9 @@ export class HttpRenaveTransport implements RenaveTransport {
 }
 
 /** Transporte nominal de consultas que não possui superfície de mutação. */
-export class HttpRenaveReadOnlyTransport implements RenaveQueryTransport {
+export class HttpRenaveReadOnlyTransport
+  implements RenaveQueryTransport, RenaveVehicleLookupTransport
+{
   constructor(options: HttpRenaveReadOnlyTransportOptions) {
     if (new.target !== HttpRenaveReadOnlyTransport) {
       throw new RenaveProtocolError("get-authenticated-client");
@@ -913,6 +1069,41 @@ export class HttpRenaveReadOnlyTransport implements RenaveQueryTransport {
     return vehicleEligibilityFrom(
       await parseJson(response, "get-vehicle-eligibility"),
     );
+  }
+
+  async getVehicleByPlate(
+    headers: EstablishmentHeaders,
+    plate: string,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveVehicle> {
+    const state = httpReadOnlyTransportState(this, "get-vehicle-by-plate");
+    const normalizedPlate = normalizeStockPlate(plate);
+    if (!/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/u.test(normalizedPlate)) {
+      throw new RenaveProtocolError("get-vehicle-by-plate");
+    }
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls.homologation}/api/veiculos?placa=${normalizedPlate}`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "get-vehicle-by-plate");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "get-vehicle-by-plate");
+    }
+    return vehicleResponseFrom(response, normalizedPlate);
   }
 
   async findStocksByPlate(

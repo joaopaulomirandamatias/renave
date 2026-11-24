@@ -302,8 +302,10 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
   ] as const;
   const stocksUrl =
     "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82";
+  const vehiclesUrl =
+    "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/veiculos?placa=QTP4H82";
 
-  it("delega somente GETs canônicos de identidade, aptidão e estoque sem corpo", async () => {
+  it("delega somente GETs canônicos de identidade, aptidão, estoque e veículo sem corpo", async () => {
     const baseRequest = vi.fn<RenaveHttpRequest>(async () => Response.json([]));
     const capability = createHomologationRenaveReadOnlyRequest(
       "homologation",
@@ -319,11 +321,15 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       method: "GET",
       redirect: "error",
     });
+    await capability.request(vehiclesUrl, {
+      method: "GET",
+      redirect: "error",
+    });
     for (const url of eligibilityUrls) {
       await capability.request(url, { method: "GET", redirect: "error" });
     }
 
-    expect(baseRequest).toHaveBeenCalledTimes(5);
+    expect(baseRequest).toHaveBeenCalledTimes(6);
     for (const [, init] of baseRequest.mock.calls) {
       expect(init).toMatchObject({ method: "GET", redirect: "error" });
       expect(init.body).toBeUndefined();
@@ -393,6 +399,26 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       "query adicional no estoque",
       `${stocksUrl}&pagina=1`,
       { method: "GET", redirect: "error" },
+    ],
+    [
+      "query duplicada no veículo",
+      `${vehiclesUrl}&placa=ABC1D23`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "query extra no veículo",
+      `${vehiclesUrl}&renavam=00607701676`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "placa não canônica no veículo",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/veiculos?placa=qtp4h82",
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "body no veículo",
+      vehiclesUrl,
+      { body: "{}", method: "GET", redirect: "error" },
     ],
   ] as const)("recusa %s antes da rede base", async (_label, url, init) => {
     const baseRequest = vi.fn<RenaveHttpRequest>(async () => Response.json({}));

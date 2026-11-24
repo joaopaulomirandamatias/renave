@@ -6,10 +6,12 @@ import {
   RenaveConnector,
   RenaveIdentityMismatchError,
   RenaveQueryConnector,
+  RenaveVehicleLookupConnector,
   type AuthenticatedClientIdentity,
   type EstablishmentHeaders,
   type RenaveServerContext,
   type RenaveTransport,
+  type RenaveVehicleLookupTransport,
   type PreparedRenaveMutation,
   type StockEntryRequest,
 } from "./index.js";
@@ -44,6 +46,79 @@ function transportWithIdentity(identity: AuthenticatedClientIdentity) {
   };
   return { getAuthenticatedClient, mutate, transport };
 }
+
+describe("RenaveVehicleLookupConnector", () => {
+  it("normaliza a placa e confirma a identidade em toda consulta", async () => {
+    const getAuthenticatedClient = vi.fn(async () => ({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    }));
+    const getVehicleByPlate = vi.fn(async () => ({
+      placa: "QTP4H82",
+      restricoes: [],
+    }));
+    const transport: RenaveVehicleLookupTransport = {
+      environment: "homologation",
+      getAuthenticatedClient,
+      getVehicleByPlate,
+    };
+    const connector = new RenaveVehicleLookupConnector(transport);
+
+    await connector.getVehicleByPlate(context, " qtp4h82 ");
+    await connector.getVehicleByPlate(context, "QTP4H82");
+
+    expect(getAuthenticatedClient).toHaveBeenCalledTimes(2);
+    expect(getAuthenticatedClient).toHaveBeenCalledWith({
+      "CNPJ-Estabelecimento": "85106037000585",
+    });
+    expect(getVehicleByPlate).toHaveBeenCalledTimes(2);
+    expect(getVehicleByPlate).toHaveBeenLastCalledWith(
+      { "CNPJ-Estabelecimento": "85106037000585" },
+      "QTP4H82",
+      undefined,
+    );
+    expect("mutate" in connector).toBe(false);
+    expect(Object.isFrozen(connector)).toBe(true);
+  });
+
+  it("bloqueia produção antes da rede", async () => {
+    const getAuthenticatedClient = vi.fn();
+    const getVehicleByPlate = vi.fn();
+    const connector = new RenaveVehicleLookupConnector({
+      environment: "production",
+      getAuthenticatedClient,
+      getVehicleByPlate,
+    });
+
+    await expect(
+      connector.getVehicleByPlate(
+        { ...context, environment: "production" },
+        "QTP4H82",
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_PRODUCTION_BLOCKED" });
+    expect(getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(getVehicleByPlate).not.toHaveBeenCalled();
+  });
+
+  it.each(["ABC-1234", "1234ABC", "QTP4H8", "QTP4H820"])(
+    "recusa placa fora do formato oficial antes de autenticar: %s",
+    async (plate) => {
+      const getAuthenticatedClient = vi.fn();
+      const getVehicleByPlate = vi.fn();
+      const connector = new RenaveVehicleLookupConnector({
+        environment: "homologation",
+        getAuthenticatedClient,
+        getVehicleByPlate,
+      });
+
+      await expect(
+        connector.getVehicleByPlate(context, plate),
+      ).rejects.toMatchObject({ code: "INVALID_VEHICLE_PLATE_QUERY" });
+      expect(getAuthenticatedClient).not.toHaveBeenCalled();
+      expect(getVehicleByPlate).not.toHaveBeenCalled();
+    },
+  );
+});
 
 describe("RenaveQueryConnector", () => {
   it("expõe somente consultas e preserva a confirmação de identidade", async () => {

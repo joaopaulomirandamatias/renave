@@ -2,6 +2,7 @@ import { normalizeCnpj } from "./cnpj.js";
 import type {
   RenaveMutationOperation,
   RenaveStockState,
+  RenaveVehicle,
   StockEntryRequest,
   StockEntryResponse,
   VehicleEligibilityQuery,
@@ -78,6 +79,19 @@ export interface RenaveReadOnlyTransport {
   ): Promise<RenaveStockRecord[]>;
 }
 
+export interface RenaveVehicleLookupTransport {
+  readonly environment: RenaveEnvironment;
+  getAuthenticatedClient(
+    headers: EstablishmentHeaders,
+    options?: RenaveReadOptions,
+  ): Promise<AuthenticatedClientIdentity>;
+  getVehicleByPlate(
+    headers: EstablishmentHeaders,
+    plate: string,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveVehicle>;
+}
+
 export interface RenaveQueryTransport extends RenaveReadOnlyTransport {
   getVehicleEligibility(
     headers: EstablishmentHeaders,
@@ -90,6 +104,88 @@ export interface RenaveTransport extends RenaveQueryTransport {
     headers: EstablishmentHeaders,
     prepared: PreparedRenaveMutation,
   ): Promise<TResult>;
+}
+
+interface RenaveVehicleLookupConnectorState {
+  environment: RenaveEnvironment;
+  getAuthenticatedClient: RenaveVehicleLookupTransport["getAuthenticatedClient"];
+  getVehicleByPlate: RenaveVehicleLookupTransport["getVehicleByPlate"];
+}
+
+const vehicleLookupConnectorStates = new WeakMap<
+  RenaveVehicleLookupConnector,
+  RenaveVehicleLookupConnectorState
+>();
+
+export class InvalidVehiclePlateQueryError extends Error {
+  readonly code = "INVALID_VEHICLE_PLATE_QUERY";
+
+  constructor() {
+    super("Informe uma placa RENAVE válida para consultar o veículo");
+    this.name = "InvalidVehiclePlateQueryError";
+  }
+}
+
+export class RenaveProtocolCapabilityError extends Error {
+  readonly code = "RENAVE_CAPABILITY_INVALID";
+
+  constructor() {
+    super("A capacidade RENAVE fornecida é inválida");
+    this.name = "RenaveProtocolCapabilityError";
+  }
+}
+
+function normalizeVehiclePlate(value: unknown): string {
+  if (typeof value !== "string") throw new InvalidVehiclePlateQueryError();
+  const normalized = value.trim().toUpperCase();
+  if (!/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/u.test(normalized)) {
+    throw new InvalidVehiclePlateQueryError();
+  }
+  return normalized;
+}
+
+/** Capacidade nominal dedicada à consulta de Veiculo por placa. */
+export class RenaveVehicleLookupConnector {
+  constructor(transport: RenaveVehicleLookupTransport) {
+    if (new.target !== RenaveVehicleLookupConnector) {
+      throw new RenaveProtocolCapabilityError();
+    }
+    try {
+      if (
+        typeof transport.getAuthenticatedClient !== "function" ||
+        typeof transport.getVehicleByPlate !== "function"
+      ) {
+        throw new RenaveProtocolCapabilityError();
+      }
+      vehicleLookupConnectorStates.set(this, {
+        environment: transport.environment,
+        getAuthenticatedClient:
+          transport.getAuthenticatedClient.bind(transport),
+        getVehicleByPlate: transport.getVehicleByPlate.bind(transport),
+      });
+      Object.freeze(this);
+    } catch (error) {
+      if (error instanceof RenaveProtocolCapabilityError) throw error;
+      throw new RenaveProtocolCapabilityError();
+    }
+  }
+
+  async getVehicleByPlate(
+    context: RenaveServerContext,
+    plate: string,
+    options?: RenaveReadOptions,
+  ): Promise<MutationResult<RenaveVehicle>> {
+    const normalizedPlate = normalizeVehiclePlate(plate);
+    const state = vehicleLookupConnectorStates.get(this);
+    if (!state) throw new RenaveProtocolCapabilityError();
+    const authorization = await authorizeRead(state, context, options);
+    const result = await state.getVehicleByPlate(
+      authorization.headers,
+      normalizedPlate,
+      options,
+    );
+    return { result, verifiedIdentity: authorization.verifiedIdentity };
+  }
 }
 
 /** Conector para processos de consulta: não possui qualquer método de mutação. */
@@ -333,7 +429,10 @@ function verifyIdentity(
 }
 
 async function authorizeRead(
-  transport: RenaveReadOnlyTransport,
+  transport: Pick<
+    RenaveVehicleLookupTransport,
+    "environment" | "getAuthenticatedClient"
+  >,
   context: RenaveServerContext,
   options?: RenaveReadOptions,
 ): Promise<{
@@ -539,6 +638,8 @@ export async function readRenaveReconciliation(
 
 Object.freeze(RenaveReconciliationReader.prototype);
 Object.freeze(RenaveReconciliationReader);
+Object.freeze(RenaveVehicleLookupConnector.prototype);
+Object.freeze(RenaveVehicleLookupConnector);
 
 function validateVehicleEligibilityQuery(
   query: VehicleEligibilityQuery,

@@ -88,6 +88,22 @@ export interface VehicleEligibilityVehicle {
   veiculoAcabado?: boolean;
 }
 
+/** Projeção pública e estritamente allowlisted de Restricao do Swagger. */
+export interface RenaveVehicleRestriction {
+  codigoTipo?: string;
+  tipo?: string;
+}
+
+/** Veículo consultado por placa; propriedades desconhecidas nunca são expostas. */
+export interface RenaveVehicle {
+  chassi?: string;
+  dataPreCadastro?: string;
+  placa: string;
+  renavam?: string;
+  restricoes: readonly RenaveVehicleRestriction[];
+  veiculoAcabado?: boolean;
+}
+
 export interface VehicleEligibilityResponse {
   autorizacaoTransferencia?: VehicleEligibilityTransferAuthorization;
   comunicacaoComDetranFalhou?: boolean;

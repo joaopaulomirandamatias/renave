@@ -9,12 +9,8 @@ const HOMOLOGATION_ORIGIN = "https://hom.renave.estaleiro.serpro.gov.br";
 const HOMOLOGATION_IDENTITY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/cliente-autenticado`;
 const HOMOLOGATION_ELIGIBILITY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/aptidao-veiculo-estoque`;
 const HOMOLOGATION_STOCKS_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/estoques`;
-const ALLOWED_PATHS = new Set([
-  "/renave-ws/api/aptidao-veiculo-estoque",
-  "/renave-ws/api/cliente-autenticado",
-  "/renave-ws/api/estoques",
-  "/renave-ws/api/solicitacoes-entrada-estoque",
-]);
+const HOMOLOGATION_VEHICLES_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/veiculos`;
+const HOMOLOGATION_STOCK_ENTRY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/solicitacoes-entrada-estoque`;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 export interface PemMtlsMaterial {
@@ -188,7 +184,12 @@ function isAllowedReadUrl(input: string): boolean {
     canonical.set(identifier[0], identifier[1]);
     return input === `${HOMOLOGATION_ELIGIBILITY_URL}?${canonical.toString()}`;
   }
-  if (url.pathname !== "/renave-ws/api/estoques") return false;
+  if (
+    url.pathname !== "/renave-ws/api/estoques" &&
+    url.pathname !== "/renave-ws/api/veiculos"
+  ) {
+    return false;
+  }
 
   const entries = [...url.searchParams.entries()];
   if (
@@ -198,7 +199,26 @@ function isAllowedReadUrl(input: string): boolean {
   ) {
     return false;
   }
-  return input === `${HOMOLOGATION_STOCKS_URL}?placa=${entries[0][1]}`;
+  const base =
+    url.pathname === "/renave-ws/api/veiculos"
+      ? HOMOLOGATION_VEHICLES_URL
+      : HOMOLOGATION_STOCKS_URL;
+  return input === `${base}?placa=${entries[0][1]}`;
+}
+
+function isAllowedMtlsRequest(input: string, init: RequestInit): boolean {
+  if (init.redirect !== "error") return false;
+  if (init.method === "GET") {
+    return init.body === undefined && isAllowedReadUrl(input);
+  }
+  if (init.method !== "POST" || input !== HOMOLOGATION_STOCK_ENTRY_URL) {
+    return false;
+  }
+  return (
+    typeof init.body === "string" ||
+    init.body instanceof Uint8Array ||
+    init.body instanceof ArrayBuffer
+  );
 }
 
 function executeHomologationRenaveReadOnlyRequest(
@@ -424,17 +444,10 @@ export function createHomologationPemMtlsClient(
   });
 
   const request: RenaveHttpRequest = async (input, init) => {
-    if (init.redirect !== "error") throw new RenaveMtlsOriginError();
-    const url = new URL(input);
-    if (
-      url.origin !== HOMOLOGATION_ORIGIN ||
-      !ALLOWED_PATHS.has(url.pathname) ||
-      url.username !== "" ||
-      url.password !== "" ||
-      url.hash !== ""
-    ) {
+    if (!isAllowedMtlsRequest(input, init)) {
       throw new RenaveMtlsOriginError();
     }
+    const url = new URL(input);
 
     return await new Promise<Response>((resolve, reject) => {
       const request = httpsRequest(
