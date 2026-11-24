@@ -59,9 +59,11 @@ function clientFor(
     loadRenaveReadiness: vi.fn(async () => ({
       certificate: "ready" as const,
       environment: "homologation" as const,
+      establishmentContact: "blocked" as const,
       integration: "configured" as const,
       link: "not_started" as const,
       mutations: "blocked" as const,
+      operatorIdentity: "blocked" as const,
       queries: "blocked" as const,
     })),
     loadTenants: vi.fn(async () => tenants),
@@ -362,9 +364,11 @@ describe("App session boundary", () => {
     const valid: BrowserRenaveReadiness = {
       certificate: "warning",
       environment: "homologation",
+      establishmentContact: "blocked",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
+      operatorIdentity: "ready",
       queries: "ready",
     };
     const fetchMock = vi
@@ -373,6 +377,9 @@ describe("App session boundary", () => {
       .mockResolvedValueOnce(Response.json({ ...valid, thumbprint: "secret" }))
       .mockResolvedValueOnce(
         Response.json({ ...valid, certificate: "unknown" }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ ...valid, operatorIdentity: "verified" }),
       );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -387,6 +394,9 @@ describe("App session boundary", () => {
         credentials: "same-origin",
       }),
     );
+    await expect(
+      browserSessionClient.loadRenaveReadiness("tenant-a", "store-a"),
+    ).rejects.toThrow("Resposta de prontidão RENAVE inválida");
     await expect(
       browserSessionClient.loadRenaveReadiness("tenant-a", "store-a"),
     ).rejects.toThrow("Resposta de prontidão RENAVE inválida");
@@ -415,9 +425,11 @@ describe("App session boundary", () => {
       loadRenaveReadiness: vi.fn(async () => ({
         certificate: "ready" as const,
         environment: "homologation" as const,
+        establishmentContact: "blocked" as const,
         integration: "configured" as const,
         link: "not_started" as const,
         mutations: "blocked" as const,
+        operatorIdentity: "blocked" as const,
         queries: "blocked" as const,
       })),
       loadTenants: vi.fn(async () => []),
@@ -988,9 +1000,11 @@ describe("App session boundary", () => {
           : {
               certificate: "warning",
               environment: "homologation",
+              establishmentContact: "blocked",
               integration: "configured",
               link: "confirmed",
               mutations: "blocked",
+              operatorIdentity: "ready",
               queries: "ready",
             },
     );
@@ -1009,9 +1023,11 @@ describe("App session boundary", () => {
     oldReadiness.resolve({
       certificate: "blocked",
       environment: "homologation",
+      establishmentContact: "unavailable",
       integration: "disabled",
       link: "rejected",
       mutations: "blocked",
+      operatorIdentity: "blocked",
       queries: "blocked",
     });
     await waitFor(() => {

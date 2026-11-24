@@ -109,6 +109,13 @@ export {
   type OperationStatus,
 } from "./operations.js";
 export {
+  getEstablishmentRenaveProfileStatus,
+  getOperatorIdentityProfileStatus,
+  renaveProfileStatuses,
+  RenaveProfileInputError,
+  type RenaveProfileStatusValue,
+} from "./renave-profiles.js";
+export {
   beginOperationReconciliation,
   claimOperationReconciliations,
   completeOperationReconciliationConfirmed,

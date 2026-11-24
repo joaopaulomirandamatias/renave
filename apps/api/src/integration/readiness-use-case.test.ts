@@ -1,4 +1,7 @@
+import { createHash } from "node:crypto";
+
 import {
+  computeCnpjCheckDigits,
   createEstablishment,
   createPool,
   grantTenantUserAccess,
@@ -6,6 +9,7 @@ import {
   transitionCredentialLink,
   withTenant,
   type Establishment,
+  type TenantClient,
   type Tenant,
 } from "@seu-renave/db";
 import type { Pool } from "pg";
@@ -29,6 +33,9 @@ declare module "vitest" {
 
 const urls = inject("dbUrls");
 const OPERATOR = "oidc|readiness-operator";
+const PENDING_OPERATOR = "oidc|readiness-pending";
+const SUSPENDED_OPERATOR = "oidc|readiness-suspended";
+const MISSING_OPERATOR = "oidc|readiness-missing";
 
 let appPool: Pool;
 let migratorPool: Pool;
@@ -37,6 +44,112 @@ let tenantB: Tenant;
 let storeA: Establishment;
 let otherStoreA: Establishment;
 let storeB: Establishment;
+let pendingStoreA: Establishment;
+let suspendedStoreA: Establishment;
+let missingStoreA: Establishment;
+
+function digest(value: string): Buffer {
+  return createHash("sha256").update(value, "utf8").digest();
+}
+
+function cnpj(index: number): string {
+  const base = `63920518${String(index).padStart(4, "0")}`;
+  return `${base}${computeCnpjCheckDigits(base)}`;
+}
+
+async function grantAndConfirm(
+  client: TenantClient,
+  subject: string,
+  establishmentId: string,
+): Promise<void> {
+  await grantTenantUserAccess(client, subject, [
+    { establishmentIds: [establishmentId], role: "renave_operator" },
+  ]);
+  await transitionCredentialLink(client, {
+    changedBySubject: subject,
+    establishmentId,
+    source: "manual",
+    status: "pending",
+  });
+  await transitionCredentialLink(client, {
+    changedBySubject: subject,
+    establishmentId,
+    source: "serpro_preflight",
+    status: "confirmed",
+  });
+}
+
+async function seedOperatorProfile(
+  client: TenantClient,
+  subject: string,
+  status: "pending" | "suspended" | "verified",
+): Promise<void> {
+  const verified = status !== "pending";
+  await client.query(
+    `insert into renave.operator_identity_profile (
+       tenant_id, subject, hmac_key_id, identity_hmac,
+       envelope_schema_version, envelope_key_id, envelope_nonce,
+       envelope_auth_tag, envelope_ciphertext, envelope_aad_sha256,
+       status, verification_source, source_evidence_digest,
+       changed_by_subject_hash, verified_by_subject_hash, verified_at
+     ) values (
+       renave.current_tenant_id(), $1, 'cpf-hmac-v1', $2,
+       1, 'cpf-envelope-v1', $3, $4, $5, $6,
+       $7, $8, $9, $10, $11,
+       case when $11::bytea is null then null else pg_catalog.clock_timestamp() end
+     )`,
+    [
+      subject,
+      digest(`cpf-hmac:${tenantA.id}:${subject}`),
+      Buffer.alloc(12, 1),
+      Buffer.alloc(16, 2),
+      Buffer.alloc(128, 3),
+      digest(`cpf-aad:${tenantA.id}:${subject}`),
+      status,
+      verified ? "regulated_provider" : "unverified_candidate",
+      digest(`cpf-evidence:${tenantA.id}:${subject}`),
+      digest(`cpf-changer:${tenantA.id}:${subject}`),
+      verified ? digest(`cpf-verifier:${tenantA.id}:${subject}`) : null,
+    ],
+  );
+}
+
+async function seedEstablishmentProfile(
+  client: TenantClient,
+  establishmentId: string,
+  status: "pending" | "suspended" | "verified",
+): Promise<void> {
+  const verified = status !== "pending";
+  await client.query(
+    `insert into renave.establishment_renave_profile (
+       tenant_id, establishment_id, hmac_key_id, email_hmac,
+       envelope_schema_version, envelope_key_id, envelope_nonce,
+       envelope_auth_tag, envelope_ciphertext, envelope_aad_sha256,
+       status, verification_source, source_evidence_digest,
+       changed_by_subject_hash, verified_by_subject_hash, verified_at
+     ) values (
+       renave.current_tenant_id(), $1, 'email-hmac-v1', $2,
+       1, 'email-envelope-v1', $3, $4, $5, $6,
+       $7, $8, $9, $10, $11,
+       case when $11::bytea is null then null else pg_catalog.clock_timestamp() end
+     )`,
+    [
+      establishmentId,
+      digest(`email-hmac:${tenantA.id}:${establishmentId}`),
+      Buffer.alloc(12, 4),
+      Buffer.alloc(16, 5),
+      Buffer.alloc(256, 6),
+      digest(`email-aad:${tenantA.id}:${establishmentId}`),
+      status,
+      verified ? "mailbox_challenge" : "unverified_candidate",
+      digest(`email-evidence:${tenantA.id}:${establishmentId}`),
+      digest(`email-changer:${tenantA.id}:${establishmentId}`),
+      verified
+        ? digest(`email-verifier:${tenantA.id}:${establishmentId}`)
+        : null,
+    ],
+  );
+}
 
 beforeAll(async () => {
   appPool = createPool(urls.app, { max: 4 });
@@ -49,10 +162,8 @@ beforeAll(async () => {
     displayName: "Readiness B",
     slug: "readiness-b",
   });
-  [storeA, otherStoreA] = await withTenant(
-    appPool,
-    tenantA.id,
-    async (client) => [
+  [storeA, otherStoreA, pendingStoreA, suspendedStoreA, missingStoreA] =
+    await withTenant(appPool, tenantA.id, async (client) => [
       await createEstablishment(client, {
         cnpj: "11222333000181",
         tradeName: "Loja autorizada",
@@ -61,8 +172,19 @@ beforeAll(async () => {
         cnpj: "12ABC34501DE35",
         tradeName: "Loja fora do escopo",
       }),
-    ],
-  );
+      await createEstablishment(client, {
+        cnpj: cnpj(1),
+        tradeName: "Loja com perfis pendentes",
+      }),
+      await createEstablishment(client, {
+        cnpj: cnpj(2),
+        tradeName: "Loja com perfis suspensos",
+      }),
+      await createEstablishment(client, {
+        cnpj: cnpj(3),
+        tradeName: "Loja sem perfis",
+      }),
+    ]);
   storeB = await withTenant(appPool, tenantB.id, (client) =>
     createEstablishment(client, {
       cnpj: "11222333000181",
@@ -70,21 +192,16 @@ beforeAll(async () => {
     }),
   );
   await withTenant(migratorPool, tenantA.id, async (client) => {
-    await grantTenantUserAccess(client, OPERATOR, [
-      { establishmentIds: [storeA.id], role: "renave_operator" },
-    ]);
-    await transitionCredentialLink(client, {
-      changedBySubject: OPERATOR,
-      establishmentId: storeA.id,
-      source: "manual",
-      status: "pending",
-    });
-    await transitionCredentialLink(client, {
-      changedBySubject: OPERATOR,
-      establishmentId: storeA.id,
-      source: "serpro_preflight",
-      status: "confirmed",
-    });
+    await grantAndConfirm(client, OPERATOR, storeA.id);
+    await grantAndConfirm(client, PENDING_OPERATOR, pendingStoreA.id);
+    await grantAndConfirm(client, SUSPENDED_OPERATOR, suspendedStoreA.id);
+    await grantAndConfirm(client, MISSING_OPERATOR, missingStoreA.id);
+    await seedOperatorProfile(client, OPERATOR, "verified");
+    await seedEstablishmentProfile(client, storeA.id, "verified");
+    await seedOperatorProfile(client, PENDING_OPERATOR, "pending");
+    await seedEstablishmentProfile(client, pendingStoreA.id, "pending");
+    await seedOperatorProfile(client, SUSPENDED_OPERATOR, "suspended");
+    await seedEstablishmentProfile(client, suspendedStoreA.id, "suspended");
   });
 });
 
@@ -112,9 +229,11 @@ describe("prontidão RENAVE com PostgreSQL", () => {
     ).resolves.toEqual({
       certificate: "ready",
       environment: "homologation",
+      establishmentContact: "ready",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
+      operatorIdentity: "ready",
       queries: "ready",
     });
   });
@@ -128,10 +247,65 @@ describe("prontidão RENAVE com PostgreSQL", () => {
       }),
     ).resolves.toMatchObject({
       certificate: "blocked",
+      establishmentContact: "ready",
       link: "confirmed",
       mutations: "blocked",
+      operatorIdentity: "ready",
       queries: "blocked",
     });
+  });
+
+  it.each([
+    ["pendentes", PENDING_OPERATOR, () => pendingStoreA.id],
+    ["suspensos", SUSPENDED_OPERATOR, () => suspendedStoreA.id],
+    ["ausentes", MISSING_OPERATOR, () => missingStoreA.id],
+  ] as const)(
+    "projeta perfis %s somente como bloqueados",
+    async (_, subject, storeId) => {
+      await expect(
+        useCase().execute({
+          establishmentId: storeId(),
+          subject,
+          tenantId: tenantA.id,
+        }),
+      ).resolves.toMatchObject({
+        certificate: "ready",
+        establishmentContact: "blocked",
+        link: "confirmed",
+        mutations: "blocked",
+        operatorIdentity: "blocked",
+        queries: "ready",
+      });
+    },
+  );
+
+  it("mantém o runtime da API sem capacidade de gravar perfis", async () => {
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        client.query(
+          `insert into renave.operator_identity_profile (
+             tenant_id, subject, hmac_key_id, identity_hmac,
+             envelope_schema_version, envelope_key_id, envelope_nonce,
+             envelope_auth_tag, envelope_ciphertext, envelope_aad_sha256,
+             status, verification_source, source_evidence_digest,
+             changed_by_subject_hash
+           ) values (
+             renave.current_tenant_id(), 'oidc|forbidden-profile',
+             'cpf-hmac-v1', $1, 1, 'cpf-envelope-v1', $2, $3, $4, $5,
+             'pending', 'unverified_candidate', $6, $7
+           )`,
+          [
+            digest("forbidden-hmac"),
+            Buffer.alloc(12, 1),
+            Buffer.alloc(16, 2),
+            Buffer.alloc(128, 3),
+            digest("forbidden-aad"),
+            digest("forbidden-evidence"),
+            digest("forbidden-changer"),
+          ],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
   });
 
   it.each([

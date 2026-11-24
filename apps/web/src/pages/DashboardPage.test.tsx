@@ -185,9 +185,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "blocked",
           environment: "homologation",
+          establishmentContact: "blocked",
           integration: "configured",
           link: "confirmed",
           mutations: "blocked",
+          operatorIdentity: "blocked",
           queries: "blocked",
         }}
         selectedEstablishmentId="store-belem"
@@ -213,9 +215,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "ready",
           environment: "homologation",
+          establishmentContact: "ready",
           integration: "configured",
           link: "confirmed",
           mutations: "blocked",
+          operatorIdentity: "ready",
           queries: "ready",
         }}
         selectedEstablishmentId="store-belem"
@@ -303,9 +307,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "warning",
           environment: "homologation",
+          establishmentContact: "blocked",
           integration: "configured",
           link: "confirmed",
           mutations: "blocked",
+          operatorIdentity: "ready",
           queries: "ready",
         }}
         selectedEstablishmentId="store-belem"
@@ -319,6 +325,10 @@ describe("DashboardPage", () => {
     expect(readiness).toHaveTextContent("Homologação");
     expect(readiness).toHaveTextContent("Configurada");
     expect(readiness).toHaveTextContent("Atenção");
+    expect(readiness).toHaveTextContent("Identidade do operador");
+    expect(readiness).toHaveTextContent("Contato RENAVE do estabelecimento");
+    expect(readiness).toHaveTextContent("Verificada");
+    expect(readiness).toHaveTextContent("Verificação pendente");
     expect(readiness).toHaveTextContent("Liberadas");
     expect(readiness).toHaveTextContent("Mutações RENAVE");
     expect(readiness).toHaveTextContent("Protegidas");
@@ -337,9 +347,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "unavailable",
           environment: "homologation",
+          establishmentContact: "unavailable",
           integration: "configured",
           link: "pending",
           mutations: "blocked",
+          operatorIdentity: "blocked",
           queries: "blocked",
         }}
         selectedEstablishmentId="store-belem"
@@ -362,9 +374,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "warning",
           environment: "homologation",
+          establishmentContact: "blocked",
           integration: "configured",
           link: "pending",
           mutations: "blocked",
+          operatorIdentity: "ready",
           queries: "blocked",
         }}
         selectedEstablishmentId="store-belem"

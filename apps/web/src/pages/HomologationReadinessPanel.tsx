@@ -100,6 +100,37 @@ function linkItem(status: BrowserRenaveReadiness["link"]): ReadinessItem {
   };
 }
 
+function principalItem(
+  label: string,
+  status: BrowserRenaveReadiness["operatorIdentity"],
+): ReadinessItem {
+  if (status === "ready") {
+    return {
+      description:
+        "A fonte verificada necessária está disponível, sem expor o dado protegido.",
+      label,
+      state: "complete",
+      stateLabel: "Verificada",
+    };
+  }
+  if (status === "unavailable") {
+    return {
+      description:
+        "O estado não pôde ser confirmado com segurança nesta verificação.",
+      label,
+      state: "attention",
+      stateLabel: "Indisponível",
+    };
+  }
+  return {
+    description:
+      "A fonte verificada ainda não está pronta para uma operação RENAVE.",
+    label,
+    state: "blocked",
+    stateLabel: "Verificação pendente",
+  };
+}
+
 function readinessItems(
   readiness: BrowserRenaveReadiness,
 ): readonly ReadinessItem[] {
@@ -122,6 +153,11 @@ function readinessItems(
     },
     certificateItem(readiness.certificate),
     linkItem(readiness.link),
+    principalItem("Identidade do operador", readiness.operatorIdentity),
+    principalItem(
+      "Contato RENAVE do estabelecimento",
+      readiness.establishmentContact,
+    ),
     {
       description:
         readiness.queries === "ready"

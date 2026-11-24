@@ -72,9 +72,11 @@ function setup(
     async () => ({
       certificate: "warning",
       environment: "homologation",
+      establishmentContact: "blocked",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
+      operatorIdentity: "ready",
       queries: "ready",
     }),
   );
@@ -154,7 +156,7 @@ describe("rota autenticada de aptidão", () => {
       setup();
     const response = await app.inject({
       method: "GET",
-      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/renave-readiness`,
+      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/renave-readiness?subject=oidc%7Cattacker`,
       headers: { cookie: "renave_session=opaque-session" },
     });
 
@@ -162,13 +164,15 @@ describe("rota autenticada de aptidão", () => {
     expect(response.json()).toEqual({
       certificate: "warning",
       environment: "homologation",
+      establishmentContact: "blocked",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
+      operatorIdentity: "ready",
       queries: "ready",
     });
     expect(response.body).not.toMatch(
-      /cnpj|thumbprint|fingerprint|serial|expires|notAfter|\.pem|\/run\/secrets/iu,
+      /cnpj|cpf|email|thumbprint|fingerprint|serial|expires|notAfter|verifiedAt|version|source|keyId|hmac|cipher|\.pem|\/run\/secrets/iu,
     );
     expect(readinessExecute).toHaveBeenCalledWith({
       establishmentId: ESTABLISHMENT_ID,

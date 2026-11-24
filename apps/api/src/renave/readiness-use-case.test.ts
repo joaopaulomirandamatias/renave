@@ -4,6 +4,8 @@ const db = vi.hoisted(() => ({
   getAuthorizationContext: vi.fn(),
   getCredentialLink: vi.fn(),
   getEstablishment: vi.fn(),
+  getEstablishmentRenaveProfileStatus: vi.fn(),
+  getOperatorIdentityProfileStatus: vi.fn(),
   withTenant: vi.fn(),
 }));
 
@@ -27,7 +29,7 @@ beforeEach(() => {
       _pool: unknown,
       _tenantId: string,
       work: (client: object) => unknown,
-    ) => await work({}),
+    ) => await work({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
   );
   db.getAuthorizationContext.mockResolvedValue({
     grants: [{ establishmentIds: [ESTABLISHMENT_ID], role: "renave_operator" }],
@@ -40,6 +42,8 @@ beforeEach(() => {
     tenantId: TENANT_ID,
   });
   db.getCredentialLink.mockResolvedValue({ status: "confirmed" });
+  db.getOperatorIdentityProfileStatus.mockResolvedValue("verified");
+  db.getEstablishmentRenaveProfileStatus.mockResolvedValue("verified");
 });
 
 describe("prontidão RENAVE sanitizada", () => {
@@ -58,16 +62,20 @@ describe("prontidão RENAVE sanitizada", () => {
     expect(publicCertificateReadiness(false)).toBe("unavailable");
     expect(
       summarizeRenaveReadiness({
+        establishmentContact: "blocked",
         integrationConfigured: false,
         link: "not_started",
+        operatorIdentity: "blocked",
         queryLimiterConfigured: false,
       }),
     ).toEqual({
       certificate: "unavailable",
       environment: "homologation",
+      establishmentContact: "blocked",
       integration: "disabled",
       link: "not_started",
       mutations: "blocked",
+      operatorIdentity: "blocked",
       queries: "blocked",
     });
   });
@@ -78,16 +86,20 @@ describe("prontidão RENAVE sanitizada", () => {
       expect(
         summarizeRenaveReadiness({
           certificateStatus: "expiring_30d",
+          establishmentContact: "ready",
           integrationConfigured: true,
           link,
+          operatorIdentity: "ready",
           queryLimiterConfigured: true,
         }),
       ).toEqual({
         certificate: "warning",
         environment: "homologation",
+        establishmentContact: "ready",
         integration: "configured",
         link,
         mutations: "blocked",
+        operatorIdentity: "ready",
         queries: "ready",
       });
     },
@@ -103,8 +115,10 @@ describe("prontidão RENAVE sanitizada", () => {
       expect(
         summarizeRenaveReadiness({
           certificateStatus,
+          establishmentContact: "blocked",
           integrationConfigured: true,
           link,
+          operatorIdentity: "blocked",
           queryLimiterConfigured,
         }).queries,
       ).toBe("blocked");
@@ -137,7 +151,81 @@ describe("prontidão RENAVE sanitizada", () => {
     expect(db.getAuthorizationContext).toHaveBeenCalledOnce();
     expect(db.getEstablishment).toHaveBeenCalledOnce();
     expect(db.getCredentialLink).toHaveBeenCalledOnce();
+    expect(db.getOperatorIdentityProfileStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      SUBJECT,
+    );
+    expect(db.getEstablishmentRenaveProfileStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      ESTABLISHMENT_ID,
+    );
     expect(temporalStatus).toHaveBeenCalledOnce();
+  });
+
+  it.each(["pending", "suspended"] as const)(
+    "projeta perfil interno %s somente como bloqueado",
+    async (status) => {
+      db.getOperatorIdentityProfileStatus.mockResolvedValueOnce(status);
+      const useCase = new PostgresRenaveReadinessUseCase({
+        integrationConfigured: true,
+        pool: {} as never,
+        queryLimiterConfigured: true,
+      });
+
+      await expect(
+        useCase.execute({
+          establishmentId: ESTABLISHMENT_ID,
+          subject: SUBJECT,
+          tenantId: TENANT_ID,
+        }),
+      ).resolves.toMatchObject({ operatorIdentity: "blocked" });
+    },
+  );
+
+  it("projeta perfis ausentes como bloqueados sem inventar metadados", async () => {
+    db.getOperatorIdentityProfileStatus.mockResolvedValueOnce(null);
+    db.getEstablishmentRenaveProfileStatus.mockResolvedValueOnce(null);
+    const useCase = new PostgresRenaveReadinessUseCase({
+      integrationConfigured: true,
+      pool: {} as never,
+      queryLimiterConfigured: true,
+    });
+
+    const result = await useCase.execute({
+      establishmentId: ESTABLISHMENT_ID,
+      subject: SUBJECT,
+      tenantId: TENANT_ID,
+    });
+    expect(result).toMatchObject({
+      establishmentContact: "blocked",
+      operatorIdentity: "blocked",
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /verifiedAt|updatedAt|version|source|keyId|hmac|cipher/iu,
+    );
+  });
+
+  it("isola falhas de capacidade e retorna somente indisponível", async () => {
+    db.getOperatorIdentityProfileStatus.mockRejectedValueOnce(
+      new Error("column envelope_key_id /run/secrets/profile-key"),
+    );
+    const useCase = new PostgresRenaveReadinessUseCase({
+      integrationConfigured: true,
+      pool: {} as never,
+      queryLimiterConfigured: true,
+    });
+
+    const result = await useCase.execute({
+      establishmentId: ESTABLISHMENT_ID,
+      subject: SUBJECT,
+      tenantId: TENANT_ID,
+    });
+    expect(result).toMatchObject({
+      establishmentContact: "ready",
+      operatorIdentity: "unavailable",
+      mutations: "blocked",
+    });
+    expect(JSON.stringify(result)).not.toMatch(/envelope|secret|profile-key/iu);
   });
 
   it("nega contexto de outro tenant antes de consultar a loja ou certificado", async () => {
@@ -168,6 +256,8 @@ describe("prontidão RENAVE sanitizada", () => {
     });
     expect(db.getEstablishment).not.toHaveBeenCalled();
     expect(db.getCredentialLink).not.toHaveBeenCalled();
+    expect(db.getOperatorIdentityProfileStatus).not.toHaveBeenCalled();
+    expect(db.getEstablishmentRenaveProfileStatus).not.toHaveBeenCalled();
     expect(temporalStatus).not.toHaveBeenCalled();
   });
 
@@ -197,6 +287,8 @@ describe("prontidão RENAVE sanitizada", () => {
     ).rejects.toMatchObject({ code: "AUTHORIZATION_DENIED" });
     expect(db.getEstablishment).not.toHaveBeenCalled();
     expect(db.getCredentialLink).not.toHaveBeenCalled();
+    expect(db.getOperatorIdentityProfileStatus).not.toHaveBeenCalled();
+    expect(db.getEstablishmentRenaveProfileStatus).not.toHaveBeenCalled();
   });
 
   it("falha fechada se a leitura temporal local lançar erro", async () => {
@@ -218,9 +310,11 @@ describe("prontidão RENAVE sanitizada", () => {
     ).resolves.toEqual({
       certificate: "blocked",
       environment: "homologation",
+      establishmentContact: "ready",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
+      operatorIdentity: "ready",
       queries: "blocked",
     });
   });

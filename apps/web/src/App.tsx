@@ -71,9 +71,11 @@ export interface BrowserRenaveLink {
 export interface BrowserRenaveReadiness {
   certificate: "ready" | "warning" | "blocked" | "unavailable";
   environment: "homologation";
+  establishmentContact: "ready" | "blocked" | "unavailable";
   integration: "configured" | "disabled";
   link: BrowserRenaveLinkStatus;
   mutations: "blocked";
+  operatorIdentity: "ready" | "blocked" | "unavailable";
   queries: "ready" | "blocked";
 }
 
@@ -323,14 +325,19 @@ const renaveQueryReadiness = new Set<BrowserRenaveReadiness["queries"]>([
   "ready",
   "blocked",
 ]);
+const renavePrincipalReadiness = new Set<
+  BrowserRenaveReadiness["operatorIdentity"]
+>(["ready", "blocked", "unavailable"]);
 
 function parseRenaveReadiness(value: unknown): BrowserRenaveReadiness {
   const expectedKeys = new Set([
     "certificate",
     "environment",
+    "establishmentContact",
     "integration",
     "link",
     "mutations",
+    "operatorIdentity",
     "queries",
   ]);
   if (
@@ -352,6 +359,14 @@ function parseRenaveReadiness(value: unknown): BrowserRenaveReadiness {
     !renaveQueryReadiness.has(
       value.queries as BrowserRenaveReadiness["queries"],
     ) ||
+    typeof value.operatorIdentity !== "string" ||
+    !renavePrincipalReadiness.has(
+      value.operatorIdentity as BrowserRenaveReadiness["operatorIdentity"],
+    ) ||
+    typeof value.establishmentContact !== "string" ||
+    !renavePrincipalReadiness.has(
+      value.establishmentContact as BrowserRenaveReadiness["establishmentContact"],
+    ) ||
     value.mutations !== "blocked"
   ) {
     throw new Error("Resposta de prontidão RENAVE inválida");
@@ -359,9 +374,13 @@ function parseRenaveReadiness(value: unknown): BrowserRenaveReadiness {
   return {
     certificate: value.certificate as BrowserRenaveReadiness["certificate"],
     environment: "homologation",
+    establishmentContact:
+      value.establishmentContact as BrowserRenaveReadiness["establishmentContact"],
     integration: value.integration as BrowserRenaveReadiness["integration"],
     link: value.link as BrowserRenaveLinkStatus,
     mutations: "blocked",
+    operatorIdentity:
+      value.operatorIdentity as BrowserRenaveReadiness["operatorIdentity"],
     queries: value.queries as BrowserRenaveReadiness["queries"],
   };
 }

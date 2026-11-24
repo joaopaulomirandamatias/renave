@@ -6,8 +6,12 @@ import {
   getAuthorizationContext,
   getCredentialLink,
   getEstablishment,
+  getEstablishmentRenaveProfileStatus,
+  getOperatorIdentityProfileStatus,
   withTenant,
   type CredentialLinkStatus,
+  type RenaveProfileStatusValue,
+  type TenantClient,
 } from "@seu-renave/db";
 import type { MtlsCertificateTemporalStatus } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
@@ -22,13 +26,16 @@ const READY_LINK_STATUSES = new Set<CredentialLinkStatus>([
 
 export type PublicCertificateReadiness =
   "ready" | "warning" | "blocked" | "unavailable";
+export type PublicPrincipalReadiness = "ready" | "blocked" | "unavailable";
 
 export interface RenaveHomologationReadiness {
   certificate: PublicCertificateReadiness;
   environment: "homologation";
+  establishmentContact: PublicPrincipalReadiness;
   integration: "configured" | "disabled";
   link: PublicRenaveLinkStatus;
   mutations: "blocked";
+  operatorIdentity: PublicPrincipalReadiness;
   queries: "ready" | "blocked";
 }
 
@@ -52,8 +59,10 @@ export function publicCertificateReadiness(
 
 export function summarizeRenaveReadiness(input: {
   certificateStatus?: MtlsCertificateTemporalStatus;
+  establishmentContact: PublicPrincipalReadiness;
   integrationConfigured: boolean;
   link: PublicRenaveLinkStatus;
+  operatorIdentity: PublicPrincipalReadiness;
   queryLimiterConfigured: boolean;
 }): RenaveHomologationReadiness {
   const certificate = publicCertificateReadiness(
@@ -69,11 +78,36 @@ export function summarizeRenaveReadiness(input: {
   return {
     certificate,
     environment: "homologation",
+    establishmentContact: input.establishmentContact,
     integration: input.integrationConfigured ? "configured" : "disabled",
     link: input.link,
     mutations: "blocked",
+    operatorIdentity: input.operatorIdentity,
     queries: queriesReady ? "ready" : "blocked",
   };
+}
+
+function publicPrincipalReadiness(
+  status: RenaveProfileStatusValue | null,
+): PublicPrincipalReadiness {
+  return status === "verified" ? "ready" : "blocked";
+}
+
+async function readProfileWithinSavepoint(
+  client: TenantClient,
+  savepoint: "renave_readiness_establishment" | "renave_readiness_operator",
+  read: () => Promise<RenaveProfileStatusValue | null>,
+): Promise<PublicPrincipalReadiness> {
+  await client.query(`savepoint ${savepoint}`);
+  try {
+    const status = publicPrincipalReadiness(await read());
+    await client.query(`release savepoint ${savepoint}`);
+    return status;
+  } catch {
+    await client.query(`rollback to savepoint ${savepoint}`);
+    await client.query(`release savepoint ${savepoint}`);
+    return "unavailable";
+  }
 }
 
 export class PostgresRenaveReadinessUseCase implements RenaveReadinessUseCase {
@@ -91,7 +125,7 @@ export class PostgresRenaveReadinessUseCase implements RenaveReadinessUseCase {
     subject: string;
     tenantId: string;
   }): Promise<RenaveHomologationReadiness> {
-    const link = await withTenant(
+    const localState = await withTenant(
       this.options.pool,
       input.tenantId,
       async (client) => {
@@ -118,7 +152,23 @@ export class PostgresRenaveReadinessUseCase implements RenaveReadinessUseCase {
         if (!establishment || establishment.status !== "active") {
           throw new AuthorizationDeniedError("ESTABLISHMENT_SCOPE_DENIED");
         }
-        return await getCredentialLink(client, input.establishmentId);
+        const link = await getCredentialLink(client, input.establishmentId);
+        const operatorIdentity = await readProfileWithinSavepoint(
+          client,
+          "renave_readiness_operator",
+          async () =>
+            await getOperatorIdentityProfileStatus(client, input.subject),
+        );
+        const establishmentContact = await readProfileWithinSavepoint(
+          client,
+          "renave_readiness_establishment",
+          async () =>
+            await getEstablishmentRenaveProfileStatus(
+              client,
+              input.establishmentId,
+            ),
+        );
+        return { establishmentContact, link, operatorIdentity };
       },
     );
 
@@ -131,8 +181,10 @@ export class PostgresRenaveReadinessUseCase implements RenaveReadinessUseCase {
 
     return summarizeRenaveReadiness({
       ...(certificateStatus ? { certificateStatus } : {}),
+      establishmentContact: localState.establishmentContact,
       integrationConfigured: this.options.integrationConfigured,
-      link: link?.status ?? "not_started",
+      link: localState.link?.status ?? "not_started",
+      operatorIdentity: localState.operatorIdentity,
       queryLimiterConfigured: this.options.queryLimiterConfigured,
     });
   }
