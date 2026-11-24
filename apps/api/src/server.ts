@@ -1,5 +1,9 @@
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import {
+  createCertificateExpiryMonitor,
+  type CertificateExpiryEvent,
+} from "./renave/certificate-expiry-monitor.js";
 import { createRuntime } from "./runtime.js";
 
 const config = loadConfig();
@@ -25,10 +29,27 @@ const app = buildApp({
     : {}),
   ready: runtime.ready,
 });
-app.addHook("onClose", async () => runtime.close());
+
+function logCertificateEvent(event: CertificateExpiryEvent): void {
+  const { level, ...payload } = event;
+  app.log[level](payload);
+}
+
+const certificateMonitor = runtime.certificateTemporalStatus
+  ? createCertificateExpiryMonitor({
+      emit: logCertificateEvent,
+      readStatus: runtime.certificateTemporalStatus,
+    })
+  : undefined;
+let stopCertificateMonitor: (() => void) | undefined;
+app.addHook("onClose", async () => {
+  stopCertificateMonitor?.();
+  await runtime.close();
+});
 
 try {
   await app.listen({ host: config.host, port: config.port });
+  stopCertificateMonitor = certificateMonitor?.start();
 } catch (error) {
   app.log.error(error);
   await app.close();

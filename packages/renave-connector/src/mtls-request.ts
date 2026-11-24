@@ -22,6 +22,7 @@ export interface PemMtlsMaterial {
 }
 
 export interface HomologationMtlsClient {
+  getCertificateTemporalStatus(now?: Date): MtlsCertificateTemporalStatus;
   close(): void;
   isCertificateValidAt(now?: Date): boolean;
   request: RenaveHttpRequest;
@@ -39,6 +40,18 @@ export type PemMtlsValidationCode =
   | "RENAVE_MTLS_CERT_USAGE_INVALID"
   | "RENAVE_MTLS_KEY_INVALID"
   | "RENAVE_MTLS_KEY_MISMATCH";
+
+export type MtlsCertificateTemporalStatus =
+  | "invalid_clock"
+  | "not_yet_valid"
+  | "healthy"
+  | "expiring_90d"
+  | "expiring_60d"
+  | "expiring_30d"
+  | "expiring_15d"
+  | "expiring_7d"
+  | "expiring_1d"
+  | "expired";
 
 export class PemMtlsProductionBlockedError extends Error {
   readonly code = "PEM_MTLS_PRODUCTION_BLOCKED";
@@ -195,6 +208,27 @@ function isCertificateValidAt(
   );
 }
 
+const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1_000;
+
+function getCertificateTemporalStatus(
+  certificate: X509Certificate,
+  now: Date,
+): MtlsCertificateTemporalStatus {
+  const timestamp = now.getTime();
+  if (!Number.isFinite(timestamp)) return "invalid_clock";
+  if (timestamp < certificate.validFromDate.getTime()) return "not_yet_valid";
+
+  const remainingMilliseconds = certificate.validToDate.getTime() - timestamp;
+  if (remainingMilliseconds <= 0) return "expired";
+  if (remainingMilliseconds <= DAY_IN_MILLISECONDS) return "expiring_1d";
+  if (remainingMilliseconds <= 7 * DAY_IN_MILLISECONDS) return "expiring_7d";
+  if (remainingMilliseconds <= 15 * DAY_IN_MILLISECONDS) return "expiring_15d";
+  if (remainingMilliseconds <= 30 * DAY_IN_MILLISECONDS) return "expiring_30d";
+  if (remainingMilliseconds <= 60 * DAY_IN_MILLISECONDS) return "expiring_60d";
+  if (remainingMilliseconds <= 90 * DAY_IN_MILLISECONDS) return "expiring_90d";
+  return "healthy";
+}
+
 function responseHeaders(
   source: Readonly<Record<string, string | string[] | undefined>>,
 ): Headers {
@@ -297,6 +331,8 @@ export function createHomologationPemMtlsClient(
 
   return {
     close: () => agent.destroy(),
+    getCertificateTemporalStatus: (now = new Date()) =>
+      getCertificateTemporalStatus(certificate, now),
     isCertificateValidAt: (now = new Date()) =>
       isCertificateValidAt(certificate, now),
     request,

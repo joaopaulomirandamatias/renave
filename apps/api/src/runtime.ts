@@ -19,6 +19,7 @@ import {
   HttpRenaveTransport,
   RenaveConnector,
   type HomologationMtlsClient,
+  type MtlsCertificateTemporalStatus,
 } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
 
@@ -39,6 +40,7 @@ import type { TenantDirectory } from "./tenant/routes.js";
 
 export interface AppRuntime {
   close(): Promise<void>;
+  certificateTemporalStatus?: () => MtlsCertificateTemporalStatus;
   ready(): Promise<boolean>;
   eligibility?: PostgresVehicleEligibilityUseCase;
   linkStatus?: PostgresRenaveLinkStatusUseCase;
@@ -214,6 +216,12 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     }
 
     return {
+      ...(mtls
+        ? {
+            certificateTemporalStatus: () =>
+              mtls!.getCertificateTemporalStatus(),
+          }
+        : {}),
       ...(eligibility ? { eligibility } : {}),
       ...(preflight ? { preflight } : {}),
       ...(identity ? { identity } : {}),

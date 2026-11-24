@@ -56,7 +56,9 @@ describe("fundação da API", () => {
       service: "seu-renave-api",
       status: "not_ready",
     });
-    expect(response.body).not.toContain("database");
+    expect(response.body).not.toMatch(
+      /certificate|cnpj|database|expiry|fingerprint|path|serial/iu,
+    );
   });
 
   it("recusa produção sem OIDC", () => {

@@ -51,6 +51,7 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - trilha de auditoria append-only com RLS forçada, hash encadeado serializado por tenant e verificador de adulteração;
 - testes cobrindo fail-closed de autenticação, isolamento multi-tenant, escopo por estabelecimento, reuso concorrente do pool e fallback silencioso de identidade;
 - bancos remotos exigem CA explícita; o startup confirma papéis mínimos e migrations, e readiness consulta os pools sem revelar a dependência indisponível;
+- o certificado mTLS é validado no startup e monitorado durante a execução nas faixas de 90, 60, 30, 15, 7 e 1 dia; cada transição emite um evento sanitizado, a expiração fecha o readiness e a rotação exige reinício controlado para recarregar o material. A deduplicação deste estágio é por processo; o agregador deve deduplicar entre réplicas por serviço, ambiente e faixa, sem identificador sensível;
 - o contrato de runtime compara checksums das migrations e rejeita ownership ou qualquer caminho de `SET ROLE`; proxy direto/CIDRs confiáveis são configuração explícita;
 - ADR 0001 consolidando o modo `INTEGRADORA` e bloqueando produção até confirmação do SERPRO.
 - ADR 0002 definindo reconciliação antes de qualquer repetição de mutação.

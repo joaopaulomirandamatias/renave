@@ -15,6 +15,7 @@ export {
   RenaveMtlsResponseTooLargeError,
   readBoundedResponseBody,
   type HomologationMtlsClient,
+  type MtlsCertificateTemporalStatus,
   type PemMtlsClientOptions,
   type PemMtlsMaterial,
   type PemMtlsValidationCode,

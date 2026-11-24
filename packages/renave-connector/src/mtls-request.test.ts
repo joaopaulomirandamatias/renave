@@ -100,6 +100,9 @@ const material: PemMtlsMaterial = {
 };
 
 const VALID_NOW = new Date("2030-01-01T00:00:00.000Z");
+const CERTIFICATE_VALID_FROM = Date.parse("2026-11-24T01:13:57.000Z");
+const CERTIFICATE_VALID_TO = Date.parse("2036-11-21T01:13:57.000Z");
+const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1_000;
 
 function createClient(candidate: PemMtlsMaterial = material) {
   return createHomologationPemMtlsClient("homologation", candidate, {
@@ -188,6 +191,54 @@ describe("createHomologationPemMtlsClient", () => {
         client.isCertificateValidAt(new Date("2040-01-01T00:00:00Z")),
       ).toBe(false);
       expect(client.isCertificateValidAt(new Date("invalid"))).toBe(false);
+    } finally {
+      client.close();
+    }
+  });
+
+  it.each([
+    ["healthy", 90 * DAY_IN_MILLISECONDS + 1, "healthy"],
+    ["expiring_90d", 90 * DAY_IN_MILLISECONDS, "expiring_90d"],
+    ["expiring_90d", 60 * DAY_IN_MILLISECONDS + 1, "expiring_90d"],
+    ["expiring_60d", 60 * DAY_IN_MILLISECONDS, "expiring_60d"],
+    ["expiring_60d", 30 * DAY_IN_MILLISECONDS + 1, "expiring_60d"],
+    ["expiring_30d", 30 * DAY_IN_MILLISECONDS, "expiring_30d"],
+    ["expiring_30d", 15 * DAY_IN_MILLISECONDS + 1, "expiring_30d"],
+    ["expiring_15d", 15 * DAY_IN_MILLISECONDS, "expiring_15d"],
+    ["expiring_15d", 7 * DAY_IN_MILLISECONDS + 1, "expiring_15d"],
+    ["expiring_7d", 7 * DAY_IN_MILLISECONDS, "expiring_7d"],
+    ["expiring_7d", DAY_IN_MILLISECONDS + 1, "expiring_7d"],
+    ["expiring_1d", DAY_IN_MILLISECONDS, "expiring_1d"],
+    ["expiring_1d", 1, "expiring_1d"],
+    ["expired", 0, "expired"],
+    ["expired", -1, "expired"],
+  ] as const)(
+    "classifica a banda %s com %d ms restantes",
+    (_label, remainingMilliseconds, expected) => {
+      const client = createClient();
+      try {
+        expect(
+          client.getCertificateTemporalStatus(
+            new Date(CERTIFICATE_VALID_TO - remainingMilliseconds),
+          ),
+        ).toBe(expected);
+      } finally {
+        client.close();
+      }
+    },
+  );
+
+  it("separa certificado ainda inválido de relógio inválido", () => {
+    const client = createClient();
+    try {
+      expect(
+        client.getCertificateTemporalStatus(
+          new Date(CERTIFICATE_VALID_FROM - 1),
+        ),
+      ).toBe("not_yet_valid");
+      expect(client.getCertificateTemporalStatus(new Date("invalid"))).toBe(
+        "invalid_clock",
+      );
     } finally {
       client.close();
     }

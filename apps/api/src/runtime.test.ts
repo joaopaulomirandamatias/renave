@@ -32,4 +32,18 @@ describe("areRuntimeDependenciesReady", () => {
     ).toBe(false);
     expect(isCertificateValidAt).toHaveBeenCalledWith(now);
   });
+
+  it("mantém readiness enquanto o certificado válido está em faixa de aviso", () => {
+    const now = new Date("2030-01-01T00:00:00.000Z");
+    const isCertificateValidAt = vi.fn(() => true);
+
+    expect(
+      areRuntimeDependenciesReady({
+        databasesReady: true,
+        mtls: { isCertificateValidAt },
+        now,
+      }),
+    ).toBe(true);
+    expect(isCertificateValidAt).toHaveBeenCalledWith(now);
+  });
 });
