@@ -7,6 +7,7 @@ import {
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
   PROFILE_PROVISIONER_ROLE,
+  PROFILE_READER_ROLE,
   isLoopbackUrl,
   requireEnv,
   withCredentials,
@@ -26,12 +27,13 @@ import { createPool } from "./tenant-context.js";
 
 const USAGE = `Uso: pnpm --filter @seu-renave/db cli <comando>
 
-  bootstrap    Cria/atualiza ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE} e ${PROFILE_PROVISIONER_ROLE} (idempotente; rotaciona senhas).
+  bootstrap    Cria/atualiza ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE} e ${PROFILE_READER_ROLE} (idempotente; rotaciona senhas).
                Requer: DATABASE_ADMIN_URL, RENAVE_DB_MIGRATOR_PASSWORD,
                RENAVE_DB_APP_PASSWORD, RENAVE_DB_IDENTITY_APP_PASSWORD,
                RENAVE_DB_MAINTENANCE_APP_PASSWORD,
                RENAVE_DB_OPERATION_WORKER_PASSWORD,
-               RENAVE_DB_PROFILE_PROVISIONER_PASSWORD
+               RENAVE_DB_PROFILE_PROVISIONER_PASSWORD,
+               RENAVE_DB_PROFILE_READER_PASSWORD
   migrate      Aplica as migrations pendentes como ${MIGRATOR_ROLE}.
                Requer: DATABASE_MIGRATOR_URL
   purge-identity
@@ -102,9 +104,10 @@ async function main(command: string | undefined): Promise<void> {
         profileProvisionerPassword: requireEnv(
           "RENAVE_DB_PROFILE_PROVISIONER_PASSWORD",
         ),
+        profileReaderPassword: requireEnv("RENAVE_DB_PROFILE_READER_PASSWORD"),
       });
       console.log(
-        `Papéis ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE} e ${PROFILE_PROVISIONER_ROLE} prontos.`,
+        `Papéis ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE} e ${PROFILE_READER_ROLE} prontos.`,
       );
       return;
     }
@@ -213,6 +216,7 @@ async function main(command: string | undefined): Promise<void> {
         maintenanceAppPassword: LOCAL_DEFAULTS.maintenanceAppPassword,
         operationWorkerPassword: LOCAL_DEFAULTS.operationWorkerPassword,
         profileProvisionerPassword: LOCAL_DEFAULTS.profileProvisionerPassword,
+        profileReaderPassword: LOCAL_DEFAULTS.profileReaderPassword,
       });
       const migratorUrl = withCredentials(
         adminUrl,
@@ -238,7 +242,10 @@ async function main(command: string | undefined): Promise<void> {
         `OPERATION_WORKER_DATABASE_URL=${withCredentials(adminUrl, OPERATION_WORKER_ROLE, LOCAL_DEFAULTS.operationWorkerPassword)}`,
       );
       console.log(
-        `PROFILE_PROVISIONER_DATABASE_URL=${withCredentials(adminUrl, PROFILE_PROVISIONER_ROLE, LOCAL_DEFAULTS.profileProvisionerPassword)}`,
+        `DATABASE_PROFILE_PROVISIONER_URL=${withCredentials(adminUrl, PROFILE_PROVISIONER_ROLE, LOCAL_DEFAULTS.profileProvisionerPassword)}`,
+      );
+      console.log(
+        `DATABASE_PROFILE_READER_URL=${withCredentials(adminUrl, PROFILE_READER_ROLE, LOCAL_DEFAULTS.profileReaderPassword)}`,
       );
       return;
     }

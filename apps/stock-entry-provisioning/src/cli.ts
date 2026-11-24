@@ -6,7 +6,10 @@ import { generateBundleFile } from "./bundle-writer.js";
 import { StockEntryProvisioningError } from "./errors.js";
 import { destroyProfileAdminMasterKey } from "./profile-admin-key.js";
 import { generateProfileAdminKeyFile } from "./profile-admin-key-writer.js";
-import { withProfileProvisioningDatabase } from "./profile-provisioner.js";
+import {
+  withProfileProvisioningDatabase,
+  withProfileStatusDatabase,
+} from "./profile-provisioner.js";
 import {
   assertPinConfirmation,
   inspectPinWithClient,
@@ -53,6 +56,13 @@ const PROFILE_COMMANDS = new Set([
   "suspend-operator",
 ]);
 
+const PROFILE_MUTATION_COMMANDS = new Set([
+  "stage-establishment",
+  "stage-operator",
+  "suspend-establishment",
+  "suspend-operator",
+]);
+
 const PROFILE_OUTPUT_COMMANDS = new Set([
   ...PROFILE_COMMANDS,
   "generate-profile-admin-key",
@@ -70,6 +80,7 @@ interface CliDependencies {
   readProfileStatusSecrets: typeof readProfileStatusSecrets;
   readSecrets: typeof readStockEntryProvisioningSecrets;
   withProfileDatabase: typeof withProfileProvisioningDatabase;
+  withProfileStatusDatabase: typeof withProfileStatusDatabase;
 }
 
 const defaults: CliDependencies = {
@@ -79,6 +90,7 @@ const defaults: CliDependencies = {
   readProfileStatusSecrets,
   readSecrets: readStockEntryProvisioningSecrets,
   withProfileDatabase: withProfileProvisioningDatabase,
+  withProfileStatusDatabase,
 };
 
 function options(
@@ -210,8 +222,8 @@ export async function runCli(input: {
     if (command === "profile-status") {
       options(rest, []);
       const secrets = await dependencies.readProfileStatusSecrets();
-      const databaseUrl = requiredEnv(env, "DATABASE_PROFILE_PROVISIONER_URL");
-      const profile = await dependencies.withProfileDatabase({
+      const databaseUrl = requiredEnv(env, "DATABASE_PROFILE_READER_URL");
+      const profile = await dependencies.withProfileStatusDatabase({
         databaseCa: secrets.databaseCa,
         databaseUrl,
         request: secrets.request,
@@ -223,12 +235,15 @@ export async function runCli(input: {
       });
       return 0;
     }
-    if (PROFILE_COMMANDS.has(command)) {
+    if (PROFILE_MUTATION_COMMANDS.has(command)) {
       options(rest, []);
       const secrets = await dependencies.readProfileSecrets();
       let databaseOwnsSecrets = false;
       try {
-        if (secrets.request.command !== command) {
+        if (
+          secrets.request.command === "profile-status" ||
+          secrets.request.command !== command
+        ) {
           throw new StockEntryProvisioningError("PROFILE_INPUT_INVALID");
         }
         const databaseUrl = requiredEnv(

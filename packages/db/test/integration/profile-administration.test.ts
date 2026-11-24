@@ -11,6 +11,7 @@ import {
 } from "../../src/establishments.js";
 import {
   assertProfileProvisionerSession,
+  assertProfileReaderSession,
   getAdminEstablishmentRenaveProfileStatus,
   getAdminOperatorRenaveProfileStatus,
   stageEstablishmentRenaveProfile,
@@ -27,8 +28,10 @@ const urls = inject("dbUrls");
 const SUBJECT = "oidc|profile-admin-operator";
 
 let appPool: Pool;
+let adminPool: Pool;
 let migratorPool: Pool;
 let provisionerPool: Pool;
+let readerPool: Pool;
 let tenant: Tenant;
 let establishment: Establishment;
 
@@ -53,8 +56,10 @@ function envelope(label: string, size: 128 | 512): ProfileEnvelopeInput {
 
 beforeAll(async () => {
   appPool = createPool(urls.app, { max: 2 });
+  adminPool = createPool(urls.admin, { max: 1 });
   migratorPool = createPool(urls.migrator, { max: 2 });
   provisionerPool = createPool(urls.profileProvisioner, { max: 4 });
+  readerPool = createPool(urls.profileReader, { max: 4 });
   tenant = await provisionTenant(migratorPool, {
     displayName: "Profile administration",
     slug: "profile-administration",
@@ -79,8 +84,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await Promise.all([
     appPool?.end(),
+    adminPool?.end(),
     migratorPool?.end(),
     provisionerPool?.end(),
+    readerPool?.end(),
   ]);
 });
 
@@ -90,12 +97,37 @@ describe("RENAVE profile administration", () => {
       assertProfileProvisionerSession(provisionerPool),
     ).resolves.toBeUndefined();
     await expect(
+      assertProfileReaderSession(readerPool),
+    ).resolves.toBeUndefined();
+    await expect(assertProfileReaderSession(provisionerPool)).rejects.toThrow(
+      "renave_profile_reader",
+    );
+    await expect(assertProfileProvisionerSession(readerPool)).rejects.toThrow(
+      "renave_profile_provisioner",
+    );
+    await expect(
       provisionerPool.query("select * from renave.operator_identity_profile"),
     ).rejects.toMatchObject({ code: "42501" });
     await expect(
       provisionerPool.query(
         "select * from renave.profile_administration_ledger",
       ),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      readerPool.query("select * from renave.operator_identity_profile"),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      readerPool.query(
+        "select * from renave_admin.stage_operator_pending(null,null,null,null,null,null,null,null,null,null,null,null,null,null,null)",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      provisionerPool.query(
+        "select * from renave_admin.get_operator_status(null,null)",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      readerPool.query("set role renave_profile_provisioner"),
     ).rejects.toMatchObject({ code: "42501" });
   });
 
@@ -126,7 +158,7 @@ describe("RENAVE profile administration", () => {
       }),
     ).rejects.toMatchObject({ code: "23000" });
     await expect(
-      getAdminOperatorRenaveProfileStatus(provisionerPool, tenant.id, SUBJECT),
+      getAdminOperatorRenaveProfileStatus(readerPool, tenant.id, SUBJECT),
     ).resolves.toMatchObject({
       profileId: input.profileId,
       status: "pending",
@@ -149,9 +181,92 @@ describe("RENAVE profile administration", () => {
     expect(counts).toEqual({ history: "1", ledger: "1", verified: "0" });
   });
 
+  it("mantém ACLs exclusivas e detecta membership entre papéis", async () => {
+    const privileges = await migratorPool.query<{
+      provisioner_can_status: boolean;
+      reader_can_stage: boolean;
+      reader_can_status: boolean;
+    }>(`select
+      has_function_privilege('renave_profile_provisioner',
+        'renave_admin.get_operator_status(uuid,text)','EXECUTE') as provisioner_can_status,
+      has_function_privilege('renave_profile_reader',
+        'renave_admin.stage_operator_pending(uuid,text,uuid,text,bytea,integer,text,bytea,bytea,bytea,bytea,bytea,text,bytea,text)','EXECUTE') as reader_can_stage,
+      has_function_privilege('renave_profile_reader',
+        'renave_admin.get_operator_status(uuid,text)','EXECUTE') as reader_can_status`);
+    expect(privileges.rows[0]).toEqual({
+      provisioner_can_status: false,
+      reader_can_stage: false,
+      reader_can_status: true,
+    });
+
+    await adminPool.query(
+      "grant renave_profile_reader to renave_profile_provisioner",
+    );
+    try {
+      await expect(
+        appPool.query("select renave_runtime.api_contract_ready() as ready"),
+      ).resolves.toMatchObject({ rows: [{ ready: false }] });
+      await expect(
+        getAdminOperatorRenaveProfileStatus(readerPool, tenant.id, SUBJECT),
+      ).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await adminPool.query(
+        "revoke renave_profile_reader from renave_profile_provisioner",
+      );
+    }
+    await expect(
+      appPool.query("select renave_runtime.api_contract_ready() as ready"),
+    ).resolves.toMatchObject({ rows: [{ ready: true }] });
+  });
+
+  it("nega CREATE e TEMP de banco e bloqueia os dois guards", async () => {
+    const database = (
+      await adminPool.query<{ quoted: string }>(
+        "select quote_ident(current_database()) as quoted",
+      )
+    ).rows[0]!.quoted;
+    const cases = [
+      { privilege: "create", role: "renave_profile_reader" },
+      { privilege: "temporary", role: "renave_profile_provisioner" },
+    ] as const;
+
+    for (const item of cases) {
+      await adminPool.query(
+        `grant ${item.privilege} on database ${database} to ${item.role}`,
+      );
+      try {
+        await expect(
+          appPool.query("select renave_runtime.api_contract_ready() as ready"),
+        ).resolves.toMatchObject({ rows: [{ ready: false }] });
+        await expect(
+          getAdminOperatorRenaveProfileStatus(readerPool, tenant.id, SUBJECT),
+        ).rejects.toMatchObject({ code: "42501" });
+        await expect(
+          stageOperatorRenaveProfile(provisionerPool, {
+            tenantId: tenant.id,
+            subject: SUBJECT,
+            profileId: randomUUID(),
+            hmacKeyId: "cpf-hmac-v1",
+            identityHmac: digest(`db-privilege:${item.privilege}`),
+            envelope: envelope(`db-${item.privilege}`, 128),
+            assertion: keyed(`db-privilege:${item.privilege}:assertion`),
+            changedBy: keyed(`db-privilege:${item.privilege}:actor`),
+          }),
+        ).rejects.toMatchObject({ code: "42501" });
+      } finally {
+        await adminPool.query(
+          `revoke ${item.privilege} on database ${database} from ${item.role}`,
+        );
+      }
+      await expect(
+        appPool.query("select renave_runtime.api_contract_ready() as ready"),
+      ).resolves.toMatchObject({ rows: [{ ready: true }] });
+    }
+  });
+
   it("suspende com versão esperada, replay exato e conflito sem escrita", async () => {
     const before = await getAdminOperatorRenaveProfileStatus(
-      provisionerPool,
+      readerPool,
       tenant.id,
       SUBJECT,
     );
@@ -241,7 +356,7 @@ describe("RENAVE profile administration", () => {
     ).rejects.toMatchObject({ code: "23000" });
     await expect(
       getAdminEstablishmentRenaveProfileStatus(
-        provisionerPool,
+        readerPool,
         tenant.id,
         establishment.id,
       ),
@@ -320,14 +435,10 @@ describe("RENAVE profile administration", () => {
     try {
       const blockedCalls = [
         () =>
-          getAdminOperatorRenaveProfileStatus(
-            provisionerPool,
-            tenant.id,
-            SUBJECT,
-          ),
+          getAdminOperatorRenaveProfileStatus(readerPool, tenant.id, SUBJECT),
         () =>
           getAdminEstablishmentRenaveProfileStatus(
-            provisionerPool,
+            readerPool,
             tenant.id,
             establishment.id,
           ),

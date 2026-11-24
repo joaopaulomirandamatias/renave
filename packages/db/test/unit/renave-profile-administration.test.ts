@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertProfileProvisionerSession,
+  assertProfileReaderSession,
   stageOperatorRenaveProfile,
 } from "../../src/renave-profile-administration.js";
 
@@ -82,6 +83,35 @@ describe("RENAVE profile administration adapter", () => {
     };
     await expect(assertProfileProvisionerSession(database)).rejects.toThrow(
       "Conexão deve usar exclusivamente",
+    );
+  });
+
+  it("aceita somente sessão reader sem atributos privilegiados", async () => {
+    const database = {
+      async query<T extends QueryResultRow>(): Promise<QueryResult<T>> {
+        return {
+          command: "SELECT",
+          fields: [],
+          oid: 0,
+          rowCount: 1,
+          rows: [
+            {
+              current_role: "renave_profile_reader",
+              session_role: "renave_profile_reader",
+              rolbypassrls: false,
+              rolcreatedb: false,
+              rolcreaterole: false,
+              rolinherit: false,
+              rolreplication: false,
+              rolsuper: false,
+            } as unknown as T,
+          ],
+        };
+      },
+    };
+    await expect(assertProfileReaderSession(database)).resolves.toBeUndefined();
+    await expect(assertProfileProvisionerSession(database)).rejects.toThrow(
+      "renave_profile_provisioner",
     );
   });
 });

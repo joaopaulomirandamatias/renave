@@ -21,15 +21,17 @@ deliberadamente status-only: lê apenas `profile-request.json` e
 `database-ca.pem`; `keys.json` e `profile-admin-key.json` não devem ser montados
 nesse job de consulta.
 
-`DATABASE_PROFILE_PROVISIONER_URL` é a única configuração de conexão e deve
-usar exatamente `renave_profile_provisioner`. O job valida `session_user`,
-`current_user` e os atributos seguros do papel. A URL nunca é impressa.
+Os quatro comandos mutantes exigem `DATABASE_PROFILE_PROVISIONER_URL` com o
+papel exato `renave_profile_provisioner`. `profile-status` exige exclusivamente
+`DATABASE_PROFILE_READER_URL` com `renave_profile_reader`. Não existe fallback
+entre as URLs. Os jobs validam `session_user`, `current_user` e os atributos
+seguros do papel; as URLs nunca são impressas.
 
-Neste ciclo, `status-only` limita os arquivos e a operação da CLI, mas ainda
-usa o mesmo papel de banco que possui `EXECUTE` nas rotinas mutantes. Isole o
-job e sua credencial como administrativos. Uma role dedicada, exclusivamente
-leitora para status, permanece como hardening futuro antes de delegar essa
-consulta a um contexto de menor confiança.
+O reader não executa staging/suspensão nem lê tabelas diretamente, enquanto o
+provisioner não executa as funções de status. Mesmo assim, o reader é global:
+com tenant e target conhecidos, consulta metadados sanitizados de qualquer
+tenant. Mantenha-o em job operacional isolado; não exponha a credencial à API,
+ao navegador ou a contexto de menor confiança.
 
 Nunca coloque CPF, e-mail, request JSON ou chave em argumento, variável de
 ambiente, ticket, chat ou log. O output contém somente identificadores técnicos,
@@ -94,6 +96,11 @@ pnpm stock-entry:profile:status
 pnpm stock-entry:profile:suspend-operator
 pnpm stock-entry:profile:suspend-establishment
 ```
+
+No rollout, crie/rotacione a senha do reader no bootstrap, aplique as migrations
+e só então publique o job com `DATABASE_PROFILE_READER_URL`. Remova a URL do
+provisioner do job de consulta. Publicar a CLI antes da role/migration falha
+fechado; não contorne a falha reutilizando a credencial mutante.
 
 Remova o request do mount ao terminar conforme a política do cofre/orquestrador.
 Não reutilize uma idempotência para outro conteúdo. `replayed: true` significa

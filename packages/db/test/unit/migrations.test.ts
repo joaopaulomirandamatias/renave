@@ -7,8 +7,8 @@ import { loadMigrations, MigrationError } from "../../src/migrate.js";
 describe("loadMigrations", () => {
   it("lê as migrations versionadas em ordem, com checksum estável", async () => {
     const all = await loadMigrations();
-    const first = all.slice(0, -14);
-    const second = (await loadMigrations()).slice(0, -14);
+    const first = all.slice(0, -16);
+    const second = (await loadMigrations()).slice(0, -16);
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
     expect(first.at(-21)?.version).toBe("0024_runtime_contract_stock_query");
@@ -141,124 +141,133 @@ describe("loadMigrations", () => {
     expect(first.at(-1)?.sql).toContain(first.at(-2)?.checksum);
     expect(first.at(-1)?.sql).toContain(first.at(-3)?.checksum);
     expect(first.at(-1)?.sql).toContain("select pg_catalog.count(*) = 11");
-    expect(all.at(-14)?.version).toBe("0045_identity_authentication_assurance");
-    expect(all.at(-14)?.sql).toContain("authentication_context");
-    expect(all.at(-14)?.sql).toContain(
+    expect(all.at(-16)?.version).toBe("0045_identity_authentication_assurance");
+    expect(all.at(-16)?.sql).toContain("authentication_context");
+    expect(all.at(-16)?.sql).toContain(
       "mfa_verified_at_login boolean not null default false",
     );
-    expect(all.at(-14)?.sql).toContain("authentication_context ~ '^[!-~]+$'");
-    expect(all.at(-13)?.version).toBe(
+    expect(all.at(-16)?.sql).toContain("authentication_context ~ '^[!-~]+$'");
+    expect(all.at(-15)?.version).toBe(
       "0046_runtime_contract_identity_assurance",
+    );
+    expect(all.at(-15)?.sql).toContain(all.at(-16)?.checksum);
+    expect(all.at(-15)?.sql).toContain(
+      "reconciliation_projection_preflight_contract_ready_v0044",
+    );
+    expect(all.at(-14)?.version).toBe("0047_tenant_administration");
+    expect(all.at(-14)?.sql).toContain("lock_current_tenant_admin");
+    expect(all.at(-14)?.sql).toContain("admin_mutation_idempotency");
+    expect(all.at(-13)?.version).toBe(
+      "0048_runtime_contract_tenant_administration",
     );
     expect(all.at(-13)?.sql).toContain(all.at(-14)?.checksum);
     expect(all.at(-13)?.sql).toContain(
-      "reconciliation_projection_preflight_contract_ready_v0044",
+      "tenant_administration_catalog_fingerprint_v0048",
     );
-    expect(all.at(-12)?.version).toBe("0047_tenant_administration");
-    expect(all.at(-12)?.sql).toContain("lock_current_tenant_admin");
-    expect(all.at(-12)?.sql).toContain("admin_mutation_idempotency");
+    expect(all.at(-12)?.version).toBe("0049_held_local_operation");
+    expect(all.at(-12)?.sql).toContain("'HELD_LOCAL'");
+    expect(all.at(-12)?.sql).toContain(
+      "create function renave.create_held_local_operation",
+    );
+    expect(all.at(-12)?.sql).toContain(
+      "revoke all on function renave.create_operation_with_outbox",
+    );
+    expect(all.at(-12)?.sql).not.toContain(
+      "insert into renave.operation_outbox",
+    );
     expect(all.at(-11)?.version).toBe(
-      "0048_runtime_contract_tenant_administration",
+      "0050_runtime_contract_held_local_operation",
     );
     expect(all.at(-11)?.sql).toContain(all.at(-12)?.checksum);
     expect(all.at(-11)?.sql).toContain(
-      "tenant_administration_catalog_fingerprint_v0048",
+      "held_local_operation_catalog_fingerprint_v0050",
     );
-    expect(all.at(-10)?.version).toBe("0049_held_local_operation");
-    expect(all.at(-10)?.sql).toContain("'HELD_LOCAL'");
-    expect(all.at(-10)?.sql).toContain(
-      "create function renave.create_held_local_operation",
-    );
-    expect(all.at(-10)?.sql).toContain(
-      "revoke all on function renave.create_operation_with_outbox",
-    );
-    expect(all.at(-10)?.sql).not.toContain(
-      "insert into renave.operation_outbox",
-    );
+    expect(all.at(-10)?.version).toBe("0051_verified_renave_profiles");
+    expect(all.at(-10)?.sql).toContain("operator_identity_profile");
+    expect(all.at(-10)?.sql).toContain("establishment_renave_profile");
+    expect(all.at(-10)?.sql).toContain("reindexar");
+    expect(all.at(-10)?.sql).toContain("aliases");
+    expect(all.at(-10)?.sql).not.toContain("resolve_verified_renave_profiles");
     expect(all.at(-9)?.version).toBe(
-      "0050_runtime_contract_held_local_operation",
+      "0052_runtime_contract_verified_renave_profiles",
     );
     expect(all.at(-9)?.sql).toContain(all.at(-10)?.checksum);
     expect(all.at(-9)?.sql).toContain(
-      "held_local_operation_catalog_fingerprint_v0050",
+      "renave_profiles_catalog_fingerprint_v0052",
     );
-    expect(all.at(-8)?.version).toBe("0051_verified_renave_profiles");
-    expect(all.at(-8)?.sql).toContain("operator_identity_profile");
-    expect(all.at(-8)?.sql).toContain("establishment_renave_profile");
-    expect(all.at(-8)?.sql).toContain("reindexar");
-    expect(all.at(-8)?.sql).toContain("aliases");
-    expect(all.at(-8)?.sql).not.toContain("resolve_verified_renave_profiles");
+    expect(all.at(-8)?.version).toBe(
+      "0053_verified_renave_principal_resolution",
+    );
+    expect(all.at(-8)?.sql).toContain("resolve_verified_renave_principals");
+    expect(all.at(-8)?.sql).toContain("pg_advisory_xact_lock(");
+    expect(all.at(-8)?.sql).not.toContain("pg_advisory_xact_lock_shared");
+    expect(all.at(-8)!.sql.indexOf("250025")).toBeLessThan(
+      all.at(-8)!.sql.indexOf("170017"),
+    );
+    expect(all.at(-8)?.sql).toContain(
+      "resolve_verified_renave_principals(text, uuid, bytea)",
+    );
+    expect(all.at(-8)?.sql).not.toMatch(
+      /insert into renave\.(operation|operation_outbox)/u,
+    );
     expect(all.at(-7)?.version).toBe(
-      "0052_runtime_contract_verified_renave_profiles",
+      "0054_runtime_contract_verified_renave_principal_resolution",
     );
     expect(all.at(-7)?.sql).toContain(all.at(-8)?.checksum);
     expect(all.at(-7)?.sql).toContain(
-      "renave_profiles_catalog_fingerprint_v0052",
+      "renave_principal_resolution_catalog_fingerprint_v0054",
     );
-    expect(all.at(-6)?.version).toBe(
-      "0053_verified_renave_principal_resolution",
+    expect(all.at(-6)?.version).toBe("0055_stock_entry_rate_limit");
+    expect(all.at(-6)?.sql).toContain("consume_stock_entry_rate_limit");
+    expect(all.at(-6)?.sql).toContain(
+      "matches_stock_entry_runtime_key_generation",
     );
-    expect(all.at(-6)?.sql).toContain("resolve_verified_renave_principals");
-    expect(all.at(-6)?.sql).toContain("pg_advisory_xact_lock(");
-    expect(all.at(-6)?.sql).not.toContain("pg_advisory_xact_lock_shared");
-    expect(all.at(-6)!.sql.indexOf("250025")).toBeLessThan(
-      all.at(-6)!.sql.indexOf("170017"),
+    expect(all.at(-6)?.sql).toContain("stock_entry_runtime_key_generation");
+    expect(all.at(-6)?.sql).toContain(
+      "stock_entry_runtime_key_generation_reject_update_delete",
     );
     expect(all.at(-6)?.sql).toContain(
-      "resolve_verified_renave_principals(text, uuid, bytea)",
+      "stock_entry_runtime_key_generation_reject_truncate",
     );
+    expect(all.at(-6)?.sql).toContain("for share");
     expect(all.at(-6)?.sql).not.toMatch(
-      /insert into renave\.(operation|operation_outbox)/u,
+      /insert into renave_runtime\.stock_entry_runtime_key_generation/iu,
     );
+    expect(all.at(-6)?.sql).toContain("global -> tenant -> actor");
+    expect(all.at(-6)!.sql.indexOf("for update;")).toBeLessThan(
+      all.at(-6)!.sql.indexOf("item.scope = 'global'"),
+    );
+    expect(all.at(-6)!.sql.indexOf("item.scope = 'global'")).toBeLessThan(
+      all.at(-6)!.sql.indexOf("limit 100"),
+    );
+    expect(all.at(-6)?.sql).toContain("limit 100");
+    expect(all.at(-6)?.sql).not.toMatch(/grant\s+[^;]*on\s+(table|sequence)/iu);
     expect(all.at(-5)?.version).toBe(
-      "0054_runtime_contract_verified_renave_principal_resolution",
+      "0056_runtime_contract_stock_entry_rate_limit",
     );
     expect(all.at(-5)?.sql).toContain(all.at(-6)?.checksum);
     expect(all.at(-5)?.sql).toContain(
-      "renave_principal_resolution_catalog_fingerprint_v0054",
+      "stock_entry_rate_limit_catalog_fingerprint_v0056",
     );
-    expect(all.at(-4)?.version).toBe("0055_stock_entry_rate_limit");
-    expect(all.at(-4)?.sql).toContain("consume_stock_entry_rate_limit");
-    expect(all.at(-4)?.sql).toContain(
-      "matches_stock_entry_runtime_key_generation",
-    );
-    expect(all.at(-4)?.sql).toContain("stock_entry_runtime_key_generation");
-    expect(all.at(-4)?.sql).toContain(
-      "stock_entry_runtime_key_generation_reject_update_delete",
-    );
-    expect(all.at(-4)?.sql).toContain(
-      "stock_entry_runtime_key_generation_reject_truncate",
-    );
-    expect(all.at(-4)?.sql).toContain("for share");
-    expect(all.at(-4)?.sql).not.toMatch(
-      /insert into renave_runtime\.stock_entry_runtime_key_generation/iu,
-    );
-    expect(all.at(-4)?.sql).toContain("global -> tenant -> actor");
-    expect(all.at(-4)!.sql.indexOf("for update;")).toBeLessThan(
-      all.at(-4)!.sql.indexOf("item.scope = 'global'"),
-    );
-    expect(all.at(-4)!.sql.indexOf("item.scope = 'global'")).toBeLessThan(
-      all.at(-4)!.sql.indexOf("limit 100"),
-    );
-    expect(all.at(-4)?.sql).toContain("limit 100");
-    expect(all.at(-4)?.sql).not.toMatch(/grant\s+[^;]*on\s+(table|sequence)/iu);
+    expect(all.at(-4)?.version).toBe("0057_renave_profile_administration");
+    expect(all.at(-4)?.sql).toContain("profile_administration_ledger");
+    expect(all.at(-4)?.sql).toContain("stage_operator_pending");
+    expect(all.at(-4)?.sql).not.toMatch(/function\s+[^\n]*(verify|promote)/iu);
     expect(all.at(-3)?.version).toBe(
-      "0056_runtime_contract_stock_entry_rate_limit",
+      "0058_runtime_contract_profile_administration",
     );
     expect(all.at(-3)?.sql).toContain(all.at(-4)?.checksum);
     expect(all.at(-3)?.sql).toContain(
-      "stock_entry_rate_limit_catalog_fingerprint_v0056",
-    );
-    expect(all.at(-2)?.version).toBe("0057_renave_profile_administration");
-    expect(all.at(-2)?.sql).toContain("profile_administration_ledger");
-    expect(all.at(-2)?.sql).toContain("stage_operator_pending");
-    expect(all.at(-2)?.sql).not.toMatch(/function\s+[^\n]*(verify|promote)/iu);
-    expect(all.at(-1)?.version).toBe(
-      "0058_runtime_contract_profile_administration",
-    );
-    expect(all.at(-1)?.sql).toContain(all.at(-2)?.checksum);
-    expect(all.at(-1)?.sql).toContain(
       "profile_administration_catalog_fingerprint_v0058",
+    );
+    expect(all.at(-2)?.version).toBe("0059_renave_profile_reader");
+    expect(all.at(-2)?.sql).toContain("assert_profile_reader");
+    expect(all.at(-2)?.sql).toContain("renave_profile_reader");
+    expect(all.at(-1)?.version).toBe("0060_runtime_contract_profile_reader");
+    expect(all.at(-1)?.sql).toContain(all.at(-2)?.checksum);
+    expect(all.at(-1)?.sql).toContain(all.at(-4)?.checksum);
+    expect(all.at(-1)?.sql).toContain(
+      "profile_reader_catalog_fingerprint_v0060",
     );
   });
 

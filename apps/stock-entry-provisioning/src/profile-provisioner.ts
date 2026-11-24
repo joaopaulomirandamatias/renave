@@ -1,4 +1,5 @@
 import {
+  assertProfileReaderSession,
   assertProfileProvisionerSession,
   getAdminEstablishmentRenaveProfileStatus,
   getAdminOperatorRenaveProfileStatus,
@@ -23,7 +24,17 @@ import {
   profileAdminDigest,
   type ProfileAdminMasterKey,
 } from "./profile-admin-key.js";
-import type { ProfileProvisioningRequest } from "./profile-request.js";
+import type {
+  EstablishmentStatusRequest,
+  OperatorStatusRequest,
+  ProfileProvisioningRequest,
+} from "./profile-request.js";
+
+type ProfileStatusRequest = OperatorStatusRequest | EstablishmentStatusRequest;
+type ProfileMutationRequest = Exclude<
+  ProfileProvisioningRequest,
+  ProfileStatusRequest
+>;
 
 export interface ProfileCommandResult {
   profileId?: string;
@@ -96,9 +107,10 @@ function destroyProtected(value: ProtectedRenavePrincipal | undefined): void {
   value.nonce.fill(0);
 }
 
-export function profileProvisioningDatabaseConfig(
+function profileDatabaseConfig(
   connectionString: string,
   databaseCa: string | undefined,
+  applicationName: string,
 ): PoolConfig {
   let url: URL;
   try {
@@ -118,7 +130,7 @@ export function profileProvisioningDatabaseConfig(
     throw new StockEntryProvisioningError("DATABASE_CONFIG_INVALID");
   }
   return {
-    application_name: "seu-renave-profile-provisioning",
+    application_name: applicationName,
     connectionString,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 5_000,
@@ -127,6 +139,28 @@ export function profileProvisioningDatabaseConfig(
     statement_timeout: 5_000,
     ssl: { ca: databaseCa, rejectUnauthorized: true },
   };
+}
+
+export function profileProvisioningDatabaseConfig(
+  connectionString: string,
+  databaseCa: string | undefined,
+): PoolConfig {
+  return profileDatabaseConfig(
+    connectionString,
+    databaseCa,
+    "seu-renave-profile-provisioning",
+  );
+}
+
+export function profileStatusDatabaseConfig(
+  connectionString: string,
+  databaseCa: string | undefined,
+): PoolConfig {
+  return profileDatabaseConfig(
+    connectionString,
+    databaseCa,
+    "seu-renave-profile-status",
+  );
 }
 
 export async function executeProfileCommand(
@@ -280,7 +314,7 @@ export async function withProfileProvisioningDatabase(input: {
   bundle?: StockEntryKeyBundle;
   databaseCa: string | undefined;
   databaseUrl: string;
-  request: ProfileProvisioningRequest;
+  request: ProfileMutationRequest;
 }): Promise<ProfileCommandResult> {
   let pool: Pool | undefined;
   let client: PoolClient | undefined;
@@ -298,5 +332,27 @@ export async function withProfileProvisioningDatabase(input: {
     await pool?.end().catch(() => undefined);
     destroyProfileAdminMasterKey(input.adminKey);
     destroyStockEntryKeyBundle(input.bundle);
+  }
+}
+
+export async function withProfileStatusDatabase(input: {
+  databaseCa: string | undefined;
+  databaseUrl: string;
+  request: ProfileStatusRequest;
+}): Promise<ProfileCommandResult> {
+  let pool: Pool | undefined;
+  let client: PoolClient | undefined;
+  try {
+    pool = new Pool(
+      profileStatusDatabaseConfig(input.databaseUrl, input.databaseCa),
+    );
+    client = await pool.connect();
+    await assertProfileReaderSession(client);
+    return await executeProfileCommand(client, input);
+  } catch (error) {
+    throw provisioningError(error, "PROFILE_PROVISIONING_FAILED");
+  } finally {
+    client?.release(true);
+    await pool?.end().catch(() => undefined);
   }
 }

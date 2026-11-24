@@ -9,6 +9,7 @@ import {
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
   PROFILE_PROVISIONER_ROLE,
+  PROFILE_READER_ROLE,
   isLoopbackUrl,
   withCredentials,
 } from "../../src/config.js";
@@ -23,6 +24,7 @@ export interface DbUrls {
   maintenance: string;
   operationWorker: string;
   profileProvisioner: string;
+  profileReader: string;
 }
 
 declare module "vitest" {
@@ -46,6 +48,7 @@ const TEST_IDENTITY_APP_PASSWORD = "renave_identity_app_it";
 const TEST_MAINTENANCE_APP_PASSWORD = "renave_maintenance_app_it";
 const TEST_OPERATION_WORKER_PASSWORD = "renave_operation_worker_it";
 const TEST_PROFILE_PROVISIONER_PASSWORD = "renave_profile_provisioner_it";
+const TEST_PROFILE_READER_PASSWORD = "renave_profile_reader_it";
 
 export default async function setup(
   project: TestProject,
@@ -79,6 +82,7 @@ export default async function setup(
     maintenanceAppPassword: TEST_MAINTENANCE_APP_PASSWORD,
     operationWorkerPassword: TEST_OPERATION_WORKER_PASSWORD,
     profileProvisionerPassword: TEST_PROFILE_PROVISIONER_PASSWORD,
+    profileReaderPassword: TEST_PROFILE_READER_PASSWORD,
   });
   const migrator = withCredentials(
     admin,
@@ -106,6 +110,11 @@ export default async function setup(
     PROFILE_PROVISIONER_ROLE,
     TEST_PROFILE_PROVISIONER_PASSWORD,
   );
+  const profileReader = withCredentials(
+    admin,
+    PROFILE_READER_ROLE,
+    TEST_PROFILE_READER_PASSWORD,
+  );
   await runMigrations(migrator);
 
   project.provide("dbUrls", {
@@ -116,6 +125,7 @@ export default async function setup(
     maintenance: maintenanceApp,
     operationWorker,
     profileProvisioner,
+    profileReader,
   });
 
   return async () => {

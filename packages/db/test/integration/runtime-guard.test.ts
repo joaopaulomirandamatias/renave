@@ -449,7 +449,8 @@ describe("guard do banco de runtime", () => {
     await adminPool.query(
       `grant temporary on database ${database} to
          renave_app,renave_identity_app,renave_maintenance_app,
-         renave_operation_worker,renave_profile_provisioner`,
+         renave_operation_worker,renave_profile_provisioner,
+         renave_profile_reader`,
     );
     await adminPool.query(
       `grant create on database ${database} to renave_operation_worker`,
@@ -463,6 +464,7 @@ describe("guard do banco de runtime", () => {
       migratorPassword: "renave_migrator_it",
       operationWorkerPassword: "renave_operation_worker_it",
       profileProvisionerPassword: "renave_profile_provisioner_it",
+      profileReaderPassword: "renave_profile_reader_it",
     };
     await bootstrapRoles(options);
     await bootstrapRoles(options);
@@ -493,10 +495,11 @@ describe("guard do banco de runtime", () => {
           "renave_maintenance_app",
           "renave_operation_worker",
           "renave_profile_provisioner",
+          "renave_profile_reader",
         ],
       ],
     );
-    expect(privileges.rows).toHaveLength(5);
+    expect(privileges.rows).toHaveLength(6);
     for (const privilege of privileges.rows) {
       expect(privilege).toMatchObject({
         can_connect: true,

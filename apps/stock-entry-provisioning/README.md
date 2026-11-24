@@ -11,4 +11,6 @@ Os comandos e a cerimônia obrigatória estão em
 Staging, status e suspensão de perfis estão no runbook
 [`docs/ops/renave-profile-administration.md`](../../docs/ops/renave-profile-administration.md).
 Não existe comando de verificação ou promoção; o registro de provedores nasce
-vazio e falha fechado.
+vazio e falha fechado. A consulta de status usa a role read-only
+`renave_profile_reader`; staging e suspensão usam exclusivamente
+`renave_profile_provisioner`.

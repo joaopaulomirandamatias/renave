@@ -178,6 +178,9 @@ describe("CLI de provisionamento HELD_LOCAL", () => {
       throw new Error("não deve ler chaves");
     });
     const withProfileDatabase = vi.fn(async () => ({
+      status: "pending" as const,
+    }));
+    const withProfileStatusDatabase = vi.fn(async () => ({
       status: "not_found" as const,
     }));
     expect(
@@ -196,21 +199,106 @@ describe("CLI de provisionamento HELD_LOCAL", () => {
             },
           }),
           withProfileDatabase,
+          withProfileStatusDatabase,
         },
         env: {
           DATABASE_PROFILE_PROVISIONER_URL:
-            "postgres://profile:secret@database/profiles",
+            "postgres://provisioner:secret@database/profiles",
+          DATABASE_PROFILE_READER_URL:
+            "postgres://reader:reader-secret@database/profiles",
         },
         io: output.io,
       }),
     ).toBe(0);
     expect(readProfileSecrets).not.toHaveBeenCalled();
-    expect(withProfileDatabase).toHaveBeenCalledWith(
+    expect(withProfileDatabase).not.toHaveBeenCalled();
+    expect(withProfileStatusDatabase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        databaseUrl: "postgres://reader:reader-secret@database/profiles",
+      }),
+    );
+    expect(withProfileStatusDatabase).toHaveBeenCalledWith(
       expect.not.objectContaining({ adminKey: expect.anything() }),
     );
-    expect(withProfileDatabase).toHaveBeenCalledWith(
+    expect(withProfileStatusDatabase).toHaveBeenCalledWith(
       expect.not.objectContaining({ bundle: expect.anything() }),
     );
     expect(output.stdout).toEqual(['{"schemaVersion":1,"status":"not_found"}']);
+  });
+
+  it("falha fechado sem URL do reader e nunca reutiliza o provisioner", async () => {
+    const output = capture();
+    const withProfileStatusDatabase = vi.fn();
+    expect(
+      await runCli({
+        args: ["profile-status"],
+        dependencies: {
+          readProfileStatusSecrets: async () => ({
+            databaseCa: "CA",
+            request: {
+              schemaVersion: 1,
+              command: "profile-status",
+              tenantId: "11111111-1111-4111-8111-111111111111",
+              profileKind: "operator",
+              subject: "operator-sensitive-subject",
+            },
+          }),
+          withProfileStatusDatabase,
+        },
+        env: {
+          DATABASE_PROFILE_PROVISIONER_URL:
+            "postgres://provisioner:secret@database/profiles",
+        },
+        io: output.io,
+      }),
+    ).toBe(1);
+    expect(withProfileStatusDatabase).not.toHaveBeenCalled();
+    expect(output.stderr).toEqual([
+      '{"schemaVersion":1,"errorCode":"DATABASE_CONFIG_INVALID"}',
+    ]);
+    expect(output.stderr.join("\n")).not.toContain("secret");
+  });
+
+  it("não reutiliza a URL do reader para comandos mutantes", async () => {
+    const output = capture();
+    const value = bundle();
+    const adminKey = generateProfileAdminMasterKey("profile-admin-v1", (size) =>
+      Buffer.alloc(size, 7),
+    );
+    const withProfileDatabase = vi.fn();
+    expect(
+      await runCli({
+        args: ["stage-operator"],
+        dependencies: {
+          readProfileSecrets: async () => ({
+            adminKey,
+            bundle: value,
+            databaseCa: "CA",
+            request: {
+              schemaVersion: 1,
+              command: "stage-operator",
+              tenantId: "11111111-1111-4111-8111-111111111111",
+              profileId: "33333333-3333-4333-8333-333333333333",
+              subject: "operator-sensitive-subject",
+              cpf: "52998224725",
+              actorSubject: "admin-sensitive-subject",
+              idempotencyKey: "22222222-2222-4222-8222-222222222222",
+            },
+          }),
+          withProfileDatabase,
+        },
+        env: {
+          DATABASE_PROFILE_READER_URL:
+            "postgres://reader:reader-secret@database/profiles",
+        },
+        io: output.io,
+      }),
+    ).toBe(1);
+    expect(withProfileDatabase).not.toHaveBeenCalled();
+    expect(output.stderr).toEqual([
+      '{"schemaVersion":1,"errorCode":"DATABASE_CONFIG_INVALID"}',
+    ]);
+    expect(adminKey.key.every((byte) => byte === 0)).toBe(true);
+    expect(value.digests.actor.every((byte) => byte === 0)).toBe(true);
   });
 });

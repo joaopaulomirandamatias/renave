@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { assertProfileProvisionerSession } from "@seu-renave/db";
+import {
+  assertProfileProvisionerSession,
+  assertProfileReaderSession,
+} from "@seu-renave/db";
 import {
   destroyStockEntryKeyBundle,
   generateStockEntryKeyBundle,
@@ -26,7 +29,8 @@ describe("administração de perfis no PostgreSQL", () => {
     const urls = inject("dbUrls");
     const admin = new Client({ connectionString: urls.admin });
     const profile = new Client({ connectionString: urls.profileProvisioner });
-    await Promise.all([admin.connect(), profile.connect()]);
+    const reader = new Client({ connectionString: urls.profileReader });
+    await Promise.all([admin.connect(), profile.connect(), reader.connect()]);
     const tenantId = randomUUID();
     const profileId = randomUUID();
     const subject = `operator-${randomUUID()}`;
@@ -46,7 +50,11 @@ describe("administração de perfis no PostgreSQL", () => {
         [tenantId, subject],
       );
       await assertProfileProvisionerSession(profile);
+      await assertProfileReaderSession(reader);
+      await expect(assertProfileReaderSession(profile)).rejects.toThrow();
+      await expect(assertProfileProvisionerSession(reader)).rejects.toThrow();
       const client = profile as unknown as PoolClient;
+      const readerClient = reader as unknown as PoolClient;
       const stage = {
         schemaVersion: 1 as const,
         command: "stage-operator" as const,
@@ -82,7 +90,7 @@ describe("administração de perfis no PostgreSQL", () => {
         replayed: true,
       });
       expect(
-        await executeProfileCommand(client, {
+        await executeProfileCommand(readerClient, {
           request: {
             schemaVersion: 1,
             command: "profile-status",
@@ -92,6 +100,24 @@ describe("administração de perfis no PostgreSQL", () => {
           },
         }),
       ).toEqual({ profileId, status: "pending", version: 1 });
+      await expect(
+        executeProfileCommand(client, {
+          request: {
+            schemaVersion: 1,
+            command: "profile-status",
+            tenantId,
+            profileKind: "operator",
+            subject,
+          },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        executeProfileCommand(readerClient, {
+          adminKey,
+          bundle: value,
+          request: stage,
+        }),
+      ).rejects.toThrow();
       const suspend = {
         schemaVersion: 1 as const,
         command: "suspend-operator" as const,
@@ -137,7 +163,7 @@ describe("administração de perfis no PostgreSQL", () => {
     } finally {
       destroyProfileAdminMasterKey(adminKey);
       destroyStockEntryKeyBundle(value);
-      await Promise.all([admin.end(), profile.end()]);
+      await Promise.all([admin.end(), profile.end(), reader.end()]);
     }
   });
 });

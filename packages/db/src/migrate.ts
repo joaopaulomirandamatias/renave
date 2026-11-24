@@ -7,6 +7,7 @@ import {
   DEFAULT_MIGRATIONS_DIR,
   IDENTITY_APP_ROLE,
   PROFILE_PROVISIONER_ROLE,
+  PROFILE_READER_ROLE,
   SCHEMA,
 } from "./config.js";
 
@@ -81,13 +82,21 @@ export async function runMigrations(
 
     const roles = await client.query<{ rolname: string }>(
       "select rolname from pg_roles where rolname = any($1::text[]) order by rolname",
-      [[APP_ROLE, IDENTITY_APP_ROLE, PROFILE_PROVISIONER_ROLE]],
+      [
+        [
+          APP_ROLE,
+          IDENTITY_APP_ROLE,
+          PROFILE_PROVISIONER_ROLE,
+          PROFILE_READER_ROLE,
+        ],
+      ],
     );
     const existingRoles = new Set(roles.rows.map(({ rolname }) => rolname));
     const missingRoles = [
       APP_ROLE,
       IDENTITY_APP_ROLE,
       PROFILE_PROVISIONER_ROLE,
+      PROFILE_READER_ROLE,
     ].filter((role) => !existingRoles.has(role));
     if (missingRoles.length > 0) {
       throw new MigrationError(

@@ -8,6 +8,7 @@ declare module "vitest" {
       migrator: string;
       operationWorker: string;
       profileProvisioner: string;
+      profileReader: string;
     };
   }
 }

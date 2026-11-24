@@ -1,5 +1,5 @@
 import type { QueryResult, QueryResultRow } from "pg";
-import { PROFILE_PROVISIONER_ROLE } from "./config.js";
+import { PROFILE_PROVISIONER_ROLE, PROFILE_READER_ROLE } from "./config.js";
 
 interface Queryable {
   query<T extends QueryResultRow>(
@@ -154,8 +154,9 @@ function mapStatusRow(
   };
 }
 
-export async function assertProfileProvisionerSession(
+async function assertProfileSession(
   database: Queryable,
+  expectedRole: typeof PROFILE_PROVISIONER_ROLE | typeof PROFILE_READER_ROLE,
 ): Promise<void> {
   const result = await database.query<{
     current_role: string;
@@ -175,8 +176,8 @@ export async function assertProfileProvisionerSession(
   );
   const row = result.rows[0];
   if (
-    row?.current_role !== PROFILE_PROVISIONER_ROLE ||
-    row.session_role !== PROFILE_PROVISIONER_ROLE ||
+    row?.current_role !== expectedRole ||
+    row.session_role !== expectedRole ||
     row.rolsuper ||
     row.rolbypassrls ||
     row.rolcreatedb ||
@@ -185,9 +186,21 @@ export async function assertProfileProvisionerSession(
     row.rolreplication
   ) {
     throw new RenaveProfileAdministrationContractError(
-      `Conexão deve usar exclusivamente o papel ${PROFILE_PROVISIONER_ROLE}.`,
+      `Conexão deve usar exclusivamente o papel ${expectedRole}.`,
     );
   }
+}
+
+export async function assertProfileProvisionerSession(
+  database: Queryable,
+): Promise<void> {
+  await assertProfileSession(database, PROFILE_PROVISIONER_ROLE);
+}
+
+export async function assertProfileReaderSession(
+  database: Queryable,
+): Promise<void> {
+  await assertProfileSession(database, PROFILE_READER_ROLE);
 }
 
 export async function stageOperatorRenaveProfile(

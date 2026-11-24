@@ -41,6 +41,7 @@ export {
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
   PROFILE_PROVISIONER_ROLE,
+  PROFILE_READER_ROLE,
   SCHEMA,
   TENANT_SETTING,
   isLoopbackUrl,
@@ -123,6 +124,7 @@ export {
 } from "./renave-profiles.js";
 export {
   assertProfileProvisionerSession,
+  assertProfileReaderSession,
   getAdminEstablishmentRenaveProfileStatus,
   getAdminOperatorRenaveProfileStatus,
   stageEstablishmentRenaveProfile,
