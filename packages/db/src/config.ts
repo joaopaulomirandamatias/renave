@@ -8,6 +8,8 @@ export const APP_ROLE = "renave_app";
 export const IDENTITY_APP_ROLE = "renave_identity_app";
 /** Papel do job operacional; apenas EXECUTE em rotinas fechadas de manutenção. */
 export const MAINTENANCE_APP_ROLE = "renave_maintenance_app";
+/** Papel exclusivo do worker de operações; somente EXECUTE em rotinas fechadas. */
+export const OPERATION_WORKER_ROLE = "renave_operation_worker";
 /** Esquema de negócio e do ledger de migrations. */
 export const SCHEMA = "renave";
 /** GUC transacional com o tenant ativo, lido por `renave.current_tenant_id()`. */
@@ -40,6 +42,7 @@ export const LOCAL_DEFAULTS = {
   appPassword: "renave_app_local",
   identityAppPassword: "renave_identity_app_local",
   maintenanceAppPassword: "renave_maintenance_app_local",
+  operationWorkerPassword: "renave_operation_worker_local",
 } as const;
 
 export function isLoopbackUrl(connectionString: string): boolean {

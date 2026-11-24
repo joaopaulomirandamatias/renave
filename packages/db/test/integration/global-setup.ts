@@ -8,6 +8,7 @@ import {
   LOCAL_DEFAULTS,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
+  OPERATION_WORKER_ROLE,
   isLoopbackUrl,
   withCredentials,
 } from "../../src/config.js";
@@ -19,6 +20,7 @@ export interface DbUrls {
   app: string;
   identity: string;
   maintenance: string;
+  operationWorker: string;
 }
 
 declare module "vitest" {
@@ -40,6 +42,7 @@ const TEST_MIGRATOR_PASSWORD = "renave_migrator_it";
 const TEST_APP_PASSWORD = "renave_app_it";
 const TEST_IDENTITY_APP_PASSWORD = "renave_identity_app_it";
 const TEST_MAINTENANCE_APP_PASSWORD = "renave_maintenance_app_it";
+const TEST_OPERATION_WORKER_PASSWORD = "renave_operation_worker_it";
 
 export default async function setup(
   project: TestProject,
@@ -71,6 +74,7 @@ export default async function setup(
     appPassword: TEST_APP_PASSWORD,
     identityAppPassword: TEST_IDENTITY_APP_PASSWORD,
     maintenanceAppPassword: TEST_MAINTENANCE_APP_PASSWORD,
+    operationWorkerPassword: TEST_OPERATION_WORKER_PASSWORD,
   });
   const migrator = withCredentials(
     admin,
@@ -88,6 +92,11 @@ export default async function setup(
     MAINTENANCE_APP_ROLE,
     TEST_MAINTENANCE_APP_PASSWORD,
   );
+  const operationWorker = withCredentials(
+    admin,
+    OPERATION_WORKER_ROLE,
+    TEST_OPERATION_WORKER_PASSWORD,
+  );
   await runMigrations(migrator);
 
   project.provide("dbUrls", {
@@ -96,6 +105,7 @@ export default async function setup(
     app,
     identity,
     maintenance: maintenanceApp,
+    operationWorker,
   });
 
   return async () => {

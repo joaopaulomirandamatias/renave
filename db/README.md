@@ -11,7 +11,7 @@ SQL versionado em `db/migrations/`; runner, helpers e testes em `packages/db`
 | `pnpm db:up` / `pnpm db:down`                     | Sobe/derruba o Postgres 17 do `compose.yaml` (`127.0.0.1:54317`, banco `renave`).                                          |
 | `pnpm db:setup:local`                             | `bootstrap` + `migrate` no Postgres local, com valores de dev **não secretos**. Recusa host fora de loopback.              |
 | `pnpm db:reset`                                   | Apaga o volume, sobe de novo e roda `db:setup:local`.                                                                      |
-| `pnpm db:bootstrap`                               | Cria/atualiza os papéis (idempotente; rotaciona senhas). Requer `DATABASE_ADMIN_URL` e as senhas de migrator, app, identity app e maintenance app.                         |
+| `pnpm db:bootstrap`                               | Cria/atualiza os papéis (idempotente; rotaciona senhas). Requer `DATABASE_ADMIN_URL` e as senhas de migrator, app, identity app, maintenance app e operation worker.       |
 | `pnpm db:migrate`                                 | Aplica migrations pendentes como migrator. Requer `DATABASE_MIGRATOR_URL`.                                                 |
 | `pnpm db:purge-identity`                          | Remove tentativas e sessões OIDC expiradas em um lote. Requer `IDENTITY_DATABASE_URL`; indicado para agendamento periódico. |
 | `pnpm db:scan-evidence`                           | Detecta evidências pendentes acima do SLA em lote, sem alterar a prova. Requer `MAINTENANCE_DATABASE_URL`.                   |
@@ -33,6 +33,7 @@ existem depois do `bootstrap`.
 | `renave_app`      | Runtime da API.                                                                     | `NOSUPERUSER`, `NOBYPASSRLS`, `NOINHERIT`, não é dono nem membro do migrator, sem `CREATE`. DML mínimo; sem `DELETE`/`TRUNCATE`. |
 | `renave_identity_app` | Runtime isolado do armazenamento OIDC.                                          | Sem acesso às tabelas de negócio ou às tabelas OIDC; possui somente `EXECUTE` nas rotinas `SECURITY DEFINER` de identidade. |
 | `renave_maintenance_app` | Job operacional de lote.                                                    | `NOSUPERUSER`, `NOBYPASSRLS`, `NOINHERIT`; sem leitura de tabelas, possui somente `EXECUTE` em rotinas fechadas de manutenção. |
+| `renave_operation_worker` | Worker fenced de operações RENAVE.                                         | `NOSUPERUSER`, `NOBYPASSRLS`, `NOINHERIT`; zero ACL de tabela, somente `EXECUTE` nas rotinas fechadas de claim, lease, begin e completion. |
 
 ## Evidência protegida e monitor operacional
 

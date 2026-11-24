@@ -39,6 +39,7 @@ export {
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
+  OPERATION_WORKER_ROLE,
   SCHEMA,
   TENANT_SETTING,
   isLoopbackUrl,
@@ -89,6 +90,23 @@ export {
   type OperationRecord,
   type OperationStatus,
 } from "./operations.js";
+export {
+  beginOperationReconciliation,
+  claimOperationReconciliations,
+  completeOperationReconciliationConfirmed,
+  completeOperationReconciliationManualReview,
+  reconciliationManualReviewReasons,
+  releaseOperationReconciliationLease,
+  renewOperationReconciliationLease,
+  OperationReconciliationInputError,
+  OperationReconciliationStorageError,
+  type OperationReconciliationBegin,
+  type OperationReconciliationClaim,
+  type OperationReconciliationCompletion,
+  type OperationReconciliationFence,
+  type ReconciliationManualReviewReason,
+  type ReconciliationRemoteState,
+} from "./operation-reconciliation.js";
 export {
   assertRuntimeDatabase,
   RuntimeDatabaseContractError,

@@ -4,6 +4,7 @@ import {
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
+  OPERATION_WORKER_ROLE,
 } from "./config.js";
 
 export interface BootstrapOptions {
@@ -13,6 +14,7 @@ export interface BootstrapOptions {
   appPassword: string;
   identityAppPassword: string;
   maintenanceAppPassword: string;
+  operationWorkerPassword: string;
 }
 
 /**
@@ -25,6 +27,8 @@ export interface BootstrapOptions {
  *    recebe apenas EXECUTE nas rotinas OIDC pelas migrations.
  *  - `renave_maintenance_app`: LOGIN isolado, sem leitura direta; recebe
  *    apenas EXECUTE em rotinas operacionais fechadas pelas migrations.
+ *  - `renave_operation_worker`: LOGIN isolado, sem leitura direta; recebe
+ *    somente EXECUTE nas rotinas fenced de operações pelas migrations.
  *
  * Rodar de novo rotaciona as senhas. As senhas vão como literal escapado no
  * servidor (`format('%L')`) e o log de statements é silenciado na transação.
@@ -34,7 +38,8 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
     options.migratorPassword === "" ||
     options.appPassword === "" ||
     options.identityAppPassword === "" ||
-    options.maintenanceAppPassword === ""
+    options.maintenanceAppPassword === "" ||
+    options.operationWorkerPassword === ""
   ) {
     throw new Error("Senhas dos papéis não podem ser vazias.");
   }
@@ -55,6 +60,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
       [APP_ROLE, options.appPassword],
       [IDENTITY_APP_ROLE, options.identityAppPassword],
       [MAINTENANCE_APP_ROLE, options.maintenanceAppPassword],
+      [OPERATION_WORKER_ROLE, options.operationWorkerPassword],
     ] as const) {
       const exists = await client.query(
         "select 1 from pg_roles where rolname = $1",
@@ -77,6 +83,9 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
     await client.query(
       `alter role ${MAINTENANCE_APP_ROLE} set idle_in_transaction_session_timeout = '30s'`,
     );
+    await client.query(
+      `alter role ${OPERATION_WORKER_ROLE} set idle_in_transaction_session_timeout = '30s'`,
+    );
 
     // Privilégios por banco (escopo da conexão administrativa).
     await client.query(`
@@ -85,25 +94,36 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
       begin
         execute format('revoke all on database %I from public', db);
         execute format('grant connect, create on database %I to ${MIGRATOR_ROLE}', db);
+        execute format('revoke all on database %I from ${APP_ROLE}', db);
+        execute format('revoke all on database %I from ${IDENTITY_APP_ROLE}', db);
+        execute format('revoke all on database %I from ${MAINTENANCE_APP_ROLE}', db);
+        execute format('revoke all on database %I from ${OPERATION_WORKER_ROLE}', db);
         execute format('grant connect on database %I to ${APP_ROLE}', db);
         execute format('grant connect on database %I to ${IDENTITY_APP_ROLE}', db);
         execute format('grant connect on database %I to ${MAINTENANCE_APP_ROLE}', db);
-        execute format('revoke create on database %I from ${APP_ROLE}', db);
-        execute format('revoke create on database %I from ${IDENTITY_APP_ROLE}', db);
-        execute format('revoke create on database %I from ${MAINTENANCE_APP_ROLE}', db);
+        execute format('grant connect on database %I to ${OPERATION_WORKER_ROLE}', db);
       end $$`);
-    await client.query("revoke create on schema public from public");
+    await client.query("revoke all on schema public from public");
     await client.query(`revoke all on schema public from ${APP_ROLE}`);
     await client.query(`revoke all on schema public from ${IDENTITY_APP_ROLE}`);
     await client.query(
       `revoke all on schema public from ${MAINTENANCE_APP_ROLE}`,
     );
-    for (const member of [APP_ROLE, IDENTITY_APP_ROLE, MAINTENANCE_APP_ROLE]) {
+    await client.query(
+      `revoke all on schema public from ${OPERATION_WORKER_ROLE}`,
+    );
+    for (const member of [
+      APP_ROLE,
+      IDENTITY_APP_ROLE,
+      MAINTENANCE_APP_ROLE,
+      OPERATION_WORKER_ROLE,
+    ]) {
       for (const parent of [
         MIGRATOR_ROLE,
         APP_ROLE,
         IDENTITY_APP_ROLE,
         MAINTENANCE_APP_ROLE,
+        OPERATION_WORKER_ROLE,
       ]) {
         if (member !== parent) {
           await client.query(`revoke ${parent} from ${member}`);

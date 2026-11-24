@@ -1,9 +1,17 @@
 import type { Pool } from "pg";
 
-import { APP_ROLE, IDENTITY_APP_ROLE, MAINTENANCE_APP_ROLE } from "./config.js";
+import {
+  APP_ROLE,
+  IDENTITY_APP_ROLE,
+  MAINTENANCE_APP_ROLE,
+  OPERATION_WORKER_ROLE,
+} from "./config.js";
 
 export type RuntimeDatabaseRole =
-  typeof APP_ROLE | typeof IDENTITY_APP_ROLE | typeof MAINTENANCE_APP_ROLE;
+  | typeof APP_ROLE
+  | typeof IDENTITY_APP_ROLE
+  | typeof MAINTENANCE_APP_ROLE
+  | typeof OPERATION_WORKER_ROLE;
 
 export interface RuntimeDatabaseGuardOptions {
   expectedRole: RuntimeDatabaseRole;
@@ -11,7 +19,10 @@ export interface RuntimeDatabaseGuardOptions {
 
 interface RuntimeRoleRow {
   current_user: string;
+  has_database_connect: boolean;
+  has_database_create: boolean;
   has_database_ownership: boolean;
+  has_database_temporary: boolean;
   has_protected_object_ownership: boolean;
   has_set_role: boolean;
   rolbypassrls: boolean;
@@ -48,6 +59,9 @@ function roleIsSafe(
     !row.rolcreatedb &&
     !row.rolcreaterole &&
     !row.rolreplication &&
+    row.has_database_connect &&
+    !row.has_database_create &&
+    !row.has_database_temporary &&
     !row.has_set_role &&
     !row.has_database_ownership &&
     !row.has_protected_object_ownership
@@ -66,7 +80,8 @@ export async function assertRuntimeDatabase(
   if (
     options.expectedRole !== APP_ROLE &&
     options.expectedRole !== IDENTITY_APP_ROLE &&
-    options.expectedRole !== MAINTENANCE_APP_ROLE
+    options.expectedRole !== MAINTENANCE_APP_ROLE &&
+    options.expectedRole !== OPERATION_WORKER_ROLE
   ) {
     throw new RuntimeDatabaseContractError();
   }
@@ -83,6 +98,15 @@ export async function assertRuntimeDatabase(
          roles.rolcreatedb,
          roles.rolcreaterole,
          roles.rolreplication,
+         pg_catalog.has_database_privilege(
+           current_user, pg_catalog.current_database(), 'CONNECT'
+         ) as has_database_connect,
+         pg_catalog.has_database_privilege(
+           current_user, pg_catalog.current_database(), 'CREATE'
+         ) as has_database_create,
+         pg_catalog.has_database_privilege(
+           current_user, pg_catalog.current_database(), 'TEMPORARY'
+         ) as has_database_temporary,
          exists (
            select 1
              from pg_catalog.pg_roles candidate
@@ -128,7 +152,9 @@ export async function assertRuntimeDatabase(
     const contractFunction =
       options.expectedRole === MAINTENANCE_APP_ROLE
         ? "maintenance_contract_ready"
-        : "api_contract_ready";
+        : options.expectedRole === OPERATION_WORKER_ROLE
+          ? "operation_worker_contract_ready"
+          : "api_contract_ready";
     const contract = await pool.query<{ ready: boolean }>(
       `select renave_runtime.${contractFunction}() as ready`,
     );

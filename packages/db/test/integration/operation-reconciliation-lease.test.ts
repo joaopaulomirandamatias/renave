@@ -322,6 +322,7 @@ describe("operation reconciliation lease", () => {
       [
         "attempt_count",
         "correlation_id",
+        "establishment_cnpj",
         "establishment_id",
         "kind",
         "lease_expires_at",
@@ -344,6 +345,7 @@ describe("operation reconciliation lease", () => {
     );
     expect(rows[0]).toMatchObject({
       correlation_id: target.correlationId,
+      establishment_cnpj: target.establishment.cnpj,
       establishment_id: target.establishment.id,
       kind: "USED_STOCK_ENTRY",
       mutation_family: "STOCK_ENTRY",

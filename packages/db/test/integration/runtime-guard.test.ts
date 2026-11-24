@@ -5,6 +5,7 @@ import {
   assertRuntimeDatabase,
   RuntimeDatabaseContractError,
 } from "../../src/runtime-guard.js";
+import { bootstrapRoles } from "../../src/bootstrap.js";
 import { createPool } from "../../src/tenant-context.js";
 
 const urls = inject("dbUrls");
@@ -14,6 +15,7 @@ let appPool: Pool;
 let identityPool: Pool;
 let maintenancePool: Pool;
 let migratorPool: Pool;
+let operationWorkerPool: Pool;
 
 async function expectAppContractRejected(): Promise<void> {
   await expect(
@@ -27,12 +29,29 @@ async function expectAppContractReady(): Promise<void> {
   ).resolves.toBeUndefined();
 }
 
+async function expectWorkerContractRejected(): Promise<void> {
+  await expect(
+    assertRuntimeDatabase(operationWorkerPool, {
+      expectedRole: "renave_operation_worker",
+    }),
+  ).rejects.toBeInstanceOf(RuntimeDatabaseContractError);
+}
+
+async function expectWorkerContractReady(): Promise<void> {
+  await expect(
+    assertRuntimeDatabase(operationWorkerPool, {
+      expectedRole: "renave_operation_worker",
+    }),
+  ).resolves.toBeUndefined();
+}
+
 beforeAll(() => {
   adminPool = createPool(urls.admin, { max: 1 });
   appPool = createPool(urls.app, { max: 1 });
   identityPool = createPool(urls.identity, { max: 1 });
   maintenancePool = createPool(urls.maintenance, { max: 1 });
   migratorPool = createPool(urls.migrator, { max: 1 });
+  operationWorkerPool = createPool(urls.operationWorker, { max: 1 });
 });
 
 afterAll(async () => {
@@ -42,6 +61,7 @@ afterAll(async () => {
     identityPool?.end(),
     maintenancePool?.end(),
     migratorPool?.end(),
+    operationWorkerPool?.end(),
   ]);
 });
 
@@ -60,6 +80,11 @@ describe("guard do banco de runtime", () => {
         expectedRole: "renave_maintenance_app",
       }),
     ).resolves.toBeUndefined();
+    await expect(
+      assertRuntimeDatabase(operationWorkerPool, {
+        expectedRole: "renave_operation_worker",
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it("recusa URLs trocadas sem revelar detalhes da conexão", async () => {
@@ -70,6 +95,9 @@ describe("guard do banco de runtime", () => {
       assertRuntimeDatabase(identityPool, { expectedRole: "renave_app" }),
       assertRuntimeDatabase(appPool, {
         expectedRole: "renave_maintenance_app",
+      }),
+      assertRuntimeDatabase(appPool, {
+        expectedRole: "renave_operation_worker",
       }),
     ];
     const errors = await Promise.all(
@@ -157,6 +185,330 @@ describe("guard do banco de runtime", () => {
         "select renave_runtime.api_contract_ready() as ready",
       ),
     ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      operationWorkerPool.query(
+        "select renave_runtime.api_contract_ready() as ready",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      appPool.query(
+        "select renave_runtime.operation_worker_contract_ready() as ready",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  it("contrato do worker recusa ACL extra de função, tabela ou membership", async () => {
+    const assertWorkerRejected = async () => {
+      await expect(
+        assertRuntimeDatabase(operationWorkerPool, {
+          expectedRole: "renave_operation_worker",
+        }),
+      ).rejects.toBeInstanceOf(RuntimeDatabaseContractError);
+    };
+    const assertWorkerReady = async () => {
+      await expect(
+        assertRuntimeDatabase(operationWorkerPool, {
+          expectedRole: "renave_operation_worker",
+        }),
+      ).resolves.toBeUndefined();
+    };
+
+    await migratorPool.query(
+      `grant execute on function
+         renave.complete_operation_reconciliation_confirmed(
+           uuid,uuid,uuid,bigint,bigint,text
+         ) to renave_maintenance_app`,
+    );
+    try {
+      await assertWorkerRejected();
+    } finally {
+      await migratorPool.query(
+        `revoke execute on function
+           renave.complete_operation_reconciliation_confirmed(
+             uuid,uuid,uuid,bigint,bigint,text
+           ) from renave_maintenance_app`,
+      );
+    }
+    await assertWorkerReady();
+
+    await migratorPool.query(
+      "grant select on renave.operation to renave_operation_worker",
+    );
+    try {
+      await assertWorkerRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke select on renave.operation from renave_operation_worker",
+      );
+    }
+    await assertWorkerReady();
+
+    await adminPool.query("create role operation_worker_parent nologin");
+    await adminPool.query(
+      "grant operation_worker_parent to renave_operation_worker",
+    );
+    try {
+      await assertWorkerRejected();
+    } finally {
+      await adminPool.query(
+        "revoke operation_worker_parent from renave_operation_worker",
+      );
+      await adminPool.query("drop role operation_worker_parent");
+    }
+    await assertWorkerReady();
+  });
+
+  it("contrato do worker recusa overload não previsto de conclusão", async () => {
+    await adminPool.query(`
+      create function renave.complete_operation_reconciliation_confirmed(
+        uuid,uuid,uuid,bigint,bigint,text,boolean
+      ) returns void language sql as 'select'
+    `);
+    try {
+      await expect(
+        assertRuntimeDatabase(operationWorkerPool, {
+          expectedRole: "renave_operation_worker",
+        }),
+      ).rejects.toBeInstanceOf(RuntimeDatabaseContractError);
+    } finally {
+      await adminPool.query(`
+        drop function renave.complete_operation_reconciliation_confirmed(
+          uuid,uuid,uuid,bigint,bigint,text,boolean
+        )
+      `);
+    }
+    await expect(
+      assertRuntimeDatabase(operationWorkerPool, {
+        expectedRole: "renave_operation_worker",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    {
+      replacement: `
+        create or replace function renave.complete_operation_reconciliation_confirmed(
+          p_outbox_id uuid,p_lease_owner uuid,p_lease_token uuid,
+          p_expected_operation_version bigint,p_remote_record_id bigint,
+          p_remote_state text
+        ) returns table (
+          operation_id uuid,reconcile_outbox_id uuid,
+          operation_version bigint,completed_at timestamptz
+        ) language plpgsql security definer set search_path=pg_catalog as $$
+        begin return; end $$
+      `,
+      signature:
+        "renave.complete_operation_reconciliation_confirmed(uuid,uuid,uuid,bigint,bigint,text)",
+    },
+    {
+      replacement: `
+        create or replace function renave.complete_operation_reconciliation_manual_review(
+          p_outbox_id uuid,p_lease_owner uuid,p_lease_token uuid,
+          p_expected_operation_version bigint,p_reason_code text
+        ) returns table (
+          operation_id uuid,reconcile_outbox_id uuid,
+          operation_version bigint,completed_at timestamptz
+        ) language plpgsql security definer set search_path=pg_catalog as $$
+        begin return; end $$
+      `,
+      signature:
+        "renave.complete_operation_reconciliation_manual_review(uuid,uuid,uuid,bigint,text)",
+    },
+  ])(
+    "contrato do worker recusa body e SECURITY INVOKER de $signature",
+    async ({ replacement, signature }) => {
+      const original = await adminPool.query<{ definition: string }>(
+        "select pg_catalog.pg_get_functiondef($1::regprocedure) as definition",
+        [signature],
+      );
+      await adminPool.query(replacement);
+      try {
+        await expectWorkerContractRejected();
+      } finally {
+        await adminPool.query(original.rows[0]!.definition);
+      }
+      await expectWorkerContractReady();
+
+      await adminPool.query(`alter function ${signature} security invoker`);
+      try {
+        await expectWorkerContractRejected();
+      } finally {
+        await adminPool.query(`alter function ${signature} security definer`);
+      }
+      await expectWorkerContractReady();
+    },
+  );
+
+  it("worker recusa CREATE/TEMP no banco e ACL extra de schema/função", async () => {
+    const database = (
+      await adminPool.query<{ quoted: string }>(
+        "select pg_catalog.quote_ident(pg_catalog.current_database()) as quoted",
+      )
+    ).rows[0]!.quoted;
+    for (const privilege of ["create", "temporary"] as const) {
+      await adminPool.query(
+        `grant ${privilege} on database ${database} to renave_operation_worker`,
+      );
+      try {
+        await expectWorkerContractRejected();
+      } finally {
+        await adminPool.query(
+          `revoke ${privilege} on database ${database} from renave_operation_worker`,
+        );
+      }
+      await expectWorkerContractReady();
+    }
+
+    await migratorPool.query(
+      "grant create on schema renave_runtime to renave_operation_worker",
+    );
+    try {
+      await expectWorkerContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke create on schema renave_runtime from renave_operation_worker",
+      );
+    }
+    await expectWorkerContractReady();
+
+    await adminPool.query("create role operation_worker_acl_probe nologin");
+    try {
+      await migratorPool.query(
+        "grant usage on schema renave_runtime to operation_worker_acl_probe",
+      );
+      try {
+        await expectWorkerContractRejected();
+      } finally {
+        await migratorPool.query(
+          "revoke usage on schema renave_runtime from operation_worker_acl_probe",
+        );
+      }
+      await expectWorkerContractReady();
+
+      await migratorPool.query(
+        "grant execute on function renave_runtime.operation_worker_contract_ready() to operation_worker_acl_probe",
+      );
+      try {
+        await expectWorkerContractRejected();
+      } finally {
+        await migratorPool.query(
+          "revoke execute on function renave_runtime.operation_worker_contract_ready() from operation_worker_acl_probe",
+        );
+      }
+      await expectWorkerContractReady();
+    } finally {
+      await adminPool.query("drop role operation_worker_acl_probe");
+    }
+
+    await migratorPool.query(
+      "grant execute on function renave_runtime.api_contract_ready() to renave_operation_worker",
+    );
+    try {
+      await expectWorkerContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke execute on function renave_runtime.api_contract_ready() from renave_operation_worker",
+      );
+    }
+    await expectWorkerContractReady();
+  });
+
+  it("bootstrap remove TEMP legado de todos runtime roles e é idempotente", async () => {
+    const database = (
+      await adminPool.query<{ quoted: string }>(
+        "select pg_catalog.quote_ident(pg_catalog.current_database()) as quoted",
+      )
+    ).rows[0]!.quoted;
+    await adminPool.query(
+      `grant temporary on database ${database} to
+         renave_app,renave_identity_app,renave_maintenance_app,
+         renave_operation_worker`,
+    );
+    await adminPool.query(
+      `grant create on database ${database} to renave_operation_worker`,
+    );
+
+    const options = {
+      adminUrl: urls.admin,
+      appPassword: "renave_app_it",
+      identityAppPassword: "renave_identity_app_it",
+      maintenanceAppPassword: "renave_maintenance_app_it",
+      migratorPassword: "renave_migrator_it",
+      operationWorkerPassword: "renave_operation_worker_it",
+    };
+    await bootstrapRoles(options);
+    await bootstrapRoles(options);
+
+    const privileges = await adminPool.query<{
+      can_connect: boolean;
+      can_create: boolean;
+      can_temporary: boolean;
+      rolname: string;
+    }>(
+      `select roles.rolname,
+              has_database_privilege(
+                roles.rolname,current_database(),'CONNECT'
+              ) as can_connect,
+              has_database_privilege(
+                roles.rolname,current_database(),'CREATE'
+              ) as can_create,
+              has_database_privilege(
+                roles.rolname,current_database(),'TEMPORARY'
+              ) as can_temporary
+         from pg_catalog.pg_roles roles
+        where roles.rolname=any($1::text[])
+        order by roles.rolname`,
+      [
+        [
+          "renave_app",
+          "renave_identity_app",
+          "renave_maintenance_app",
+          "renave_operation_worker",
+        ],
+      ],
+    );
+    expect(privileges.rows).toHaveLength(4);
+    for (const privilege of privileges.rows) {
+      expect(privilege).toMatchObject({
+        can_connect: true,
+        can_create: false,
+        can_temporary: false,
+      });
+    }
+    await expectWorkerContractReady();
+  });
+
+  it("contrato efetivo recusa CREATE via PUBLIC e nova função PUBLIC", async () => {
+    await migratorPool.query("grant create on schema renave_runtime to public");
+    try {
+      await expectWorkerContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke create on schema renave_runtime from public",
+      );
+    }
+    await expectWorkerContractReady();
+
+    await migratorPool.query(`
+      create function renave_runtime.operation_worker_public_probe()
+      returns boolean language sql stable set search_path=pg_catalog
+      as 'select true'
+    `);
+    try {
+      const publicExecute = await adminPool.query<{ allowed: boolean }>(
+        `select has_function_privilege(
+           'renave_operation_worker',
+           'renave_runtime.operation_worker_public_probe()','EXECUTE'
+         ) as allowed`,
+      );
+      expect(publicExecute.rows[0]?.allowed).toBe(true);
+      await expectWorkerContractRejected();
+    } finally {
+      await migratorPool.query(
+        "drop function renave_runtime.operation_worker_public_probe()",
+      );
+    }
+    await expectWorkerContractReady();
   });
 
   it("recusa contrato quando um checksum do ledger diverge", async () => {
@@ -879,6 +1231,7 @@ describe("guard do banco de runtime", () => {
          p_expected_operation_version bigint
        ) returns table (
          outbox_id uuid,operation_id uuid,establishment_id uuid,
+         establishment_cnpj text,
          correlation_id uuid,kind text,mutation_family text,
          request_schema_version integer,operation_version bigint,
          sent_at timestamptz,attempt_count integer,lease_expires_at timestamptz,
