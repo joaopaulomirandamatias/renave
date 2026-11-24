@@ -131,4 +131,79 @@ describe("StockSearchPanel", () => {
     pending.resolve([{ estado: "CONFIRMADO", id: 71, placa: "ABC1D23" }]);
     await waitFor(() => expect(screen.queryByText("Registro #71")).toBeNull());
   });
+
+  it("oferece consulta do veículo somente para estoque confirmado", async () => {
+    const onLookupVehicle = vi.fn(async () => ({
+      chassi: "9BWZZZ377VT004251",
+      placa: "ABC1D23",
+      restricoes: [],
+      veiculoAcabado: true,
+    }));
+    render(
+      <StockSearchPanel
+        onLookupVehicle={onLookupVehicle}
+        onSearch={vi.fn(async () => [
+          { estado: "CONFIRMADO" as const, id: 71, placa: "ABC1D23" },
+          { estado: "SOLICITADO" as const, id: 72, placa: "ABC1D23" },
+        ])}
+        selectionKey="tenant-a:store-a"
+      />,
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Placa do veículo" }),
+      { target: { value: "ABC1D23" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Consultar estoque" }));
+
+    const lookup = await screen.findByRole("button", {
+      name: "Consultar veículo",
+    });
+    expect(
+      screen.getAllByRole("button", { name: "Consultar veículo" }),
+    ).toHaveLength(1);
+    fireEvent.click(lookup);
+    expect(await screen.findByText("9BWZZZ377VT004251")).toBeVisible();
+    expect(onLookupVehicle).toHaveBeenCalledWith("ABC1D23");
+    expect(screen.getByText(/nenhuma operação foi habilitada/i)).toBeVisible();
+  });
+
+  it("descarta veículo atrasado quando o contexto muda", async () => {
+    const stock = vi.fn(async () => [
+      { estado: "CONFIRMADO" as const, id: 71, placa: "ABC1D23" },
+    ]);
+    const pending = deferred<{
+      placa: string;
+      restricoes: readonly [];
+      renavam: string;
+    }>();
+    const view = render(
+      <StockSearchPanel
+        onLookupVehicle={vi.fn(() => pending.promise)}
+        onSearch={stock}
+        selectionKey="tenant-a:store-a"
+      />,
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Placa do veículo" }),
+      { target: { value: "ABC1D23" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Consultar estoque" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Consultar veículo" }),
+    );
+
+    view.rerender(
+      <StockSearchPanel
+        onLookupVehicle={vi.fn(() => pending.promise)}
+        onSearch={stock}
+        selectionKey="tenant-a:store-b"
+      />,
+    );
+    pending.resolve({
+      placa: "ABC1D23",
+      renavam: "00607701676",
+      restricoes: [],
+    });
+    await waitFor(() => expect(screen.queryByText("00607701676")).toBeNull());
+  });
 });

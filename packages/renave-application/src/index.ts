@@ -38,3 +38,23 @@ export {
   type StockQueryPorts,
   type StockQueryServiceConfig,
 } from "./stock-query.js";
+export {
+  InvalidVehicleLookupApplicationInputError,
+  VehicleLookupEvidenceError,
+  VehicleLookupResultInvalidError,
+  VehicleLookupService,
+  VehicleLookupVerifiedIdentityMismatchError,
+  VehicleNotAvailableError,
+  type VehicleLookupAuditOutcome,
+  type VehicleLookupAuditPort,
+  type VehicleLookupAuditRecord,
+  type VehicleLookupAuthorizationContextPort,
+  type VehicleLookupConnectorPort,
+  type VehicleLookupEstablishmentPort,
+  type VehicleLookupEvidenceContext,
+  type VehicleLookupEvidencePort,
+  type VehicleLookupFinalizationPort,
+  type VehicleLookupInput,
+  type VehicleLookupPorts,
+  type VehicleLookupServiceConfig,
+} from "./vehicle-lookup.js";

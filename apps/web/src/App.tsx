@@ -116,6 +116,20 @@ export interface BrowserStockSummary {
   placa: string;
 }
 
+export interface BrowserVehicleRestriction {
+  codigoTipo?: string;
+  tipo?: string;
+}
+
+export interface BrowserVehicle {
+  chassi?: string;
+  dataPreCadastro?: string;
+  placa: string;
+  renavam?: string;
+  restricoes: readonly BrowserVehicleRestriction[];
+  veiculoAcabado?: boolean;
+}
+
 export type BrowserCrvType = "AZUL" | "VERDE" | "BRANCO" | "DIGITAL";
 
 export type BrowserEligibilityStatus =
@@ -182,6 +196,11 @@ export interface SessionClient {
     establishmentId: string,
     plate: string,
   ): Promise<readonly BrowserStockSummary[]>;
+  lookupVehicle(
+    tenantId: string,
+    establishmentId: string,
+    plate: string,
+  ): Promise<BrowserVehicle>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -558,10 +577,74 @@ function parseStocks(value: unknown): readonly BrowserStockSummary[] {
   });
 }
 
+function parseVehicle(value: unknown): BrowserVehicle {
+  const allowedKeys = new Set([
+    "chassi",
+    "dataPreCadastro",
+    "placa",
+    "renavam",
+    "restricoes",
+    "veiculoAcabado",
+  ]);
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !allowedKeys.has(key)) ||
+    typeof value.placa !== "string" ||
+    !/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/u.test(value.placa) ||
+    !Array.isArray(value.restricoes) ||
+    (value.chassi !== undefined && typeof value.chassi !== "string") ||
+    (value.dataPreCadastro !== undefined &&
+      typeof value.dataPreCadastro !== "string") ||
+    (value.renavam !== undefined && typeof value.renavam !== "string") ||
+    (value.veiculoAcabado !== undefined &&
+      typeof value.veiculoAcabado !== "boolean")
+  ) {
+    throw new Error("Resposta de veículo inválida");
+  }
+  const restrictions = value.restricoes.map((restriction) => {
+    if (
+      !isRecord(restriction) ||
+      Object.keys(restriction).some(
+        (key) => key !== "codigoTipo" && key !== "tipo",
+      ) ||
+      (restriction.codigoTipo !== undefined &&
+        typeof restriction.codigoTipo !== "string") ||
+      (restriction.tipo !== undefined && typeof restriction.tipo !== "string")
+    ) {
+      throw new Error("Restrição de veículo inválida");
+    }
+    return {
+      ...(restriction.codigoTipo === undefined
+        ? {}
+        : { codigoTipo: restriction.codigoTipo }),
+      ...(restriction.tipo === undefined ? {} : { tipo: restriction.tipo }),
+    };
+  });
+  return {
+    ...(value.chassi === undefined ? {} : { chassi: value.chassi }),
+    ...(value.dataPreCadastro === undefined
+      ? {}
+      : { dataPreCadastro: value.dataPreCadastro }),
+    placa: value.placa,
+    ...(value.renavam === undefined ? {} : { renavam: value.renavam }),
+    restricoes: restrictions,
+    ...(value.veiculoAcabado === undefined
+      ? {}
+      : { veiculoAcabado: value.veiculoAcabado }),
+  };
+}
+
 class StockSearchClientError extends Error {
   constructor(readonly code?: string) {
     super("Consulta de estoque não concluída");
     this.name = "StockSearchClientError";
+  }
+}
+
+class VehicleLookupClientError extends Error {
+  constructor(readonly code?: string) {
+    super("Consulta do veículo não concluída");
+    this.name = "VehicleLookupClientError";
   }
 }
 
@@ -817,6 +900,30 @@ export const browserSessionClient: SessionClient = {
       );
     }
     return parseStocks(value);
+  },
+  async lookupVehicle(tenantId, establishmentId, plate) {
+    const response = await fetch(
+      `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/vehicles/search`,
+      {
+        body: JSON.stringify({ plate }),
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      throw new VehicleLookupClientError(
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+      );
+    }
+    return parseVehicle(value);
   },
 };
 
@@ -1379,6 +1486,13 @@ export function App({
       onRunPreflight={() => void runPreflight()}
       onSearchStocks={(plate) =>
         client.searchStocks(
+          selectedTenantId,
+          activeEstablishmentId ?? "",
+          plate,
+        )
+      }
+      onLookupVehicle={(plate) =>
+        client.lookupVehicle(
           selectedTenantId,
           activeEstablishmentId ?? "",
           plate,

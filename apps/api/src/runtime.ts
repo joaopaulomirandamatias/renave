@@ -22,6 +22,7 @@ import {
   createHomologationPemMtlsClient,
   HttpRenaveReadOnlyTransport,
   RenaveQueryConnector,
+  RenaveVehicleLookupConnector,
   type HomologationMtlsClient,
   type MtlsCertificateTemporalStatus,
 } from "@seu-renave/renave-connector";
@@ -42,6 +43,7 @@ import { PostgresRenaveLinkPreflightUseCase } from "./renave/preflight-use-case.
 import { PostgresRenaveReadinessUseCase } from "./renave/readiness-use-case.js";
 import type { SerproQueryLimiter } from "./renave/routes.js";
 import { PostgresStockQueryUseCase } from "./renave/stock-query-use-case.js";
+import { PostgresVehicleLookupUseCase } from "./renave/vehicle-lookup-use-case.js";
 import {
   composeStockEntryRuntime,
   type StockEntryRuntimeComposition,
@@ -75,6 +77,7 @@ export interface AppRuntime {
   sessionLookupGate?: SessionLookupGate;
   serproQueryLimiter?: SerproQueryLimiter;
   stockQuery?: PostgresStockQueryUseCase;
+  vehicleLookup?: PostgresVehicleLookupUseCase;
   stockEntryMutationRateLimiter?: StockEntryMutationRateLimiter;
   stockEntryOperation?: StockEntryOperationUseCase;
   tenantDirectory?: TenantDirectory;
@@ -232,6 +235,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     let eligibility: PostgresVehicleEligibilityUseCase | undefined;
     let preflight: PostgresRenaveLinkPreflightUseCase | undefined;
     let stockQuery: PostgresStockQueryUseCase | undefined;
+    let vehicleLookup: PostgresVehicleLookupUseCase | undefined;
     if (config.renave) {
       const { ca, cert, key } = await readRenaveMtlsMaterial({
         caFile: config.renave.caFile,
@@ -263,15 +267,15 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
           ],
         ]),
       });
-      const connector = new RenaveQueryConnector(
-        new HttpRenaveReadOnlyTransport({
-          environment: "homologation",
-          request: createHomologationRenaveReadOnlyRequest(
-            "homologation",
-            mtls.request,
-          ),
-        }),
-      );
+      const transport = new HttpRenaveReadOnlyTransport({
+        environment: "homologation",
+        request: createHomologationRenaveReadOnlyRequest(
+          "homologation",
+          mtls.request,
+        ),
+      });
+      const connector = new RenaveQueryConnector(transport);
+      const vehicleConnector = new RenaveVehicleLookupConnector(transport);
       eligibility = new PostgresVehicleEligibilityUseCase({
         certificateThumbprintSha256,
         cipher,
@@ -292,6 +296,14 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         connector,
         integratorCnpj: config.renave.integratorCnpj,
         pool: businessPool,
+      });
+      vehicleLookup = new PostgresVehicleLookupUseCase({
+        certificateThumbprintSha256,
+        cipher,
+        integratorCnpj: config.renave.integratorCnpj,
+        pool: businessPool,
+        stockConnector: connector,
+        vehicleConnector,
       });
     }
     const renaveReadiness = businessPool
@@ -324,6 +336,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       ...(sessionLookupGate ? { sessionLookupGate } : {}),
       ...(serproQueryLimiter ? { serproQueryLimiter } : {}),
       ...(stockQuery ? { stockQuery } : {}),
+      ...(vehicleLookup ? { vehicleLookup } : {}),
       ...(stockEntryComposition
         ? {
             stockEntryMutationRateLimiter:

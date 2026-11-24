@@ -990,6 +990,58 @@ footer {
   gap: 0.2rem;
 }
 
+.stock-search__actions {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.vehicle-lookup__result {
+  border-top: 1px solid var(--sr-color-border, #d8e0ea);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.vehicle-lookup__result [role="alert"] {
+  color: var(--sr-color-danger, #b42318);
+}
+
+.vehicle-lookup__result section,
+.vehicle-lookup__result dl,
+.vehicle-lookup__restrictions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.vehicle-lookup__result h3,
+.vehicle-lookup__result h4,
+.vehicle-lookup__result p,
+.vehicle-lookup__result dl {
+  margin: 0;
+}
+
+.vehicle-lookup__result dl {
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.vehicle-lookup__result dl > div {
+  background: var(--sr-color-surface-muted, #f5f7fa);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.vehicle-lookup__result dt {
+  color: var(--sr-color-text-muted, #526174);
+  font-size: 0.8rem;
+}
+
+.vehicle-lookup__result dd {
+  font-weight: 650;
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
 .eligibility-panel__summary {
   display: grid;
   gap: 0.5rem;

@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildApp } from "../app.js";
 import { loadConfig } from "../config.js";
-import type { SerproQueryLimiter, StockQueryUseCase } from "./routes.js";
+import type {
+  SerproQueryLimiter,
+  StockQueryUseCase,
+  VehicleLookupUseCase,
+} from "./routes.js";
 import type { EligibilityUseCase } from "./use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./preflight-use-case.js";
 import type { RenaveLinkStatusUseCase } from "./link-status-use-case.js";
@@ -59,6 +63,18 @@ function setup(
   const stockQueryExecute = vi.fn<StockQueryUseCase["execute"]>(async () => [
     { estado: "CONFIRMADO", id: 7, placa: "ABC1D23" },
   ]);
+  const authorizeVehicleLookup = vi.fn<VehicleLookupUseCase["authorize"]>(
+    async () => undefined,
+  );
+  const vehicleLookupExecute = vi.fn<VehicleLookupUseCase["execute"]>(
+    async () => ({
+      chassi: "9BWZZZ377VT004251",
+      placa: "ABC1D23",
+      renavam: "00607701676",
+      restricoes: [],
+      veiculoAcabado: true,
+    }),
+  );
   const authorizePreflight = vi.fn<RenaveLinkPreflightUseCase["authorize"]>(
     async () => undefined,
   );
@@ -98,6 +114,10 @@ function setup(
       authorize: authorizeStockQuery,
       execute: stockQueryExecute,
     },
+    vehicleLookup: {
+      authorize: authorizeVehicleLookup,
+      execute: vehicleLookupExecute,
+    },
     ...(options.sessionLookupGate
       ? { sessionLookupGate: options.sessionLookupGate }
       : {}),
@@ -109,6 +129,7 @@ function setup(
     authorizeEligibility,
     authorizePreflight,
     authorizeStockQuery,
+    authorizeVehicleLookup,
     execute,
     getSession,
     linkStatusExecute,
@@ -116,6 +137,7 @@ function setup(
     readinessExecute,
     release,
     stockQueryExecute,
+    vehicleLookupExecute,
   };
 }
 
@@ -142,6 +164,22 @@ async function stockRequest(
   return await app.inject({
     method: "POST",
     url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/stocks/search`,
+    headers: {
+      cookie: "renave_session=opaque-session",
+      origin,
+    },
+    payload: body,
+  });
+}
+
+async function vehicleRequest(
+  app: ReturnType<typeof buildApp>,
+  body: Record<string, unknown>,
+  origin = ORIGIN,
+) {
+  return await app.inject({
+    method: "POST",
+    url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/vehicles/search`,
     headers: {
       cookie: "renave_session=opaque-session",
       origin,
@@ -541,6 +579,99 @@ describe("rota autenticada de consulta pontual de estoque", () => {
     expect(response.statusCode).toBe(502);
     expect(response.json()).toMatchObject({ code: "RENAVE_PROTOCOL_ERROR" });
     expect(response.body).not.toMatch(/placa|cpf/iu);
+    expect(release).toHaveBeenCalledOnce();
+  });
+});
+
+describe("rota autenticada de consulta do veículo", () => {
+  it("autoriza antes do único lease e devolve DTO com no-store", async () => {
+    const {
+      acquire,
+      app,
+      authorizeVehicleLookup,
+      release,
+      vehicleLookupExecute,
+    } = setup();
+
+    const response = await vehicleRequest(app, { plate: " abc1d23 " });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      chassi: "9BWZZZ377VT004251",
+      placa: "ABC1D23",
+      renavam: "00607701676",
+      restricoes: [],
+      veiculoAcabado: true,
+    });
+    expect(authorizeVehicleLookup.mock.invocationCallOrder[0]).toBeLessThan(
+      acquire.mock.invocationCallOrder[0]!,
+    );
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(vehicleLookupExecute).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("recusa Origin, corpo extra e BOLA antes do limitador", async () => {
+    const { acquire, app, authorizeVehicleLookup, vehicleLookupExecute } =
+      setup();
+
+    expect(
+      (await vehicleRequest(app, { plate: "ABC1D23" }, "https://evil.test"))
+        .statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await vehicleRequest(app, {
+          plate: "ABC1D23",
+          stockId: 7,
+        })
+      ).statusCode,
+    ).toBe(400);
+    authorizeVehicleLookup.mockRejectedValueOnce(
+      Object.assign(new Error("recurso secreto"), {
+        code: "AUTHORIZATION_DENIED",
+      }),
+    );
+    expect((await vehicleRequest(app, { plate: "ABC1D23" })).statusCode).toBe(
+      403,
+    );
+    expect(acquire).not.toHaveBeenCalled();
+    expect(vehicleLookupExecute).not.toHaveBeenCalled();
+  });
+
+  it.each(["not-confirmed", "cancelled", "ambiguous", "upstream-404"])(
+    "uniformiza indisponibilidade %s e libera o lease",
+    async () => {
+      const { app, release, vehicleLookupExecute } = setup();
+      vehicleLookupExecute.mockRejectedValueOnce(
+        Object.assign(new Error("detalhe interno"), {
+          code: "VEHICLE_NOT_AVAILABLE",
+        }),
+      );
+
+      const response = await vehicleRequest(app, { plate: "ABC1D23" });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ code: "VEHICLE_NOT_AVAILABLE" });
+      expect(response.body).not.toContain("detalhe interno");
+      expect(release).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("traduz falha técnica para 502 e libera o lease", async () => {
+    const { app, release, vehicleLookupExecute } = setup();
+    vehicleLookupExecute.mockRejectedValueOnce(
+      Object.assign(new Error("veículo sigiloso"), {
+        code: "RENAVE_PROTOCOL_ERROR",
+      }),
+    );
+
+    const response = await vehicleRequest(app, { plate: "ABC1D23" });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toMatchObject({ code: "RENAVE_PROTOCOL_ERROR" });
+    expect(response.body).not.toContain("sigiloso");
     expect(release).toHaveBeenCalledOnce();
   });
 });

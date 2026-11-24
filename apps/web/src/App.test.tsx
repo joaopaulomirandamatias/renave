@@ -74,6 +74,10 @@ function clientFor(
     })),
     loadTenants: vi.fn(async () => tenants),
     logout: vi.fn(async () => ({})),
+    lookupVehicle: vi.fn(async () => ({
+      placa: "ABC1D23",
+      restricoes: [],
+    })),
     runRenaveLinkPreflight: vi.fn(async () => undefined),
     searchStocks: vi.fn(async () => []),
   };
@@ -636,6 +640,10 @@ describe("App session boundary", () => {
       })),
       loadTenants: vi.fn(async () => []),
       logout: vi.fn(async () => ({})),
+      lookupVehicle: vi.fn(async () => ({
+        placa: "ABC1D23",
+        restricoes: [],
+      })),
       runRenaveLinkPreflight: vi.fn(async () => undefined),
       searchStocks: vi.fn(async () => []),
     };

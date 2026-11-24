@@ -16,6 +16,7 @@ import {
   registerRenaveRoutes,
   type SerproQueryLimiter,
   type StockQueryUseCase,
+  type VehicleLookupUseCase,
 } from "./renave/routes.js";
 import type { EligibilityUseCase } from "./renave/use-case.js";
 import type { RenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
@@ -56,6 +57,8 @@ export interface BuildAppOptions {
   serproQueryLimiter?: SerproQueryLimiter;
   /** Consulta pontual e minimizada de estoque por placa. */
   stockQuery?: StockQueryUseCase;
+  /** Consulta sanitizada do veículo após prova de estoque confirmado. */
+  vehicleLookup?: VehicleLookupUseCase;
   /**
    * Criação local retida de entrada usada; nunca envia ao SERPRO.
    * O app chama `destroy` do caso de uso no onClose. O compositor continua
@@ -108,7 +111,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     );
   }
   if (
-    (options.eligibility || options.preflight || options.stockQuery) &&
+    (options.eligibility ||
+      options.preflight ||
+      options.stockQuery ||
+      options.vehicleLookup) &&
     !options.serproQueryLimiter
   ) {
     throw new Error("Consulta RENAVE exige limitador distribuído");
@@ -220,6 +226,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         ? { readiness: options.renaveReadiness }
         : {}),
       ...(options.stockQuery ? { stockQuery: options.stockQuery } : {}),
+      ...(options.vehicleLookup
+        ? { vehicleLookup: options.vehicleLookup }
+        : {}),
       ...(options.serproQueryLimiter
         ? { queryLimiter: options.serproQueryLimiter }
         : {}),

@@ -1,5 +1,9 @@
 import type { IdentityService } from "@seu-renave/identity";
-import type { CrvType, StockSummary } from "@seu-renave/renave-connector";
+import type {
+  CrvType,
+  RenaveVehicle,
+  StockSummary,
+} from "@seu-renave/renave-connector";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import type { RequestAccessGuard } from "../auth/request-access-guard.js";
@@ -43,6 +47,22 @@ export interface StockQueryUseCase {
   }): Promise<readonly StockSummary[]>;
 }
 
+export interface VehicleLookupUseCase {
+  authorize(input: {
+    establishmentId: string;
+    subject: string;
+    tenantId: string;
+  }): Promise<void>;
+  execute(input: {
+    actorIp: string;
+    establishmentId: string;
+    plate: string;
+    subject: string;
+    tenantId: string;
+    traceId?: string;
+  }): Promise<RenaveVehicle>;
+}
+
 export interface RenaveRoutesOptions {
   accessGuard: RequestAccessGuard;
   config: AppConfig;
@@ -53,6 +73,7 @@ export interface RenaveRoutesOptions {
   queryLimiter?: SerproQueryLimiter;
   readiness?: RenaveReadinessUseCase;
   stockQuery?: StockQueryUseCase;
+  vehicleLookup?: VehicleLookupUseCase;
 }
 
 export interface SerproQueryPermit {
@@ -169,6 +190,7 @@ function mappedStatus(code: string | undefined): number {
     code === "INVALID_ELIGIBILITY_APPLICATION_INPUT" ||
     code === "INVALID_STOCK_PLATE_QUERY" ||
     code === "INVALID_STOCK_QUERY_APPLICATION_INPUT" ||
+    code === "INVALID_VEHICLE_LOOKUP_APPLICATION_INPUT" ||
     code === "INVALID_VEHICLE_ELIGIBILITY_QUERY"
   )
     return 400;
@@ -178,20 +200,24 @@ function mappedStatus(code: string | undefined): number {
     code === "RENAVE_LINK_NOT_READY" ||
     code === "RENAVE_IDENTITY_MISMATCH" ||
     code === "ELIGIBILITY_VERIFIED_IDENTITY_MISMATCH" ||
-    code === "STOCK_QUERY_VERIFIED_IDENTITY_MISMATCH"
+    code === "STOCK_QUERY_VERIFIED_IDENTITY_MISMATCH" ||
+    code === "VEHICLE_LOOKUP_VERIFIED_IDENTITY_MISMATCH"
   )
     return 409;
+  if (code === "VEHICLE_NOT_AVAILABLE") return 404;
   if (
     code === "RENAVE_HTTP_ERROR" ||
     code === "RENAVE_PROTOCOL_ERROR" ||
     code === "RENAVE_STOCK_QUERY_RESULT_INVALID" ||
+    code === "RENAVE_VEHICLE_LOOKUP_RESULT_INVALID" ||
     code === "RENAVE_MTLS_RESPONSE_TOO_LARGE"
   )
     return 502;
   if (
     code === "ELIGIBILITY_EVIDENCE_ERROR" ||
     code === "PROTECTED_EVIDENCE_TRANSITION_REJECTED" ||
-    code === "STOCK_QUERY_EVIDENCE_ERROR"
+    code === "STOCK_QUERY_EVIDENCE_ERROR" ||
+    code === "VEHICLE_LOOKUP_EVIDENCE_ERROR"
   )
     return 503;
   return 500;
@@ -517,6 +543,102 @@ export function registerRenaveRoutes(
             errorCode: code ?? "UNEXPECTED_ERROR",
             traceId: request.id,
           });
+          return reply.code(status).send({
+            code:
+              status === 500 ? "INTERNAL_ERROR" : (code ?? "UPSTREAM_ERROR"),
+            traceId: request.id,
+          });
+        }
+      } finally {
+        try {
+          await permitDecision.permit.release();
+        } catch {
+          request.log.error({
+            event: "renave.query_permit_release_failed",
+            traceId: request.id,
+          });
+        }
+      }
+    },
+  );
+
+  app.post(
+    "/api/tenants/:tenantId/establishments/:establishmentId/vehicles/search",
+    async (request, reply) => {
+      if (request.headers.origin !== options.identity.config.publicOrigin) {
+        return reply.code(403).send({ code: "CSRF_ORIGIN_MISMATCH" });
+      }
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
+      if (!sessionResult.ok) return;
+      if (!options.vehicleLookup) {
+        return reply.code(503).send({ code: "RENAVE_NOT_CONFIGURED" });
+      }
+      const input = safeStockQueryInput(request);
+      if (!input) return reply.code(400).send({ code: "INVALID_REQUEST" });
+      if (!options.queryLimiter) {
+        return reply
+          .code(503)
+          .send({ code: "RENAVE_QUERY_LIMIT_NOT_CONFIGURED" });
+      }
+      const executionInput = {
+        actorIp: request.ip,
+        establishmentId: input.params.establishmentId,
+        plate: input.body.plate,
+        subject: sessionResult.session.subject,
+        tenantId: input.params.tenantId,
+        traceId: request.id,
+      };
+      try {
+        await options.vehicleLookup.authorize(executionInput);
+      } catch (error) {
+        const code = errorCode(error);
+        const status = mappedStatus(code);
+        return reply.code(status).send({
+          code: status === 500 ? "INTERNAL_ERROR" : (code ?? "INTERNAL_ERROR"),
+        });
+      }
+
+      let permitDecision;
+      try {
+        permitDecision = await options.queryLimiter.acquire({
+          establishmentId: input.params.establishmentId,
+          subject: sessionResult.session.subject,
+          tenantId: input.params.tenantId,
+        });
+      } catch {
+        request.log.error({
+          event: "renave.query_limit_unavailable",
+          traceId: request.id,
+        });
+        return reply.code(503).send({ code: "RENAVE_QUERY_LIMIT_UNAVAILABLE" });
+      }
+      if (!permitDecision.allowed) {
+        request.log.warn({
+          event: "renave.query_limited",
+          scope: permitDecision.scope,
+          traceId: request.id,
+        });
+        reply.header("retry-after", String(permitDecision.retryAfterSeconds));
+        return reply.code(429).send({ code: "RENAVE_QUERY_LIMITED" });
+      }
+
+      try {
+        try {
+          return await options.vehicleLookup.execute(executionInput);
+        } catch (error) {
+          const code = errorCode(error);
+          const status = mappedStatus(code);
+          request.log.error({
+            event: "renave.vehicle_lookup.failed",
+            errorCode: code ?? "UNEXPECTED_ERROR",
+            traceId: request.id,
+          });
+          if (status === 404) {
+            return reply.code(404).send({ code: "VEHICLE_NOT_AVAILABLE" });
+          }
           return reply.code(status).send({
             code:
               status === 500 ? "INTERNAL_ERROR" : (code ?? "UPSTREAM_ERROR"),

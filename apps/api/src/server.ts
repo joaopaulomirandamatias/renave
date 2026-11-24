@@ -28,6 +28,7 @@ const app = buildApp({
     ? { renaveReadiness: runtime.renaveReadiness }
     : {}),
   ...(runtime.stockQuery ? { stockQuery: runtime.stockQuery } : {}),
+  ...(runtime.vehicleLookup ? { vehicleLookup: runtime.vehicleLookup } : {}),
   ...(runtime.stockEntryMutationRateLimiter
     ? {
         stockEntryMutationRateLimiter: runtime.stockEntryMutationRateLimiter,

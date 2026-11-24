@@ -17,6 +17,7 @@ import type {
   BrowserEligibilitySummary,
   BrowserRenaveReadiness,
   BrowserRenaveLinkStatus,
+  BrowserVehicle,
   CreateEstablishmentInput,
   CreateEstablishmentResult,
   CreateStockEntryInput,
@@ -62,6 +63,7 @@ export interface DashboardPageProps {
   ) => Promise<
     readonly { estado: RenaveStockState; id: number; placa: string }[]
   >;
+  onLookupVehicle?: (plate: string) => Promise<BrowserVehicle>;
   onTenantChange?: (tenantId: string) => void;
   selectedEstablishmentId?: string;
   selectedTenantId?: string;
@@ -115,6 +117,7 @@ export function DashboardPage({
   onReloadLinkStatus,
   onRunPreflight,
   onSearchStocks,
+  onLookupVehicle,
   onTenantChange,
   selectedEstablishmentId,
   selectedTenantId,
@@ -356,6 +359,7 @@ export function DashboardPage({
           <StockSearchPanel
             key={`${selectedTenantId}:${selectedEstablishmentId}`}
             onSearch={onSearchStocks}
+            {...(onLookupVehicle ? { onLookupVehicle } : {})}
             selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
           />
         ) : null}
