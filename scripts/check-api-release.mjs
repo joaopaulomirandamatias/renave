@@ -811,6 +811,18 @@ export function checkApiRuntimePreparation(
   if (!/["']tenant-runtime["']/u.test(source)) {
     issues.push(issue(file, source, "API_TENANT_RUNTIME_REQUIRED"));
   }
+  for (const module of [
+    "platform-console-rate-limiter",
+    "platform-console-reader",
+    "platform-digests",
+  ]) {
+    if (!source.includes(`"${module}"`)) {
+      issues.push(issue(file, source, "API_PLATFORM_RUNTIME_REQUIRED"));
+    }
+  }
+  if (source.includes('"platform-operator-provisioning"')) {
+    issues.push(issue(file, source, "API_PLATFORM_PROVISIONER_FORBIDDEN"));
+  }
   if (!/assertRuntimeEsmImports\s*\(\s*root\s*\)/u.test(source)) {
     issues.push(issue(file, source, "API_RUNTIME_IMPORT_GRAPH_REQUIRED"));
   }

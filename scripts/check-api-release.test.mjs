@@ -13,7 +13,12 @@ const digest = "a".repeat(64);
 const syftDigest =
   "00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3";
 const safeRuntimePreparation = `
-const apiRuntimeDbFiles = new Set(["tenant-runtime"]);
+const apiRuntimeDbFiles = new Set([
+  "tenant-runtime",
+  "platform-console-rate-limiter",
+  "platform-console-reader",
+  "platform-digests",
+]);
 await assertRuntimeEsmImports(root);
 `;
 const safeDockerfile = `
@@ -37,7 +42,15 @@ describe("guard do pruning runtime da API", () => {
       "const apiRuntimeDbFiles = new Set([]);",
     ).map(({ id }) => id);
     assert.ok(found.includes("API_TENANT_RUNTIME_REQUIRED"));
+    assert.ok(found.includes("API_PLATFORM_RUNTIME_REQUIRED"));
     assert.ok(found.includes("API_RUNTIME_IMPORT_GRAPH_REQUIRED"));
+  });
+
+  it("mantém o provisionador global fora da imagem HTTP", () => {
+    const found = checkApiRuntimePreparation(
+      `${safeRuntimePreparation}\n"platform-operator-provisioning";`,
+    ).map(({ id }) => id);
+    assert.ok(found.includes("API_PLATFORM_PROVISIONER_FORBIDDEN"));
   });
 });
 
