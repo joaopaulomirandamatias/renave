@@ -135,6 +135,7 @@ export {
 } from "./migrate.js";
 export {
   createOrReplayHeldLocalOperation,
+  createOrReplayHeldLocalStockExitOperation,
   promoteHeldLocalOperation,
   getOperation,
   operationKinds,
@@ -149,6 +150,7 @@ export {
   OperationStorageError,
   type CreateOperationInput,
   type CreateHeldLocalOperationInput,
+  type CreateHeldLocalStockExitOperationInput,
   type CreateOperationResult,
   type PromoteHeldLocalOperationInput,
   type PromoteHeldLocalOperationResult,

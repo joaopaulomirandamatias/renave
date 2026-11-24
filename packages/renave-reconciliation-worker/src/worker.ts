@@ -12,6 +12,7 @@ import {
   type EncryptedOperationReconciliationProjection,
   type OperationReconciliationProjectionBinding,
   OperationReconciliationProjectionCipher,
+  type OperationReconciliationProjectionV1,
   type StockEntryReconciliationProjectionV1,
 } from "@seu-renave/protected-evidence";
 import {
@@ -256,6 +257,42 @@ function envelopeFrom(
     projectionKind: begun.projectionKind,
     projectionSchemaVersion: begun.projectionSchemaVersion,
   };
+}
+
+function isStockEntryReconciliationBegin(
+  begun: OperationReconciliationBegin,
+): begun is OperationReconciliationBegin & {
+  kind: "USED_STOCK_ENTRY";
+  mutationFamily: "STOCK_ENTRY";
+  projectionKind: "STOCK_ENTRY_RECONCILIATION";
+} {
+  return (
+    begun.kind === "USED_STOCK_ENTRY" &&
+    begun.mutationFamily === "STOCK_ENTRY" &&
+    begun.projectionKind === "STOCK_ENTRY_RECONCILIATION"
+  );
+}
+
+function isStockEntryReconciliationProjection(
+  projection: OperationReconciliationProjectionV1,
+): projection is StockEntryReconciliationProjectionV1 {
+  return !("comprador" in projection) && !("dataVenda" in projection);
+}
+
+function decryptStockEntryReconciliationProjection(
+  cipher: OperationReconciliationProjectionCipher,
+  envelope: EncryptedOperationReconciliationProjection,
+  binding: OperationReconciliationProjectionBinding,
+): StockEntryReconciliationProjectionV1 {
+  const projection = decryptOperationReconciliationProjection(
+    cipher,
+    envelope,
+    binding,
+  );
+  if (!isStockEntryReconciliationProjection(projection)) {
+    throw new Error("stock-entry-projection-required");
+  }
+  return projection;
 }
 
 function bindingFrom(
@@ -568,7 +605,9 @@ export class ReconciliationWorker {
         try {
           let envelope: EncryptedOperationReconciliationProjection | undefined;
           try {
-            if (
+            if (!isStockEntryReconciliationBegin(begun)) {
+              throw new Error("stock-entry-reconciliation-required");
+            } else if (
               !hasOperationReconciliationProjectionKey(
                 state.ports.projectionCipher,
                 begun.projectionKeyId,
@@ -585,7 +624,7 @@ export class ReconciliationWorker {
             } else {
               envelope = envelopeFrom(begun);
               const binding = bindingFrom(tenantId, begun);
-              projection = decryptOperationReconciliationProjection(
+              projection = decryptStockEntryReconciliationProjection(
                 state.ports.projectionCipher,
                 envelope,
                 binding,

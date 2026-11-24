@@ -36,6 +36,11 @@ export {
   type StockEntryRequest,
   type StockEntryResponse,
   type StockEntryVehicle,
+  type StockExitAddress,
+  type StockExitBuyer,
+  type StockExitRequest,
+  type StockExitResponse,
+  type StockExitVehicle,
   type VehicleEligibilityDiagnosis,
   type VehicleEligibilityDebtInformation,
   type VehicleEligibilityQuery,
@@ -43,6 +48,12 @@ export {
   type VehicleEligibilityTransferAuthorization,
   type VehicleEligibilityVehicle,
 } from "./operations.js";
+export {
+  InvalidStockExitRequestError,
+  prepareStockExitRequest,
+  type InvalidStockExitRequestReason,
+  type StockExitPreparationOptions,
+} from "./stock-exit-request.js";
 export {
   InvalidStockIdQueryError,
   InvalidVehicleEligibilityQueryError,

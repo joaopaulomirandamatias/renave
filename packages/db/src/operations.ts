@@ -6,8 +6,12 @@ const KEY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const MAX_CIPHERTEXT_BYTES = 1_048_576;
 const MAX_SCHEMA_VERSION = 2_147_483_647;
 
-export const operationKinds = ["USED_STOCK_ENTRY"] as const;
-export const operationMutationFamilies = ["STOCK_ENTRY"] as const;
+export const operationKinds = ["USED_STOCK_ENTRY", "USED_STOCK_EXIT"] as const;
+export const operationMutationFamilies = ["STOCK_ENTRY", "STOCK_EXIT"] as const;
+export const operationReconciliationProjectionKinds = [
+  "STOCK_ENTRY_RECONCILIATION",
+  "STOCK_EXIT_RECONCILIATION",
+] as const;
 export const operationStatuses = [
   "HELD_LOCAL",
   "PENDING_SEND",
@@ -21,6 +25,8 @@ export const operationStatuses = [
 export type OperationKind = (typeof operationKinds)[number];
 export type OperationMutationFamily =
   (typeof operationMutationFamilies)[number];
+export type OperationReconciliationProjectionKind =
+  (typeof operationReconciliationProjectionKinds)[number];
 export type OperationStatus = (typeof operationStatuses)[number];
 
 export interface OperationRecord {
@@ -48,7 +54,7 @@ export interface CreateOperationInput {
   reconciliationProjectionCiphertext: Buffer;
   reconciliationProjectionGeneration: number;
   reconciliationProjectionKeyId: string;
-  reconciliationProjectionKind: "STOCK_ENTRY_RECONCILIATION";
+  reconciliationProjectionKind: OperationReconciliationProjectionKind;
   reconciliationProjectionNonce: Buffer;
   reconciliationProjectionSchemaVersion: 1;
   requestAuthTag: Buffer;
@@ -67,6 +73,16 @@ export interface CreateHeldLocalOperationInput extends CreateOperationInput {
   operatorProfileVersion: string;
   subject: string;
 }
+
+export type CreateHeldLocalStockExitOperationInput = Omit<
+  CreateHeldLocalOperationInput,
+  "kind" | "mutationFamily" | "reconciliationProjectionKind"
+> & {
+  kind: "USED_STOCK_EXIT";
+  mutationFamily: "STOCK_EXIT";
+  reconciliationProjectionKind: "STOCK_EXIT_RECONCILIATION";
+  remoteStockId: number;
+};
 
 export interface CreateOperationResult {
   operation: OperationRecord;
@@ -151,12 +167,13 @@ interface NormalizedOperationInput {
   operatorProfileVersion?: string;
   establishmentProfileId?: string;
   establishmentProfileVersion?: string;
+  remoteStockId?: number;
   reconciliationProjectionAuthTag: Buffer;
   reconciliationProjectionByteLength: number;
   reconciliationProjectionCiphertext: Buffer;
   reconciliationProjectionGeneration: number;
   reconciliationProjectionKeyId: string;
-  reconciliationProjectionKind: "STOCK_ENTRY_RECONCILIATION";
+  reconciliationProjectionKind: OperationReconciliationProjectionKind;
   reconciliationProjectionNonce: Buffer;
   reconciliationProjectionSchemaVersion: 1;
   requestAuthTag: Buffer;
@@ -196,22 +213,39 @@ function copyProjectionCiphertext(value: unknown): Buffer {
 }
 
 function normalizeInput(
-  input: CreateOperationInput | CreateHeldLocalOperationInput,
+  input:
+    | CreateOperationInput
+    | CreateHeldLocalOperationInput
+    | CreateHeldLocalStockExitOperationInput,
 ): NormalizedOperationInput {
   const heldLocal = "subject" in input ? input : undefined;
+  const remoteStockId =
+    heldLocal !== undefined && "remoteStockId" in heldLocal
+      ? heldLocal.remoteStockId
+      : undefined;
   if (
     !input ||
     !isUuid(input.operationId) ||
     !isUuid(input.establishmentId) ||
     !isUuid(input.correlationId) ||
-    input.kind !== "USED_STOCK_ENTRY" ||
-    input.mutationFamily !== "STOCK_ENTRY" ||
+    !operationKinds.includes(input.kind) ||
+    !operationMutationFamilies.includes(input.mutationFamily) ||
+    !(
+      (input.kind === "USED_STOCK_ENTRY" &&
+        input.mutationFamily === "STOCK_ENTRY" &&
+        input.reconciliationProjectionKind === "STOCK_ENTRY_RECONCILIATION") ||
+      (input.kind === "USED_STOCK_EXIT" &&
+        input.mutationFamily === "STOCK_EXIT" &&
+        input.reconciliationProjectionKind === "STOCK_EXIT_RECONCILIATION")
+    ) ||
     !Number.isInteger(input.requestSchemaVersion) ||
     input.requestSchemaVersion < 1 ||
     input.requestSchemaVersion > MAX_SCHEMA_VERSION ||
     typeof input.requestKeyId !== "string" ||
     !KEY_ID_PATTERN.test(input.requestKeyId) ||
-    input.reconciliationProjectionKind !== "STOCK_ENTRY_RECONCILIATION" ||
+    !operationReconciliationProjectionKinds.includes(
+      input.reconciliationProjectionKind,
+    ) ||
     input.reconciliationProjectionSchemaVersion !== 1 ||
     input.reconciliationProjectionGeneration !== 1 ||
     !Number.isInteger(input.reconciliationProjectionByteLength) ||
@@ -250,6 +284,7 @@ function normalizeInput(
     ...(heldLocal?.establishmentProfileVersion === undefined
       ? {}
       : { establishmentProfileVersion: heldLocal.establishmentProfileVersion }),
+    ...(typeof remoteStockId === "number" ? { remoteStockId } : {}),
     reconciliationProjectionAuthTag: copyBuffer(
       input.reconciliationProjectionAuthTag,
       16,
@@ -370,8 +405,29 @@ export async function getOperation(
   if (!isUuid(operationId)) throw new OperationInputError();
   try {
     const { rows } = await client.query<OperationRow>(
-      "select * from renave.get_operation_summary($1)",
+      `select * from renave.get_operation_summary($1)
+       union all
+       select * from renave_stock_exit.get_operation_summary($1)`,
       [operationId.toLowerCase()],
+    );
+    if (rows.length > 1) throw new OperationStorageError();
+    return rows[0] ? toOperation(rows[0]) : null;
+  } catch (error) {
+    if (error instanceof OperationStorageError) throw error;
+    throw new OperationStorageError();
+  }
+}
+
+async function getOperationFrom(
+  client: TenantClient,
+  operationId: string,
+  summaryFunction:
+    "renave.get_operation_summary" | "renave_stock_exit.get_operation_summary",
+): Promise<OperationRecord | null> {
+  try {
+    const { rows } = await client.query<OperationRow>(
+      `select * from ${summaryFunction}($1)`,
+      [operationId],
     );
     return rows[0] ? toOperation(rows[0]) : null;
   } catch (error) {
@@ -382,12 +438,20 @@ export async function getOperation(
 
 async function createOrReplayUsing(
   client: TenantClient,
-  input: CreateOperationInput | CreateHeldLocalOperationInput,
-  functionName: "create_held_local_operation" | "create_operation_with_outbox",
+  input:
+    | CreateOperationInput
+    | CreateHeldLocalOperationInput
+    | CreateHeldLocalStockExitOperationInput,
+  functionName:
+    | "renave.create_held_local_operation"
+    | "renave.create_operation_with_outbox"
+    | "renave_stock_exit.create_held_local_operation",
 ): Promise<CreateOperationResult> {
   const operation = normalizeInput(input);
   let created: CreateOperationRow | undefined;
-  const heldLocal = functionName === "create_held_local_operation";
+  const heldLocal = functionName !== "renave.create_operation_with_outbox";
+  const stockExit =
+    functionName === "renave_stock_exit.create_held_local_operation";
   if (
     heldLocal &&
     (typeof operation.subject !== "string" ||
@@ -397,18 +461,22 @@ async function createOrReplayUsing(
       !isUuid(operation.operatorProfileId) ||
       !/^[1-9][0-9]*$/u.test(operation.operatorProfileVersion ?? "") ||
       !isUuid(operation.establishmentProfileId) ||
-      !/^[1-9][0-9]*$/u.test(operation.establishmentProfileVersion ?? ""))
+      !/^[1-9][0-9]*$/u.test(operation.establishmentProfileVersion ?? "") ||
+      (stockExit &&
+        (!Number.isSafeInteger(operation.remoteStockId) ||
+          (operation.remoteStockId ?? 0) < 1)))
   ) {
     throw new OperationInputError();
   }
   try {
     const { rows } = await client.query<CreateOperationRow>(
       `select operation_id, replayed
-         from renave.${functionName}(
+         from ${functionName}(
            $1, $2, $3, $4, $5, $6, $7, $8,
            $9, $10, $11, $12, $13, $14, $15, $16,
            $17, $18, $19, $20, $21, $22, $23
            ${heldLocal ? ", $24, $25, $26, $27, $28" : ""}
+           ${stockExit ? ", $29" : ""}
          )`,
       [
         operation.operationId,
@@ -443,6 +511,7 @@ async function createOrReplayUsing(
               operation.establishmentProfileVersion,
             ]
           : []),
+        ...(stockExit ? [operation.remoteStockId] : []),
       ],
     );
     created = rows[0];
@@ -457,27 +526,61 @@ async function createOrReplayUsing(
   ) {
     throw new OperationStorageError();
   }
-  const record = await getOperation(client, created.operation_id);
+  const record = await getOperationFrom(
+    client,
+    created.operation_id,
+    stockExit
+      ? "renave_stock_exit.get_operation_summary"
+      : "renave.get_operation_summary",
+  );
   if (!record) throw new OperationStorageError();
   return { operation: record, replayed: created.replayed };
 }
 
-export function createOrReplayOperation(
+export async function createOrReplayOperation(
   client: TenantClient,
   input: CreateOperationInput,
 ): Promise<CreateOperationResult> {
-  return createOrReplayUsing(client, input, "create_operation_with_outbox");
+  if (input.kind !== "USED_STOCK_ENTRY") throw new OperationInputError();
+  return createOrReplayUsing(
+    client,
+    input,
+    "renave.create_operation_with_outbox",
+  );
 }
 
 /**
  * Persiste uma operação local retida. Não cria outbox e não habilita envio;
  * uma futura liberação exigirá um contrato de banco separado.
  */
-export function createOrReplayHeldLocalOperation(
+export async function createOrReplayHeldLocalOperation(
   client: TenantClient,
   input: CreateHeldLocalOperationInput,
 ): Promise<CreateOperationResult> {
-  return createOrReplayUsing(client, input, "create_held_local_operation");
+  if (input.kind !== "USED_STOCK_ENTRY") throw new OperationInputError();
+  return createOrReplayUsing(
+    client,
+    input,
+    "renave.create_held_local_operation",
+  );
+}
+
+/**
+ * Persiste uma saída local vinculada ao identificador oficial do estoque.
+ * Esta capability não possui outbox nem caminho de promoção.
+ */
+export async function createOrReplayHeldLocalStockExitOperation(
+  client: TenantClient,
+  input: CreateHeldLocalStockExitOperationInput,
+): Promise<CreateOperationResult> {
+  if (!Number.isSafeInteger(input.remoteStockId) || input.remoteStockId < 1) {
+    throw new OperationInputError();
+  }
+  return createOrReplayUsing(
+    client,
+    input,
+    "renave_stock_exit.create_held_local_operation",
+  );
 }
 
 export class OperationPromotionDeniedError extends Error {

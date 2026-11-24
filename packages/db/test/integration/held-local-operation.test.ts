@@ -15,11 +15,14 @@ import {
 } from "../../src/establishments.js";
 import {
   createOrReplayHeldLocalOperation,
+  createOrReplayHeldLocalStockExitOperation,
   getOperation,
   OperationActiveConflictError,
   OperationCredentialLinkNotEnabledError,
   OperationIdempotencyConflictError,
+  OperationStorageError,
   type CreateHeldLocalOperationInput,
+  type CreateHeldLocalStockExitOperationInput,
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
@@ -51,6 +54,24 @@ const authorizationByEstablishment = new Map<
 
 function digest(value: string | Buffer): Buffer {
   return createHash("sha256").update(value).digest();
+}
+
+function stockExitInput(
+  label: string,
+  establishmentId: string,
+  remoteStockId: number,
+): CreateHeldLocalStockExitOperationInput {
+  return {
+    ...operationInput(label, establishmentId),
+    ...operationProjectionFields(
+      `held-exit:${label}`,
+      "STOCK_EXIT_RECONCILIATION",
+    ),
+    kind: "USED_STOCK_EXIT",
+    mutationFamily: "STOCK_EXIT",
+    reconciliationProjectionKind: "STOCK_EXIT_RECONCILIATION",
+    remoteStockId,
+  };
 }
 
 function cnpj(index: number): string {
@@ -297,6 +318,224 @@ describe("held local operation integration", () => {
         status: "HELD_LOCAL",
       },
     });
+  });
+
+  it("persiste saída cifrada vinculada ao stockId, sem outbox e com replay estrito", async () => {
+    const input = stockExitInput("stock-exit", enabledA.id, 770001);
+    const created = await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayHeldLocalStockExitOperation(client, input),
+    );
+    const retry = {
+      ...stockExitInput("stock-exit", enabledA.id, 770001),
+      requestAuthTag: Buffer.alloc(16, 71),
+      requestCiphertext: Buffer.from("new-encryption-for-the-same-request"),
+      requestKeyId: "held-local-key-v2",
+      requestNonce: Buffer.alloc(12, 72),
+      reconciliationProjectionAuthTag: Buffer.alloc(16, 73),
+      reconciliationProjectionCiphertext: Buffer.from(
+        "new-encrypted-projection",
+      ),
+      reconciliationProjectionKeyId: "projection-key-v2",
+      reconciliationProjectionNonce: Buffer.alloc(12, 74),
+      reconciliationProjectionByteLength: Buffer.byteLength(
+        "new-encrypted-projection",
+      ),
+    } satisfies CreateHeldLocalStockExitOperationInput;
+    const replay = await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayHeldLocalStockExitOperation(client, retry),
+    );
+    expect(created).toMatchObject({
+      replayed: false,
+      operation: {
+        kind: "USED_STOCK_EXIT",
+        mutationFamily: "STOCK_EXIT",
+        status: "HELD_LOCAL",
+      },
+    });
+    expect(replay).toMatchObject({
+      replayed: true,
+      operation: { id: created.operation.id },
+    });
+    expect(retry.operationId).not.toBe(input.operationId);
+    expect(retry.correlationId).not.toBe(input.correlationId);
+
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        createOrReplayHeldLocalStockExitOperation(client, {
+          ...input,
+          remoteStockId: 770002,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(OperationIdempotencyConflictError);
+
+    const stored = await withTenant(
+      migratorPool,
+      tenantA.id,
+      async (client) => {
+        const operation = await client.query<{
+          kept_original_ciphertext: boolean;
+          projection_kind: string;
+          remote_stock_id: string;
+          request_is_encrypted: boolean;
+          status: string;
+        }>(
+          `select remote_stock_id::text,reconciliation_projection_kind
+              as projection_kind,status,
+              request_ciphertext=$2::bytea as request_is_encrypted,
+              request_ciphertext<>$3::bytea as kept_original_ciphertext
+             from renave_stock_exit.operation where id=$1`,
+          [
+            created.operation.id,
+            input.requestCiphertext,
+            retry.requestCiphertext,
+          ],
+        );
+        const transitions = await client.query<{ count: number }>(
+          `select count(*)::int count
+             from renave_stock_exit.operation_transition
+            where operation_id=$1`,
+          [created.operation.id],
+        );
+        const outbox = await client.query<{ count: number }>(
+          `select count(*)::int count from renave.operation_outbox
+            where operation_id=$1`,
+          [created.operation.id],
+        );
+        return {
+          operation: operation.rows[0],
+          outbox: outbox.rows[0]?.count,
+          transitions: transitions.rows[0]?.count,
+        };
+      },
+    );
+    expect(stored).toEqual({
+      operation: {
+        kept_original_ciphertext: true,
+        projection_kind: "STOCK_EXIT_RECONCILIATION",
+        remote_stock_id: "770001",
+        request_is_encrypted: true,
+        status: "HELD_LOCAL",
+      },
+      outbox: 0,
+      transitions: 1,
+    });
+    await expect(
+      withTenant(appPool, tenantB.id, (client) =>
+        getOperation(client, created.operation.id),
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        client.query("select * from renave_stock_exit.operation"),
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  it("serializa replays concorrentes de saída com nova cifragem", async () => {
+    const attempts = Array.from({ length: 12 }, (_, index) => ({
+      ...stockExitInput("stock-exit-concurrent", enabledA.id, 770003),
+      requestAuthTag: Buffer.alloc(16, index + 1),
+      requestCiphertext: Buffer.from(`retry-ciphertext-${index}`),
+      requestNonce: Buffer.alloc(12, index + 1),
+      reconciliationProjectionAuthTag: Buffer.alloc(16, index + 20),
+      reconciliationProjectionCiphertext: Buffer.from(
+        `retry-projection-${index}`,
+      ),
+      reconciliationProjectionNonce: Buffer.alloc(12, index + 20),
+      reconciliationProjectionByteLength: Buffer.byteLength(
+        `retry-projection-${index}`,
+      ),
+    })) satisfies CreateHeldLocalStockExitOperationInput[];
+    const results = await Promise.all(
+      attempts.map((attempt) =>
+        withTenant(appPool, tenantA.id, (client) =>
+          createOrReplayHeldLocalStockExitOperation(client, attempt),
+        ),
+      ),
+    );
+    expect(new Set(results.map((item) => item.operation.id)).size).toBe(1);
+    expect(results.filter((item) => !item.replayed)).toHaveLength(1);
+    expect(results.filter((item) => item.replayed)).toHaveLength(11);
+  });
+
+  it("orienta o resumo da criação ao schema mesmo com UUID igual", async () => {
+    const entryInput = operationInput("shared-operation-id-entry", enabledA.id);
+    const entry = await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayHeldLocalOperation(client, entryInput),
+    );
+    const exitInput = {
+      ...stockExitInput("shared-operation-id-exit", enabledA.id, 770006),
+      operationId: entry.operation.id,
+    };
+    const exit = await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayHeldLocalStockExitOperation(client, exitInput),
+    );
+    expect(exit.operation).toMatchObject({
+      id: entry.operation.id,
+      kind: "USED_STOCK_EXIT",
+      mutationFamily: "STOCK_EXIT",
+    });
+    expect(entry.operation).toMatchObject({
+      id: exit.operation.id,
+      kind: "USED_STOCK_ENTRY",
+      mutationFamily: "STOCK_ENTRY",
+    });
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        getOperation(client, entry.operation.id),
+      ),
+    ).rejects.toBeInstanceOf(OperationStorageError);
+
+    const summaries = await withTenant(
+      migratorPool,
+      tenantA.id,
+      async (client) => {
+        const entrySummary = await client.query<{
+          kind: string;
+          status: string;
+        }>("select kind,status from renave.operation where id=$1", [
+          entry.operation.id,
+        ]);
+        const exitSummary = await client.query<{
+          kind: string;
+          status: string;
+        }>("select kind,status from renave_stock_exit.operation where id=$1", [
+          entry.operation.id,
+        ]);
+        return [entrySummary.rows[0], exitSummary.rows[0]];
+      },
+    );
+    expect(summaries).toEqual([
+      { kind: "USED_STOCK_ENTRY", status: "HELD_LOCAL" },
+      { kind: "USED_STOCK_EXIT", status: "HELD_LOCAL" },
+    ]);
+  });
+
+  it("mantém conflitos semânticos de saída para stockId, veículo e perfil", async () => {
+    const input = stockExitInput("stock-exit-conflict", enabledA.id, 770004);
+    await withTenant(appPool, tenantA.id, (client) =>
+      createOrReplayHeldLocalStockExitOperation(client, input),
+    );
+    for (const changed of [
+      { ...input, remoteStockId: 770005 },
+      { ...input, vehicleKeyDigest: digest("other-stock-exit-vehicle") },
+      { ...input, operatorProfileId: randomUUID() },
+    ]) {
+      await expect(
+        withTenant(appPool, tenantA.id, (client) =>
+          createOrReplayHeldLocalStockExitOperation(client, changed),
+        ),
+      ).rejects.toBeInstanceOf(OperationIdempotencyConflictError);
+    }
+
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        createOrReplayHeldLocalStockExitOperation(
+          client,
+          stockExitInput("stock-exit-same-remote", enabledA.id, 770004),
+        ),
+      ),
+    ).rejects.toBeInstanceOf(OperationActiveConflictError);
   });
 
   it.each([
@@ -590,6 +829,11 @@ describe("held local operation integration", () => {
       legacy_migrator_executes: boolean;
       maintenance_executes: boolean;
       public_executes: boolean;
+      stock_exit_app_executes: boolean;
+      stock_exit_promoter_executes: boolean;
+      stock_exit_promoter_usage: boolean;
+      stock_exit_worker_executes: boolean;
+      stock_exit_worker_usage: boolean;
       worker_executes: boolean;
     }>(
       `select
@@ -627,7 +871,28 @@ describe("held local operation integration", () => {
            'public',
            'renave.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint)',
            'execute'
-         ) as public_executes`,
+         ) as public_executes,
+         has_function_privilege(
+           'renave_app',
+           'renave_stock_exit.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint,bigint)',
+           'execute'
+         ) as stock_exit_app_executes,
+         has_function_privilege(
+           'renave_operation_worker',
+           'renave_stock_exit.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint,bigint)',
+           'execute'
+         ) as stock_exit_worker_executes,
+         has_schema_privilege(
+           'renave_operation_worker','renave_stock_exit','usage'
+         ) as stock_exit_worker_usage,
+         has_function_privilege(
+           'renave_operation_promoter',
+           'renave_stock_exit.create_held_local_operation(uuid,uuid,text,text,bytea,bytea,bytea,integer,integer,text,bytea,bytea,bytea,bytea,uuid,text,integer,bigint,integer,text,bytea,bytea,bytea,text,uuid,bigint,uuid,bigint,bigint)',
+           'execute'
+         ) as stock_exit_promoter_executes,
+         has_schema_privilege(
+           'renave_operation_promoter','renave_stock_exit','usage'
+         ) as stock_exit_promoter_usage`,
     );
     expect(rows[0]).toEqual({
       app_executes: true,
@@ -636,9 +901,57 @@ describe("held local operation integration", () => {
       legacy_migrator_executes: true,
       maintenance_executes: false,
       public_executes: false,
+      stock_exit_app_executes: true,
+      stock_exit_promoter_executes: false,
+      stock_exit_promoter_usage: false,
+      stock_exit_worker_executes: false,
+      stock_exit_worker_usage: false,
       worker_executes: false,
     });
 
+    await expect(
+      appPool.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      ),
+    ).resolves.toMatchObject({ rows: [{ ready: true }] });
+  });
+
+  it("fecha o runtime se privilégios da saída sofrerem drift", async () => {
+    try {
+      await adminPool.query(
+        "grant usage on schema renave_stock_exit to renave_operation_worker",
+      );
+      await expect(
+        appPool.query<{ ready: boolean }>(
+          "select renave_runtime.api_contract_ready() as ready",
+        ),
+      ).resolves.toMatchObject({ rows: [{ ready: false }] });
+    } finally {
+      await adminPool.query(
+        "revoke usage on schema renave_stock_exit from renave_operation_worker",
+      );
+    }
+    await expect(
+      appPool.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      ),
+    ).resolves.toMatchObject({ rows: [{ ready: true }] });
+
+    try {
+      await adminPool.query(
+        `create function renave_stock_exit.unexpected_contract_drift()
+         returns boolean language sql as 'select true'`,
+      );
+      await expect(
+        appPool.query<{ ready: boolean }>(
+          "select renave_runtime.api_contract_ready() as ready",
+        ),
+      ).resolves.toMatchObject({ rows: [{ ready: false }] });
+    } finally {
+      await adminPool.query(
+        "drop function if exists renave_stock_exit.unexpected_contract_drift()",
+      );
+    }
     await expect(
       appPool.query<{ ready: boolean }>(
         "select renave_runtime.api_contract_ready() as ready",

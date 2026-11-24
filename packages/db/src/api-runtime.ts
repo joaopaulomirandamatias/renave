@@ -66,7 +66,9 @@ export {
 } from "./login-rate-limiter.js";
 export {
   createOrReplayHeldLocalOperation,
+  createOrReplayHeldLocalStockExitOperation,
   type CreateHeldLocalOperationInput,
+  type CreateHeldLocalStockExitOperationInput,
   type CreateOperationInput,
   type CreateOperationResult,
   type OperationKind,

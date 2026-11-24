@@ -23,9 +23,10 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - workspace do cliente separado em Painel, Estoque, Entrada, Compliance e Estabelecimentos, com allowlist exata, 404 fail-closed e componentes de página independentes — **implementado**;
 - inventário recente somente leitura em `/estoque`, usando o `GET /api/estoques` oficial sem filtros, com identidade confirmada em toda chamada, evidência rica cifrada e projeção pública mínima — **implementado e bloqueado por configuração até existirem credenciais reais de homologação**;
 - ficha somente leitura em `/estoque/:id`, usando o `GET /api/estoques/{id}` oficial, com rota canônica, nova autorização por estabelecimento, evidência rica cifrada e projeção pública sem CPF, comprador, endereço ou segredos do CRV — **implementada e bloqueada pela mesma configuração segura**;
+- fundação da saída de estoque usado em `HELD_LOCAL`, com contrato oficial determinístico, payload e projeção cifrados, vínculo obrigatório ao `stockId` oficial, preflight externo antes da transação, reautorização dentro da transação, idempotência concorrente e schema PostgreSQL separado sem outbox, promoção ou capacidade de despacho — **implementada, testada e deliberadamente não composta no runtime**;
 - console global protegido por capability de banco antes da apresentação, com grant verificado antes de MFA e reautorização atômica em cada leitura da fila — **implementado**;
-- manter mutações indisponíveis até cofre/HSM, vínculo, outbox e âncora/WORM;
-- adicionar outbox/idempotência somente quando a primeira mutação entrar no escopo.
+- manter o despacho da saída indisponível até existir preflight SERPRO concreto, catálogo oficial de municípios, reconciliação própria, decisão de promoção assinada, cofre/HSM, vínculo e âncora/WORM;
+- preservar a saída em um schema sem outbox para que a mera composição da rota não conceda capacidade implícita de envio.
 
 ## Controles já implementados
 
@@ -51,6 +52,9 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - rota BFF usa POST local para não colocar placa em URL/log e deriva a autoridade do `subject` + RBAC local;
 - inventário recente usa GET local sem aceitar filtros arbitrários, aplica o mesmo RBAC e limite distribuído da consulta pontual e não devolve CPF, número/código de segurança do CRV ou resposta bruta; datas sem fuso permanecem strings e são exibidas sem `Date.parse`;
 - detalhe por ID aceita somente inteiro positivo seguro tanto no navegador quanto no BFF, revalida o vínculo e a identidade em cada abertura, limita a resposta upstream a 1 MiB/50 mil nós e conserva campos protegidos somente na evidência cifrada; o parser allowlist do navegador recusa qualquer campo inesperado;
+- saída local exige operador vinculado à filial, MFA, origem válida, limite distribuído, placa brasileira, `stockId` positivo e preflight da identidade completa do veículo; o ID local de controle não entra no JSON oficial, mas fica ligado à linha imutável e é único por estabelecimento;
+- replays de saída preservam a primeira cifra e retornam o registro original mesmo com novos UUIDs, correlação e nonces; mudança de payload, veículo, estoque oficial ou perfis regulatórios gera conflito, inclusive sob concorrência;
+- o contrato executável do schema de saída fingerprinta catálogo, RLS, constraints, índices, triggers, funções e ACLs; worker e promotor não recebem `USAGE` nem `EXECUTE` nessa capacidade;
 - consultas SERPRO usam limites de volume/concorrência global, por tenant e por operador/estabelecimento, com leases expiráveis e nenhum SQL aberto durante a chamada;
 - request/response da consulta são cifrados com AES-256-GCM; AAD liga versão, key id, tenant, evidência, estabelecimento, ação e tipo;
 - evidência pendente acima do SLA gera incidente operacional idempotente; o job não lê ciphertext, não apaga prova e não inventa desfecho;
@@ -73,7 +77,7 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - **Desenvolvimento local:** fundação executável e testada.
 - **Homologação SERPRO:** rota de consulta pronta e fail-closed; falta fornecer certificado válido por meio seguro, provisionar chave de evidência e confirmar o vínculo de integradora. O smoke sem certificado confirma apenas o fallback do cliente-padrão e não autoriza operação.
 - **Produção SERPRO:** bloqueada por código. Não há chave de configuração que contorne o bloqueio.
-- **Mutações RENAVE:** bloqueadas. Identidade, evidência, monitor de pendências e reconciliação já existem; ainda faltam cofre/HSM, certificado/vínculo reais, outbox e âncora/WORM.
+- **Mutações RENAVE pela rede:** bloqueadas. Entrada e saída podem ter fundações locais retidas, mas a saída não está registrada no runtime e não possui outbox, promoção, worker ou transporte. Ainda faltam preflight e catálogo concretos, reconciliador de saída, cofre/HSM, certificado/vínculo reais e âncora/WORM antes da ativação.
 
 ## Evidência adicional recebida
 

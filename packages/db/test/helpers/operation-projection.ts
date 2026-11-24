@@ -15,7 +15,10 @@ type ProjectionFields = Pick<
   | "reconciliationProjectionSchemaVersion"
 >;
 
-export function operationProjectionFields(label: string): ProjectionFields {
+export function operationProjectionFields(
+  label: string,
+  kind: ProjectionFields["reconciliationProjectionKind"] = "STOCK_ENTRY_RECONCILIATION",
+): ProjectionFields {
   const ciphertext = Buffer.from(`projection:${label}`, "utf8");
   return {
     operationId: randomUUID(),
@@ -24,7 +27,7 @@ export function operationProjectionFields(label: string): ProjectionFields {
     reconciliationProjectionCiphertext: ciphertext,
     reconciliationProjectionGeneration: 1,
     reconciliationProjectionKeyId: "test-projection-key-v1",
-    reconciliationProjectionKind: "STOCK_ENTRY_RECONCILIATION",
+    reconciliationProjectionKind: kind,
     reconciliationProjectionNonce: randomBytes(12),
     reconciliationProjectionSchemaVersion: 1,
   };

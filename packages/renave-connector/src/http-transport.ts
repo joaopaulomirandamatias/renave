@@ -869,6 +869,8 @@ function mutationResultFrom(
   switch (operation) {
     case "request-stock-entry":
       return stockEntryResultFrom(value);
+    case "request-stock-exit":
+      throw new RenaveProtocolError("request-stock-exit");
   }
 }
 
@@ -1158,6 +1160,11 @@ export class HttpRenaveTransport
     const state = httpTransportState(this, "request-stock-entry");
     if (state.environment === "production") {
       throw new RenaveProductionBlockedError();
+    }
+    // O contrato de saída já pode ser preparado, mas o despacho permanece
+    // bloqueado até a outbox e a reconciliação específicas serem entregues.
+    if (prepared.operation !== "request-stock-entry") {
+      throw new RenaveProtocolError("request-stock-exit");
     }
     // Copiado antes do primeiro await e enviado sem nova serialização.
     const body = copyPreparedRenaveMutationBody(prepared);

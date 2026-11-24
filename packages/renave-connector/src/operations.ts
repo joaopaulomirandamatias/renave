@@ -1,4 +1,5 @@
-export type RenaveMutationOperation = "request-stock-entry";
+export type RenaveMutationOperation =
+  "request-stock-entry" | "request-stock-exit";
 
 export type CrvType = "AZUL" | "VERDE" | "BRANCO" | "DIGITAL";
 export type OwnerDocumentType = "CPF" | "CNPJ";
@@ -34,6 +35,41 @@ export interface StockEntryResponse {
   placa?: string;
   renavam?: string;
 }
+
+export interface StockExitAddress {
+  bairro: string;
+  cep: string;
+  codigoMunicipio: number;
+  complemento?: string;
+  logradouro: string;
+  numero: string;
+}
+
+export interface StockExitBuyer {
+  email: string;
+  endereco: StockExitAddress;
+  nome: string;
+  numeroDocumento: string;
+  tipoDocumento: OwnerDocumentType;
+}
+
+export interface StockExitVehicle {
+  codigoSegurancaCrv: string;
+  numeroCrv: string;
+  placa: string;
+  renavam: string;
+}
+
+export interface StockExitRequest {
+  comprador: StockExitBuyer;
+  cpfOperadorResponsavel: string;
+  dataVenda: string;
+  emailEstabelecimento: string;
+  valorVenda: number;
+  veiculo: StockExitVehicle;
+}
+
+export type StockExitResponse = StockEntryResponse;
 
 export interface VehicleEligibilityQuery {
   numeroCrv?: string;
@@ -116,6 +152,10 @@ export const renaveMutationRoutes = {
   "request-stock-entry": {
     method: "POST",
     path: "/api/solicitacoes-entrada-estoque",
+  },
+  "request-stock-exit": {
+    method: "POST",
+    path: "/api/solicitacoes-saida-estoque",
   },
 } as const satisfies Record<
   RenaveMutationOperation,

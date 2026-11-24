@@ -17,7 +17,10 @@ import {
   type RenaveEnvironment,
 } from "@seu-renave/renave-connector";
 
-const PROJECTION_KIND = "STOCK_ENTRY_RECONCILIATION" as const;
+const ENTRY_PROJECTION_KIND = "STOCK_ENTRY_RECONCILIATION" as const;
+const EXIT_PROJECTION_KIND = "STOCK_EXIT_RECONCILIATION" as const;
+export type OperationReconciliationProjectionKind =
+  typeof ENTRY_PROJECTION_KIND | typeof EXIT_PROJECTION_KIND;
 const PROJECTION_SCHEMA_VERSION = 1 as const;
 const MAX_PROJECTION_BYTES = 4_096;
 const KEY_BYTES = 32;
@@ -35,6 +38,7 @@ const CRV_NUMBER_PATTERN = /^\d{12}$/u;
 const RENAVAM_PATTERN = /^\d{11}$/u;
 const CPF_PATTERN = /^\d{11}$/u;
 const CNPJ_PATTERN = /^[A-Za-z0-9]{12}\d{2}$/u;
+const EXIT_CNPJ_PATTERN = /^[0-9A-Z]{12}\d{2}$/u;
 const MAX_PURCHASE_VALUE = 99_999_999.99;
 const MAX_INT32 = 2_147_483_647;
 const CRV_TYPES = new Set<CrvType>(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
@@ -59,6 +63,25 @@ export interface StockEntryReconciliationProjectionV1 {
   }>;
 }
 
+export interface StockExitReconciliationProjectionV1 {
+  readonly schemaVersion: 1;
+  readonly cpfOperadorResponsavel: string;
+  readonly comprador: Readonly<{
+    numeroDocumento: string;
+    tipoDocumento: "CPF" | "CNPJ";
+  }>;
+  readonly dataVenda: string;
+  readonly veiculo: Readonly<{
+    codigoSegurancaCrv: string;
+    numeroCrv: string;
+    placa: string;
+    renavam: string;
+  }>;
+}
+
+export type OperationReconciliationProjectionV1 =
+  StockEntryReconciliationProjectionV1 | StockExitReconciliationProjectionV1;
+
 export interface OperationReconciliationProjectionBinding {
   environment: RenaveEnvironment;
   establishmentId: string;
@@ -78,13 +101,14 @@ export interface EncryptedOperationReconciliationProjection {
   keyId: string;
   nonce: Buffer;
   projectionByteLength: number;
-  projectionKind: typeof PROJECTION_KIND;
+  projectionKind: OperationReconciliationProjectionKind;
   projectionSchemaVersion: typeof PROJECTION_SCHEMA_VERSION;
 }
 
 interface PreparedState {
   body: OwnedBytes;
   destroyed: boolean;
+  projectionKind: OperationReconciliationProjectionKind;
   sourceRequestSha256: string;
 }
 
@@ -92,9 +116,10 @@ interface NormalizedBinding {
   environment: RenaveEnvironment;
   establishmentId: string;
   generation: number;
-  kind: "USED_STOCK_ENTRY";
-  mutationFamily: "STOCK_ENTRY";
+  kind: OperationKind;
+  mutationFamily: OperationMutationFamily;
   operationId: string;
+  projectionKind: OperationReconciliationProjectionKind;
   requestSchemaVersion: number;
   sourceRequestSha256: string;
   tenantId: string;
@@ -114,6 +139,7 @@ interface EnvelopeSnapshot {
   keyId: string;
   nonce: Buffer;
   projectionByteLength: number;
+  projectionKind: OperationReconciliationProjectionKind;
 }
 
 const PREPARED_TOKEN = Symbol("PreparedOperationReconciliationProjection");
@@ -355,7 +381,7 @@ function optionalIdentifier(value: unknown, pattern: RegExp): string {
   return result;
 }
 
-function projectionFromRequest(
+function entryProjectionFromRequest(
   value: unknown,
 ): StockEntryReconciliationProjectionV1 {
   const request = object(value);
@@ -458,7 +484,7 @@ function projectionFromRequest(
   });
 }
 
-function validateProjection(
+function validateEntryProjection(
   value: unknown,
 ): StockEntryReconciliationProjectionV1 {
   const projection = object(value);
@@ -511,8 +537,176 @@ function validateProjection(
   });
 }
 
+function exitProjectionFromRequest(
+  value: unknown,
+): StockExitReconciliationProjectionV1 {
+  const request = object(value);
+  exactKeys(request, [
+    "comprador",
+    "cpfOperadorResponsavel",
+    "dataVenda",
+    "emailEstabelecimento",
+    "valorVenda",
+    "veiculo",
+  ]);
+  const operatorCpf = requiredString(request["cpfOperadorResponsavel"]);
+  const saleDate = requiredString(request["dataVenda"]);
+  const establishmentEmail = requiredString(request["emailEstabelecimento"]);
+  const saleValue = finiteNumber(request["valorVenda"]);
+  if (
+    !CPF_PATTERN.test(operatorCpf) ||
+    !isCalendarDate(saleDate) ||
+    !EMAIL_PATTERN.test(establishmentEmail) ||
+    saleValue <= 0 ||
+    saleValue > MAX_PURCHASE_VALUE ||
+    Math.abs(saleValue - Math.round(saleValue * 100) / 100) > 1e-9
+  ) {
+    throw new OperationReconciliationProjectionInputError();
+  }
+
+  const buyer = object(request["comprador"]);
+  exactKeys(buyer, [
+    "email",
+    "endereco",
+    "nome",
+    "numeroDocumento",
+    "tipoDocumento",
+  ]);
+  const buyerEmail = requiredString(buyer["email"]);
+  const buyerName = requiredString(buyer["nome"]);
+  const documentType = requiredString(buyer["tipoDocumento"]);
+  const documentNumber = requiredString(buyer["numeroDocumento"]);
+  if (
+    !EMAIL_PATTERN.test(buyerEmail) ||
+    buyerName.length > 40 ||
+    (documentType !== "CPF" && documentType !== "CNPJ") ||
+    (documentType === "CPF" && !CPF_PATTERN.test(documentNumber)) ||
+    (documentType === "CNPJ" && !EXIT_CNPJ_PATTERN.test(documentNumber))
+  ) {
+    throw new OperationReconciliationProjectionInputError();
+  }
+
+  const address = object(buyer["endereco"]);
+  exactKeys(
+    address,
+    ["bairro", "cep", "codigoMunicipio", "logradouro", "numero"],
+    ["complemento"],
+  );
+  const municipalityCode = finiteNumber(address["codigoMunicipio"]);
+  for (const field of ["bairro", "cep", "logradouro", "numero"] as const) {
+    requiredString(address[field]);
+  }
+  if (
+    !/^\d{8}$/u.test(requiredString(address["cep"])) ||
+    !Number.isInteger(municipalityCode) ||
+    municipalityCode <= 0 ||
+    municipalityCode > MAX_INT32 ||
+    (Object.hasOwn(address, "complemento") &&
+      typeof address["complemento"] !== "string")
+  ) {
+    throw new OperationReconciliationProjectionInputError();
+  }
+
+  const vehicle = object(request["veiculo"]);
+  exactKeys(vehicle, ["codigoSegurancaCrv", "numeroCrv", "placa", "renavam"]);
+  const securityCode = optionalIdentifier(
+    vehicle["codigoSegurancaCrv"],
+    SECURITY_CODE_PATTERN,
+  );
+  const crvNumber = optionalIdentifier(
+    vehicle["numeroCrv"],
+    CRV_NUMBER_PATTERN,
+  );
+  const plate = optionalIdentifier(vehicle["placa"], BRAZILIAN_PLATE_PATTERN);
+  const renavam = optionalIdentifier(vehicle["renavam"], RENAVAM_PATTERN);
+  return Object.freeze({
+    schemaVersion: PROJECTION_SCHEMA_VERSION,
+    cpfOperadorResponsavel: operatorCpf,
+    comprador: Object.freeze({
+      numeroDocumento: documentNumber,
+      tipoDocumento: documentType,
+    }) as StockExitReconciliationProjectionV1["comprador"],
+    dataVenda: saleDate,
+    veiculo: Object.freeze({
+      codigoSegurancaCrv: securityCode,
+      numeroCrv: crvNumber,
+      placa: plate,
+      renavam,
+    }),
+  });
+}
+
+function validateExitProjection(
+  value: unknown,
+): StockExitReconciliationProjectionV1 {
+  const projection = object(value);
+  exactKeys(projection, [
+    "schemaVersion",
+    "cpfOperadorResponsavel",
+    "comprador",
+    "dataVenda",
+    "veiculo",
+  ]);
+  const operatorCpf = requiredString(projection["cpfOperadorResponsavel"]);
+  const saleDate = requiredString(projection["dataVenda"]);
+  if (
+    projection["schemaVersion"] !== PROJECTION_SCHEMA_VERSION ||
+    !CPF_PATTERN.test(operatorCpf) ||
+    !isCalendarDate(saleDate)
+  ) {
+    throw new OperationReconciliationProjectionInputError();
+  }
+  const buyer = object(projection["comprador"]);
+  exactKeys(buyer, ["numeroDocumento", "tipoDocumento"]);
+  const documentType = requiredString(buyer["tipoDocumento"]);
+  const documentNumber = requiredString(buyer["numeroDocumento"]);
+  if (
+    (documentType !== "CPF" && documentType !== "CNPJ") ||
+    (documentType === "CPF" && !CPF_PATTERN.test(documentNumber)) ||
+    (documentType === "CNPJ" && !EXIT_CNPJ_PATTERN.test(documentNumber))
+  ) {
+    throw new OperationReconciliationProjectionInputError();
+  }
+  const vehicle = object(projection["veiculo"]);
+  exactKeys(vehicle, ["codigoSegurancaCrv", "numeroCrv", "placa", "renavam"]);
+  const securityCode = optionalIdentifier(
+    vehicle["codigoSegurancaCrv"],
+    SECURITY_CODE_PATTERN,
+  );
+  const crvNumber = optionalIdentifier(
+    vehicle["numeroCrv"],
+    CRV_NUMBER_PATTERN,
+  );
+  const plate = optionalIdentifier(vehicle["placa"], BRAZILIAN_PLATE_PATTERN);
+  const renavam = optionalIdentifier(vehicle["renavam"], RENAVAM_PATTERN);
+  return Object.freeze({
+    schemaVersion: PROJECTION_SCHEMA_VERSION,
+    cpfOperadorResponsavel: operatorCpf,
+    comprador: Object.freeze({
+      numeroDocumento: documentNumber,
+      tipoDocumento: documentType,
+    }) as StockExitReconciliationProjectionV1["comprador"],
+    dataVenda: saleDate,
+    veiculo: Object.freeze({
+      codigoSegurancaCrv: securityCode,
+      numeroCrv: crvNumber,
+      placa: plate,
+      renavam,
+    }),
+  });
+}
+
+function validateProjection(
+  value: unknown,
+  projectionKind: OperationReconciliationProjectionKind,
+): OperationReconciliationProjectionV1 {
+  return projectionKind === ENTRY_PROJECTION_KIND
+    ? validateEntryProjection(value)
+    : validateExitProjection(value);
+}
+
 function canonicalBytes(
-  projection: StockEntryReconciliationProjectionV1,
+  projection: OperationReconciliationProjectionV1,
 ): OwnedBytes {
   const encoded = new TextEncoder().encode(JSON.stringify(projection));
   if (
@@ -552,6 +746,7 @@ function preparedState(
 
 let createPreparedProjection: (
   body: OwnedBytes,
+  projectionKind: OperationReconciliationProjectionKind,
   sourceRequestSha256: string,
 ) => PreparedOperationReconciliationProjection;
 
@@ -565,10 +760,11 @@ export class PreparedOperationReconciliationProjection {
   }
 
   static {
-    createPreparedProjection = (body, sourceRequestSha256) =>
+    createPreparedProjection = (body, projectionKind, sourceRequestSha256) =>
       new PreparedOperationReconciliationProjection(PREPARED_TOKEN, {
         body,
         destroyed: false,
+        projectionKind,
         sourceRequestSha256,
       });
   }
@@ -577,9 +773,8 @@ export class PreparedOperationReconciliationProjection {
     return preparedState(this).body.byteLength;
   }
 
-  get projectionKind(): typeof PROJECTION_KIND {
-    preparedState(this);
-    return PROJECTION_KIND;
+  get projectionKind(): OperationReconciliationProjectionKind {
+    return preparedState(this).projectionKind;
   }
 
   get schemaVersion(): typeof PROJECTION_SCHEMA_VERSION {
@@ -617,15 +812,26 @@ export function prepareOperationReconciliationProjection(
   try {
     const snapshot = readPreparedRenaveMutation(source);
     sourceBytes = snapshot.body;
-    if (
-      snapshot.operation !== "request-stock-entry" ||
-      !SHA256_PATTERN.test(snapshot.requestSha256)
-    ) {
+    if (!SHA256_PATTERN.test(snapshot.requestSha256)) {
       throw new OperationReconciliationProjectionInputError();
     }
-    const projection = projectionFromRequest(parseJson(sourceBytes));
+    const projectionKind =
+      snapshot.operation === "request-stock-entry"
+        ? ENTRY_PROJECTION_KIND
+        : snapshot.operation === "request-stock-exit"
+          ? EXIT_PROJECTION_KIND
+          : undefined;
+    if (projectionKind === undefined) {
+      throw new OperationReconciliationProjectionInputError();
+    }
+    const request = parseJson(sourceBytes);
+    const projection =
+      projectionKind === ENTRY_PROJECTION_KIND
+        ? entryProjectionFromRequest(request)
+        : exitProjectionFromRequest(request);
     return createPreparedProjection(
       canonicalBytes(projection),
+      projectionKind,
       snapshot.requestSha256,
     );
   } catch {
@@ -638,6 +844,7 @@ export function prepareOperationReconciliationProjection(
 export function restoreOperationReconciliationProjection(
   source: Uint8Array,
   sourceRequestSha256: string,
+  projectionKind: OperationReconciliationProjectionKind = ENTRY_PROJECTION_KIND,
 ): PreparedOperationReconciliationProjection {
   if (
     !(source instanceof Uint8Array) ||
@@ -649,7 +856,13 @@ export function restoreOperationReconciliationProjection(
   const copy = new Uint8Array(source.byteLength);
   copy.set(source);
   try {
-    const projection = validateProjection(parseJson(copy));
+    if (
+      projectionKind !== ENTRY_PROJECTION_KIND &&
+      projectionKind !== EXIT_PROJECTION_KIND
+    ) {
+      throw new OperationReconciliationProjectionInputError();
+    }
+    const projection = validateProjection(parseJson(copy), projectionKind);
     const canonical = canonicalBytes(projection);
     try {
       if (!bytesEqual(copy, canonical)) {
@@ -658,7 +871,7 @@ export function restoreOperationReconciliationProjection(
     } finally {
       canonical.fill(0);
     }
-    return createPreparedProjection(copy, sourceRequestSha256);
+    return createPreparedProjection(copy, projectionKind, sourceRequestSha256);
   } catch {
     copy.fill(0);
     throw new OperationReconciliationProjectionInputError();
@@ -667,6 +880,7 @@ export function restoreOperationReconciliationProjection(
 
 function normalizeBinding(
   binding: OperationReconciliationProjectionBinding,
+  projectionKind: OperationReconciliationProjectionKind,
 ): NormalizedBinding {
   let environment: unknown;
   let establishmentId: unknown;
@@ -699,8 +913,14 @@ function normalizeBinding(
     !UUID_PATTERN.test(operationId) ||
     typeof establishmentId !== "string" ||
     !UUID_PATTERN.test(establishmentId) ||
-    kind !== "USED_STOCK_ENTRY" ||
-    mutationFamily !== "STOCK_ENTRY" ||
+    !(
+      (projectionKind === ENTRY_PROJECTION_KIND &&
+        kind === "USED_STOCK_ENTRY" &&
+        mutationFamily === "STOCK_ENTRY") ||
+      (projectionKind === EXIT_PROJECTION_KIND &&
+        kind === "USED_STOCK_EXIT" &&
+        mutationFamily === "STOCK_EXIT")
+    ) ||
     requestSchemaVersion !== 1 ||
     !Number.isSafeInteger(generation) ||
     (generation as number) < 1 ||
@@ -716,6 +936,7 @@ function normalizeBinding(
     kind,
     mutationFamily,
     operationId: operationId.toLowerCase(),
+    projectionKind,
     requestSchemaVersion,
     sourceRequestSha256,
     tenantId: tenantId.toLowerCase(),
@@ -739,7 +960,7 @@ function aad(
       binding.kind,
       binding.mutationFamily,
       binding.requestSchemaVersion,
-      PROJECTION_KIND,
+      binding.projectionKind,
       PROJECTION_SCHEMA_VERSION,
       binding.generation,
       binding.sourceRequestSha256,
@@ -780,8 +1001,11 @@ function encryptProjectionWithState(
   prepared: PreparedOperationReconciliationProjection,
   binding: OperationReconciliationProjectionBinding,
 ): EncryptedOperationReconciliationProjection {
-  const normalized = normalizeBinding(binding);
   const preparedProjection = preparedState(prepared);
+  const normalized = normalizeBinding(
+    binding,
+    preparedProjection.projectionKind,
+  );
   if (
     normalized.environment !== state.environment ||
     normalized.sourceRequestSha256 !== preparedProjection.sourceRequestSha256
@@ -807,7 +1031,7 @@ function encryptProjectionWithState(
       keyId: state.activeKeyId,
       nonce: Buffer.from(nonce),
       projectionByteLength: body.byteLength,
-      projectionKind: PROJECTION_KIND,
+      projectionKind: preparedProjection.projectionKind,
       projectionSchemaVersion: PROJECTION_SCHEMA_VERSION,
     };
   } finally {
@@ -876,7 +1100,8 @@ function snapshotEnvelope(
     !authTag ||
     !ciphertext ||
     !nonce ||
-    projectionKind !== PROJECTION_KIND ||
+    (projectionKind !== ENTRY_PROJECTION_KIND &&
+      projectionKind !== EXIT_PROJECTION_KIND) ||
     projectionSchemaVersion !== PROJECTION_SCHEMA_VERSION ||
     typeof keyId !== "string" ||
     !KEY_ID_PATTERN.test(keyId) ||
@@ -900,6 +1125,7 @@ function snapshotEnvelope(
     keyId,
     nonce,
     projectionByteLength,
+    projectionKind,
   };
 }
 
@@ -909,8 +1135,8 @@ function decryptProjectionWithState(
   binding: OperationReconciliationProjectionBinding,
 ): PreparedOperationReconciliationProjection {
   try {
-    const normalized = normalizeBinding(binding);
     const envelope = snapshotEnvelope(payload);
+    const normalized = normalizeBinding(binding, envelope.projectionKind);
     if (
       normalized.environment !== state.environment ||
       envelope.generation !== normalized.generation
@@ -943,6 +1169,7 @@ function decryptProjectionWithState(
       return restoreOperationReconciliationProjection(
         plaintext,
         normalized.sourceRequestSha256,
+        envelope.projectionKind,
       );
     } finally {
       envelope.nonce.fill(0);
@@ -964,14 +1191,14 @@ export function decryptOperationReconciliationProjection(
   cipher: OperationReconciliationProjectionCipher,
   payload: EncryptedOperationReconciliationProjection,
   binding: OperationReconciliationProjectionBinding,
-): StockEntryReconciliationProjectionV1 {
+): OperationReconciliationProjectionV1 {
   const state = cipherState(cipher);
   let prepared: PreparedOperationReconciliationProjection | undefined;
   let plaintext: OwnedBytes | undefined;
   try {
     prepared = decryptProjectionWithState(state, payload, binding);
     plaintext = prepared.copyBodyBytes();
-    return validateProjection(parseJson(plaintext));
+    return validateProjection(parseJson(plaintext), prepared.projectionKind);
   } catch (error) {
     if (error instanceof OperationReconciliationProjectionConfigurationError) {
       throw error;

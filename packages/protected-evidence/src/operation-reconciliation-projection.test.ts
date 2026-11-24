@@ -48,6 +48,12 @@ const binding: OperationReconciliationProjectionBinding = {
   tenantId: TENANT_ID,
 };
 
+const exitBinding: OperationReconciliationProjectionBinding = {
+  ...binding,
+  kind: "USED_STOCK_EXIT",
+  mutationFamily: "STOCK_EXIT",
+};
+
 const requestBinding: OperationRequestBinding = {
   actorSubjectHash: Buffer.alloc(32, 1),
   correlationId: "44444444-4444-4444-8444-444444444444",
@@ -78,6 +84,36 @@ function request(overrides: Record<string, unknown> = {}) {
       renavam: "10987654321",
       tipoCrv: "DIGITAL",
       tipoDocumentoProprietarioAtual: "CPF",
+    },
+    ...overrides,
+  };
+}
+
+function exitRequest(overrides: Record<string, unknown> = {}) {
+  return {
+    comprador: {
+      email: "comprador@example.test",
+      endereco: {
+        bairro: "Centro",
+        cep: "66010000",
+        codigoMunicipio: 1_501_402,
+        complemento: "Sala 2",
+        logradouro: "Avenida Presidente Vargas",
+        numero: "100",
+      },
+      nome: "Pessoa Compradora",
+      numeroDocumento: "52998224725",
+      tipoDocumento: "CPF",
+    },
+    cpfOperadorResponsavel: "52998224725",
+    dataVenda: "2026-11-24",
+    emailEstabelecimento: "operacao@example.test",
+    valorVenda: 95_000.5,
+    veiculo: {
+      codigoSegurancaCrv: "12345678901",
+      numeroCrv: "123456789012",
+      placa: "ABC1D23",
+      renavam: "00607701676",
     },
     ...overrides,
   };
@@ -1102,6 +1138,156 @@ describe("cifra da projeção de reconciliação", () => {
     const serialized = `${String(error)} ${JSON.stringify(error)}`;
     expect(serialized).not.toMatch(
       /12345678901|QTP4H82|secret-key-id|11111111|22222222|33333333|47474747/u,
+    );
+  });
+});
+
+describe("projeção cifrada da saída de estoque", () => {
+  it("deriva somente a prova mínima em bytes canônicos estáveis", async () => {
+    const firstSource = await prepareRenaveMutation(
+      "request-stock-exit",
+      exitRequest(),
+    );
+    const reorderedSource = await prepareRenaveMutation("request-stock-exit", {
+      veiculo: exitRequest().veiculo,
+      valorVenda: exitRequest().valorVenda,
+      emailEstabelecimento: exitRequest().emailEstabelecimento,
+      dataVenda: exitRequest().dataVenda,
+      cpfOperadorResponsavel: exitRequest().cpfOperadorResponsavel,
+      comprador: exitRequest().comprador,
+    });
+    const first = prepareOperationReconciliationProjection(firstSource);
+    const second = prepareOperationReconciliationProjection(reorderedSource);
+    const expected =
+      '{"schemaVersion":1,"cpfOperadorResponsavel":"52998224725","comprador":{"numeroDocumento":"52998224725","tipoDocumento":"CPF"},"dataVenda":"2026-11-24","veiculo":{"codigoSegurancaCrv":"12345678901","numeroCrv":"123456789012","placa":"ABC1D23","renavam":"00607701676"}}';
+
+    expect(first.projectionKind).toBe("STOCK_EXIT_RECONCILIATION");
+    expect(new TextDecoder().decode(first.copyBodyBytes())).toBe(expected);
+    expect(second.copyBodyBytes()).toEqual(first.copyBodyBytes());
+    expect(expected).not.toMatch(
+      /comprador@example|operacao@example|Pessoa Compradora|Presidente Vargas|Centro|Sala 2|95000/u,
+    );
+  });
+
+  it("cifra e decripta a projeção de saída vinculada ao kind e à família", async () => {
+    const source = await prepareRenaveMutation(
+      "request-stock-exit",
+      exitRequest(),
+    );
+    const prepared = prepareOperationReconciliationProjection(source);
+    const localBinding = {
+      ...exitBinding,
+      sourceRequestSha256: source.requestSha256,
+    };
+    const projectionCipher = cipher();
+    const encrypted = encryptOperationReconciliationProjection(
+      projectionCipher,
+      prepared,
+      localBinding,
+    );
+
+    expect(encrypted.projectionKind).toBe("STOCK_EXIT_RECONCILIATION");
+    expect(
+      decryptOperationReconciliationProjection(
+        projectionCipher,
+        encrypted,
+        localBinding,
+      ),
+    ).toEqual({
+      schemaVersion: 1,
+      cpfOperadorResponsavel: "52998224725",
+      comprador: {
+        numeroDocumento: "52998224725",
+        tipoDocumento: "CPF",
+      },
+      dataVenda: "2026-11-24",
+      veiculo: {
+        codigoSegurancaCrv: "12345678901",
+        numeroCrv: "123456789012",
+        placa: "ABC1D23",
+        renavam: "00607701676",
+      },
+    });
+  });
+
+  it("recusa mismatch de kind, família e tipo da projeção", async () => {
+    const source = await prepareRenaveMutation(
+      "request-stock-exit",
+      exitRequest(),
+    );
+    const prepared = prepareOperationReconciliationProjection(source);
+    const localBinding = {
+      ...exitBinding,
+      sourceRequestSha256: source.requestSha256,
+    };
+    const projectionCipher = cipher();
+
+    expect(() =>
+      encryptOperationReconciliationProjection(projectionCipher, prepared, {
+        ...localBinding,
+        kind: "USED_STOCK_ENTRY",
+      }),
+    ).toThrow(OperationReconciliationProjectionInputError);
+    expect(() =>
+      encryptOperationReconciliationProjection(projectionCipher, prepared, {
+        ...localBinding,
+        mutationFamily: "STOCK_ENTRY",
+      }),
+    ).toThrow(OperationReconciliationProjectionInputError);
+
+    const encrypted = encryptOperationReconciliationProjection(
+      projectionCipher,
+      prepared,
+      localBinding,
+    );
+    const wrongProjection = cloneEnvelope(encrypted);
+    wrongProjection.projectionKind = "STOCK_ENTRY_RECONCILIATION";
+    expect(() =>
+      decryptOperationReconciliationProjection(
+        projectionCipher,
+        wrongProjection,
+        localBinding,
+      ),
+    ).toThrow(OperationReconciliationProjectionDecryptionError);
+    expect(() =>
+      decryptOperationReconciliationProjection(projectionCipher, encrypted, {
+        ...localBinding,
+        kind: "USED_STOCK_ENTRY",
+        mutationFamily: "STOCK_ENTRY",
+      }),
+    ).toThrow(OperationReconciliationProjectionDecryptionError);
+  });
+
+  it("restaura saída somente quando o tipo explícito corresponde aos bytes", async () => {
+    const source = await prepareRenaveMutation(
+      "request-stock-exit",
+      exitRequest(),
+    );
+    const prepared = prepareOperationReconciliationProjection(source);
+    const bytes = prepared.copyBodyBytes();
+
+    expect(() =>
+      restoreOperationReconciliationProjection(bytes, source.requestSha256),
+    ).toThrow(OperationReconciliationProjectionInputError);
+    const restored = restoreOperationReconciliationProjection(
+      bytes,
+      source.requestSha256,
+      "STOCK_EXIT_RECONCILIATION",
+    );
+    expect(restored.projectionKind).toBe("STOCK_EXIT_RECONCILIATION");
+    expect(restored.copyBodyBytes()).toEqual(bytes);
+  });
+
+  it("recusa payload comercial de saída com campo veicular fora do contrato", async () => {
+    const source = await prepareRenaveMutation(
+      "request-stock-exit",
+      exitRequest({
+        veiculo: { ...exitRequest().veiculo, tipoCrv: "DIGITAL" },
+      }),
+    );
+
+    expect(() => prepareOperationReconciliationProjection(source)).toThrow(
+      OperationReconciliationProjectionInputError,
     );
   });
 });

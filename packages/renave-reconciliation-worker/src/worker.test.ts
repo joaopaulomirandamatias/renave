@@ -103,6 +103,9 @@ async function fixture() {
       tenantId: TENANT_ID,
     },
   );
+  if (encrypted.projectionKind !== "STOCK_ENTRY_RECONCILIATION") {
+    throw new Error("fixture de entrada gerou projeção incompatível");
+  }
   prepared.destroy();
   const claim: OperationReconciliationClaim = {
     attemptCount: 3,
@@ -542,6 +545,37 @@ describe("ReconciliationWorker", () => {
       }),
     );
   });
+
+  it.each([
+    ["kind", "USED_STOCK_EXIT"],
+    ["mutationFamily", "STOCK_EXIT"],
+    ["projectionKind", "STOCK_EXIT_RECONCILIATION"],
+  ] as const)(
+    "recusa reconciliação de saída por %s antes da chave, do limiter e da rede",
+    async (field, value) => {
+      const rejected = await setup({
+        observedAt: new Date("2026-11-24T10:00:30.000Z"),
+        outcome: "not_observed",
+      });
+      rejected.begun.projectionKeyId = "projection-key-missing";
+      (rejected.begun as unknown as Record<string, unknown>)[field] = value;
+
+      await expect(rejected.worker.runCycle()).resolves.toMatchObject({
+        keyUnavailable: 0,
+        manualReview: 1,
+        released: 0,
+      });
+      expect(rejected.database.completeManual).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "RENAVE_RECONCILIATION_UNRECOVERABLE",
+        }),
+      );
+      expect(rejected.database.release).not.toHaveBeenCalled();
+      expect(rejected.limiter.tryAcquire).not.toHaveBeenCalled();
+      expect(rejected.transport.getAuthenticatedClient).not.toHaveBeenCalled();
+      expect(rejected.transport.findStocksByPlate).not.toHaveBeenCalled();
+    },
+  );
 
   it("abort gracioso tenta release uma única vez quando a lease ainda é válida", async () => {
     const abort = new AbortController();

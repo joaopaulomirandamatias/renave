@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 import {
   OperationRequestCipher,
   OperationRequestDecryptionError,
+  OperationRequestInputError,
   OperationReconciliationProjectionCipher,
+  OperationReconciliationProjectionDecryptionError,
   type EncryptedOperationRequest,
   type OperationRequestBinding,
 } from "@seu-renave/protected-evidence";
@@ -84,6 +86,43 @@ async function preparedExact(): Promise<PreparedRenaveMutation> {
   );
 }
 
+async function preparedExitExact(): Promise<PreparedRenaveMutation> {
+  const exact = Buffer.from(
+    JSON.stringify({
+      comprador: {
+        email: "comprador@example.test",
+        endereco: {
+          bairro: "Centro",
+          cep: "66000000",
+          codigoMunicipio: 1501402,
+          complemento: "Sala 2",
+          logradouro: "Avenida Brasil",
+          numero: "100",
+        },
+        nome: "Comprador Exemplo",
+        numeroDocumento: "52998224725",
+        tipoDocumento: "CPF",
+      },
+      cpfOperadorResponsavel: "52998224725",
+      dataVenda: "2026-11-24",
+      emailEstabelecimento: "loja@example.test",
+      valorVenda: 98500.25,
+      veiculo: {
+        codigoSegurancaCrv: "12345678901",
+        numeroCrv: "123456789012",
+        placa: "ABC1D23",
+        renavam: "10987654321",
+      },
+    }),
+    "utf8",
+  );
+  return restorePreparedRenaveMutation(
+    "request-stock-exit",
+    exact,
+    sha256(exact).toString("hex"),
+  );
+}
+
 function binding(input: BuildCreateOperationInput): OperationRequestBinding {
   return {
     actorSubjectHash: input.actorSubjectHash,
@@ -108,6 +147,37 @@ function envelope(
     keyId: operation.requestKeyId,
     nonce: Buffer.from(operation.requestNonce),
     operation: "request-stock-entry",
+    requestByteLength: operation.requestCiphertext.byteLength,
+    requestSha256: operation.requestSha256.toString("hex"),
+  };
+}
+
+function exitBinding(
+  input: BuildCreateOperationInput,
+): OperationRequestBinding {
+  return {
+    actorSubjectHash: input.actorSubjectHash,
+    correlationId: input.correlationId,
+    environment: input.environment,
+    establishmentId: input.establishmentId,
+    idempotencyKeyDigest: input.idempotencyKeyDigest,
+    kind: "USED_STOCK_EXIT",
+    mutationFamily: "STOCK_EXIT",
+    requestSchemaVersion: 1,
+    tenantId: input.tenantId,
+    vehicleKeyDigest: input.vehicleKeyDigest,
+  };
+}
+
+function exitEnvelope(
+  operation: ReturnType<typeof buildCreateOperationInput>,
+): EncryptedOperationRequest {
+  return {
+    authTag: Buffer.from(operation.requestAuthTag),
+    ciphertext: Buffer.from(operation.requestCiphertext),
+    keyId: operation.requestKeyId,
+    nonce: Buffer.from(operation.requestNonce),
+    operation: "request-stock-exit",
     requestByteLength: operation.requestCiphertext.byteLength,
     requestSha256: operation.requestSha256.toString("hex"),
   };
@@ -212,6 +282,117 @@ describe("buildCreateOperationInput", () => {
     expectedBody.fill(0);
     restored.destroy();
     restoredProjection.destroy();
+  });
+
+  it("produz saída coerente com família e projeção próprias", async () => {
+    const prepared = await preparedExitExact();
+    const input = { ...metadata, prepared };
+    const requestCipher = cipher();
+    const reconciliationCipher = projectionCipher();
+
+    const operation = buildCreateOperationInput(
+      requestCipher,
+      reconciliationCipher,
+      input,
+    );
+    expectPreparedDestroyed(prepared);
+    expect(operation).toMatchObject({
+      kind: "USED_STOCK_EXIT",
+      mutationFamily: "STOCK_EXIT",
+      reconciliationProjectionKind: "STOCK_EXIT_RECONCILIATION",
+      reconciliationProjectionSchemaVersion: 1,
+      requestSchemaVersion: 1,
+    });
+    const restoredRequest = await requestCipher.decrypt(
+      exitEnvelope(operation),
+      exitBinding(input),
+    );
+    const restoredProjection = reconciliationCipher.decrypt(
+      {
+        authTag: Buffer.from(operation.reconciliationProjectionAuthTag),
+        ciphertext: Buffer.from(operation.reconciliationProjectionCiphertext),
+        generation: operation.reconciliationProjectionGeneration,
+        keyId: operation.reconciliationProjectionKeyId,
+        nonce: Buffer.from(operation.reconciliationProjectionNonce),
+        projectionByteLength: operation.reconciliationProjectionByteLength,
+        projectionKind: operation.reconciliationProjectionKind,
+        projectionSchemaVersion:
+          operation.reconciliationProjectionSchemaVersion,
+      },
+      {
+        environment: input.environment,
+        establishmentId: input.establishmentId,
+        generation: 1,
+        kind: "USED_STOCK_EXIT",
+        mutationFamily: "STOCK_EXIT",
+        operationId: operation.operationId,
+        requestSchemaVersion: 1,
+        sourceRequestSha256: operation.requestSha256.toString("hex"),
+        tenantId: input.tenantId,
+      },
+    );
+    expect(
+      JSON.parse(new TextDecoder().decode(restoredProjection.copyBodyBytes())),
+    ).toEqual({
+      comprador: {
+        numeroDocumento: "52998224725",
+        tipoDocumento: "CPF",
+      },
+      cpfOperadorResponsavel: "52998224725",
+      dataVenda: "2026-11-24",
+      schemaVersion: 1,
+      veiculo: {
+        codigoSegurancaCrv: "12345678901",
+        numeroCrv: "123456789012",
+        placa: "ABC1D23",
+        renavam: "10987654321",
+      },
+    });
+    restoredRequest.destroy();
+    restoredProjection.destroy();
+  });
+
+  it("recusa restaurar saída sob identidade criptográfica de entrada", async () => {
+    const prepared = await preparedExitExact();
+    const input = { ...metadata, prepared };
+    const requestCipher = cipher();
+    const reconciliationCipher = projectionCipher();
+    const operation = buildCreateOperationInput(
+      requestCipher,
+      reconciliationCipher,
+      input,
+    );
+    expectPreparedDestroyed(prepared);
+
+    await expect(
+      requestCipher.decrypt(exitEnvelope(operation), binding(input)),
+    ).rejects.toBeInstanceOf(OperationRequestInputError);
+    expect(() =>
+      reconciliationCipher.decrypt(
+        {
+          authTag: Buffer.from(operation.reconciliationProjectionAuthTag),
+          ciphertext: Buffer.from(operation.reconciliationProjectionCiphertext),
+          generation: operation.reconciliationProjectionGeneration,
+          keyId: operation.reconciliationProjectionKeyId,
+          nonce: Buffer.from(operation.reconciliationProjectionNonce),
+          projectionByteLength: operation.reconciliationProjectionByteLength,
+          projectionKind: operation.reconciliationProjectionKind,
+          projectionSchemaVersion:
+            operation.reconciliationProjectionSchemaVersion,
+        },
+        {
+          environment: input.environment,
+          establishmentId: input.establishmentId,
+          generation: 1,
+          kind: "USED_STOCK_ENTRY",
+          mutationFamily: "STOCK_ENTRY",
+          operationId: operation.operationId,
+          requestSchemaVersion: 1,
+          sourceRequestSha256: operation.requestSha256.toString("hex"),
+          tenantId: input.tenantId,
+        },
+      ),
+    ).toThrow(OperationReconciliationProjectionDecryptionError);
   });
 
   it("devolve cópias defensivas dos metadados e do envelope", async () => {

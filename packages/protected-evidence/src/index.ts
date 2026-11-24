@@ -35,7 +35,10 @@ export {
   prepareOperationReconciliationProjection,
   type EncryptedOperationReconciliationProjection,
   type OperationReconciliationProjectionBinding,
+  type OperationReconciliationProjectionKind,
+  type OperationReconciliationProjectionV1,
   type StockEntryReconciliationProjectionV1,
+  type StockExitReconciliationProjectionV1,
 } from "./operation-reconciliation-projection.js";
 export {
   RenavePrincipalConfigurationError,

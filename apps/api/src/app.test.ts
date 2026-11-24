@@ -52,6 +52,21 @@ describe("fundação da API", () => {
     },
   );
 
+  it("mantém a saída de estoque fora do runtime até a composição segura", async () => {
+    const response = await createApp().inject({
+      headers: {
+        "idempotency-key": "33333333-3333-4333-8333-333333333333",
+        origin: "https://app.test",
+      },
+      method: "POST",
+      payload: {},
+      url: "/api/tenants/11111111-1111-4111-8111-111111111111/establishments/22222222-2222-4222-8222-222222222222/stock-exit-operations",
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body).not.toMatch(/serpro|certificate|cnpj|cpf|renavam/iu);
+  });
+
   it("readiness reflete dependências sem revelar qual falhou", async () => {
     const app = buildApp({
       config: loadConfig(),

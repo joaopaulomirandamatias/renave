@@ -32,6 +32,55 @@ describe("authorize", () => {
     ).toEqual({ allowed: false, reason: "ESTABLISHMENT_SCOPE_DENIED" });
   });
 
+  it("autoriza saída somente para operador no estabelecimento", () => {
+    expect(
+      authorize(operator, {
+        action: "renave.stock-exit.request",
+        establishmentId: "establishment-a",
+        tenantId: "tenant-a",
+      }),
+    ).toMatchObject({ allowed: true, matchedRole: "renave_operator" });
+    expect(
+      authorize(operator, {
+        action: "renave.stock-exit.request",
+        establishmentId: "establishment-b",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ESTABLISHMENT_SCOPE_DENIED" });
+    expect(
+      authorize(operator, {
+        action: "renave.stock-exit.request",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ESTABLISHMENT_REQUIRED" });
+
+    const admin: AuthorizationContext = {
+      grants: [{ establishmentIds: "*", role: "tenant_admin" }],
+      subject: "admin-1",
+      tenantId: "tenant-a",
+    };
+    expect(
+      authorize(admin, {
+        action: "renave.stock-exit.request",
+        establishmentId: "any-establishment",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ROLE_DENIED" });
+
+    const auditor: AuthorizationContext = {
+      grants: [{ establishmentIds: "*", role: "compliance_auditor" }],
+      subject: "auditor-1",
+      tenantId: "tenant-a",
+    };
+    expect(
+      authorize(auditor, {
+        action: "renave.stock-exit.request",
+        establishmentId: "establishment-a",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ROLE_DENIED" });
+  });
+
   it("nega troca de tenant mesmo com o mesmo papel", () => {
     expect(
       authorize(operator, {

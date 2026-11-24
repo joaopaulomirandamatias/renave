@@ -103,7 +103,10 @@ function copyFixed(value: Uint8Array, length: number): Buffer {
   return Buffer.from(value);
 }
 
-function normalizeBinding(binding: OperationRequestBinding): NormalizedBinding {
+function normalizeBinding(
+  binding: OperationRequestBinding,
+  operation: RenaveMutationOperation,
+): NormalizedBinding {
   if (
     !binding ||
     (binding.environment !== "homologation" &&
@@ -111,8 +114,14 @@ function normalizeBinding(binding: OperationRequestBinding): NormalizedBinding {
     !UUID_PATTERN.test(binding.tenantId) ||
     !UUID_PATTERN.test(binding.establishmentId) ||
     !UUID_PATTERN.test(binding.correlationId) ||
-    binding.kind !== "USED_STOCK_ENTRY" ||
-    binding.mutationFamily !== "STOCK_ENTRY" ||
+    !(
+      (operation === "request-stock-entry" &&
+        binding.kind === "USED_STOCK_ENTRY" &&
+        binding.mutationFamily === "STOCK_ENTRY") ||
+      (operation === "request-stock-exit" &&
+        binding.kind === "USED_STOCK_EXIT" &&
+        binding.mutationFamily === "STOCK_EXIT")
+    ) ||
     !Number.isInteger(binding.requestSchemaVersion) ||
     binding.requestSchemaVersion < 1 ||
     binding.requestSchemaVersion > MAX_SCHEMA_VERSION
@@ -165,7 +174,8 @@ function aad(
 function assertEnvelopeMetadata(payload: EncryptedOperationRequest): void {
   if (
     !payload ||
-    payload.operation !== "request-stock-entry" ||
+    (payload.operation !== "request-stock-entry" &&
+      payload.operation !== "request-stock-exit") ||
     !SHA256_PATTERN.test(payload.requestSha256) ||
     !Number.isInteger(payload.requestByteLength) ||
     payload.requestByteLength < 1 ||
@@ -195,14 +205,14 @@ function encryptWithState(
   prepared: PreparedRenaveMutation,
   binding: OperationRequestBinding,
 ): EncryptedOperationRequest {
-  const normalized = normalizeBinding(binding);
+  const operation = prepared.operation;
+  const normalized = normalizeBinding(binding, operation);
   if (normalized.environment !== state.environment) {
     throw new OperationRequestInputError();
   }
   const body = prepared.copyBodyBytes();
   try {
     if (
-      prepared.operation !== "request-stock-entry" ||
       !SHA256_PATTERN.test(prepared.requestSha256) ||
       prepared.byteLength !== body.byteLength ||
       body.byteLength < 1 ||
@@ -221,7 +231,7 @@ function encryptWithState(
       aad(
         normalized,
         state.activeKeyId,
-        prepared.operation,
+        operation,
         prepared.requestSha256,
         prepared.byteLength,
       ),
@@ -232,7 +242,7 @@ function encryptWithState(
       ciphertext: Buffer.from(ciphertext),
       keyId: state.activeKeyId,
       nonce: Buffer.from(nonce),
-      operation: prepared.operation,
+      operation,
       requestByteLength: prepared.byteLength,
       requestSha256: prepared.requestSha256,
     };
@@ -314,11 +324,11 @@ export class OperationRequestCipher {
     binding: OperationRequestBinding,
   ): Promise<PreparedRenaveMutation> {
     const state = cipherState(this);
-    const normalized = normalizeBinding(binding);
+    assertEnvelopeMetadata(payload);
+    const normalized = normalizeBinding(binding, payload.operation);
     if (normalized.environment !== state.environment) {
       throw new OperationRequestDecryptionError();
     }
-    assertEnvelopeMetadata(payload);
     const key = state.keys.get(payload.keyId);
     if (!key) throw new OperationRequestDecryptionError();
 

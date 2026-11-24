@@ -30,6 +30,7 @@ const KEY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 interface OperationDefinition {
   kind: OperationKind;
   mutationFamily: OperationMutationFamily;
+  reconciliationProjectionKind: CreateHeldLocalOperationInput["reconciliationProjectionKind"];
   requestSchemaVersion: number;
 }
 
@@ -37,6 +38,13 @@ const operationDefinitions = {
   "request-stock-entry": {
     kind: "USED_STOCK_ENTRY",
     mutationFamily: "STOCK_ENTRY",
+    reconciliationProjectionKind: "STOCK_ENTRY_RECONCILIATION",
+    requestSchemaVersion: 1,
+  },
+  "request-stock-exit": {
+    kind: "USED_STOCK_EXIT",
+    mutationFamily: "STOCK_EXIT",
+    reconciliationProjectionKind: "STOCK_EXIT_RECONCILIATION",
     requestSchemaVersion: 1,
   },
 } as const satisfies Record<RenaveMutationOperation, OperationDefinition>;
@@ -118,9 +126,10 @@ function assertEncryptedOperation(
 function assertEncryptedProjection(
   encrypted: EncryptedOperationReconciliationProjection,
   operationId: string,
+  definition: OperationDefinition,
 ): void {
   if (
-    encrypted.projectionKind !== "STOCK_ENTRY_RECONCILIATION" ||
+    encrypted.projectionKind !== definition.reconciliationProjectionKind ||
     encrypted.projectionSchemaVersion !== 1 ||
     encrypted.generation !== 1 ||
     !KEY_ID_PATTERN.test(encrypted.keyId) ||
@@ -240,7 +249,7 @@ export function buildCreateOperationInput(
         tenantId,
       },
     );
-    assertEncryptedProjection(encryptedProjection, operationId);
+    assertEncryptedProjection(encryptedProjection, operationId, definition);
 
     return {
       actorSubjectHash: Buffer.from(actorSubjectHash),

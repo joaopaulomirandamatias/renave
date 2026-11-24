@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createOrReplayHeldLocalOperation,
+  createOrReplayHeldLocalStockExitOperation,
   createOrReplayOperation,
   getOperation,
   OperationActiveConflictError,
@@ -13,6 +14,7 @@ import {
   OperationStorageError,
   promoteHeldLocalOperation,
   type CreateHeldLocalOperationInput,
+  type CreateHeldLocalStockExitOperationInput,
   type CreateOperationInput,
 } from "../../src/operations.js";
 import type { TenantClient } from "../../src/tenant-context.js";
@@ -46,6 +48,16 @@ function input(): CreateHeldLocalOperationInput {
     requestSha256: Buffer.alloc(32, 5),
     subject: "oidc|operations-unit",
     vehicleKeyDigest: Buffer.alloc(32, 6),
+  };
+}
+
+function stockExitInput(): CreateHeldLocalStockExitOperationInput {
+  return {
+    ...input(),
+    kind: "USED_STOCK_EXIT",
+    mutationFamily: "STOCK_EXIT",
+    reconciliationProjectionKind: "STOCK_EXIT_RECONCILIATION",
+    remoteStockId: 987654321,
   };
 }
 
@@ -446,6 +458,69 @@ describe("operation repository", () => {
       candidate.establishmentProfileId,
       candidate.establishmentProfileVersion,
     ]);
+  });
+
+  it("usa capability dedicada de saída e exige o stockId oficial", async () => {
+    const candidate = stockExitInput();
+    const operationId = randomUUID();
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ operation_id: operationId, replayed: false }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...summary(operationId, candidate),
+            status: "HELD_LOCAL",
+          },
+        ],
+      });
+
+    await expect(
+      createOrReplayHeldLocalStockExitOperation(
+        clientWithQuery(query),
+        candidate,
+      ),
+    ).resolves.toMatchObject({
+      operation: {
+        id: operationId,
+        kind: "USED_STOCK_EXIT",
+        mutationFamily: "STOCK_EXIT",
+        status: "HELD_LOCAL",
+      },
+    });
+    expect(query.mock.calls[0]?.[0]).toContain(
+      "renave_stock_exit.create_held_local_operation",
+    );
+    expect(query.mock.calls[0]?.[1]).toHaveLength(29);
+    expect(query.mock.calls[0]?.[1]?.[28]).toBe(candidate.remoteStockId);
+    expect(query.mock.calls[1]?.[0]).toContain(
+      "renave_stock_exit.get_operation_summary",
+    );
+
+    for (const remoteStockId of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      const invalid = { ...stockExitInput(), remoteStockId };
+      const invalidQuery = vi.fn();
+      await expect(
+        createOrReplayHeldLocalStockExitOperation(
+          clientWithQuery(invalidQuery),
+          invalid,
+        ),
+      ).rejects.toBeInstanceOf(OperationInputError);
+      expect(invalidQuery).not.toHaveBeenCalled();
+    }
+  });
+
+  it("não permite saída pelo helper genérico de HELD_LOCAL", async () => {
+    const query = vi.fn();
+    await expect(
+      createOrReplayHeldLocalOperation(
+        clientWithQuery(query),
+        stockExitInput(),
+      ),
+    ).rejects.toBeInstanceOf(OperationInputError);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it.each([

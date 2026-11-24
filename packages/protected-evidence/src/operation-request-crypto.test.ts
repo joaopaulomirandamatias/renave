@@ -30,6 +30,12 @@ const binding: OperationRequestBinding = {
   vehicleKeyDigest: Buffer.alloc(32, 3),
 };
 
+const exitBinding: OperationRequestBinding = {
+  ...binding,
+  kind: "USED_STOCK_EXIT",
+  mutationFamily: "STOCK_EXIT",
+};
+
 function createCipher(
   activeKeyId = "operation-key-2026-11",
   keys: ReadonlyMap<string, Uint8Array> = new Map([
@@ -388,5 +394,66 @@ describe("OperationRequestCipher", () => {
         binding,
       ),
     ).rejects.toBeInstanceOf(OperationRequestConfigurationError);
+  });
+
+  it("preserva bytes exatos da saída com o par USED_STOCK_EXIT/STOCK_EXIT", async () => {
+    const exact = Buffer.from(
+      '{"cpfOperadorResponsavel":"52998224725","dataVenda":"2026-11-24"}',
+      "utf8",
+    );
+    const prepared = await restorePreparedRenaveMutation(
+      "request-stock-exit",
+      exact,
+      sha256(exact),
+    );
+    const requestCipher = createCipher();
+
+    const encrypted = requestCipher.encrypt(prepared, exitBinding);
+    const restored = await requestCipher.decrypt(encrypted, exitBinding);
+
+    expect(encrypted.operation).toBe("request-stock-exit");
+    expect(encrypted.requestSha256).toBe(sha256(exact));
+    expect(restored.operation).toBe("request-stock-exit");
+    expect(Buffer.from(restored.copyBodyBytes())).toEqual(exact);
+  });
+
+  it("recusa toda combinação cruzada entre operação, kind e família", async () => {
+    const entry = await prepareRenaveMutation("request-stock-entry", {
+      value: "entry",
+    });
+    const exit = await prepareRenaveMutation("request-stock-exit", {
+      value: "exit",
+    });
+    const requestCipher = createCipher();
+
+    expect(() => requestCipher.encrypt(exit, binding)).toThrow(
+      OperationRequestInputError,
+    );
+    expect(() => requestCipher.encrypt(entry, exitBinding)).toThrow(
+      OperationRequestInputError,
+    );
+    expect(() =>
+      requestCipher.encrypt(exit, {
+        ...exitBinding,
+        mutationFamily: "STOCK_ENTRY",
+      }),
+    ).toThrow(OperationRequestInputError);
+    expect(() =>
+      requestCipher.encrypt(exit, {
+        ...exitBinding,
+        kind: "USED_STOCK_ENTRY",
+      }),
+    ).toThrow(OperationRequestInputError);
+
+    const encryptedExit = requestCipher.encrypt(exit, exitBinding);
+    await expect(
+      requestCipher.decrypt(encryptedExit, binding),
+    ).rejects.toBeInstanceOf(OperationRequestInputError);
+
+    const relabeled = cloneEnvelope(encryptedExit);
+    relabeled.operation = "request-stock-entry";
+    await expect(
+      requestCipher.decrypt(relabeled, binding),
+    ).rejects.toBeInstanceOf(OperationRequestDecryptionError);
   });
 });

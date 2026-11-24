@@ -56,7 +56,10 @@ function validateBodySize(bytes: Uint8Array): void {
 export function assertRenaveMutationOperation(
   operation: unknown,
 ): asserts operation is RenaveMutationOperation {
-  if (operation !== "request-stock-entry") {
+  if (
+    operation !== "request-stock-entry" &&
+    operation !== "request-stock-exit"
+  ) {
     throw new InvalidPreparedRenaveMutationError("OPERATION");
   }
 }

@@ -287,6 +287,20 @@ describe("HttpRenaveTransport", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("mantém o despacho da saída bloqueado em homologação antes da rede", async () => {
+    const request = vi.fn();
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+    const prepared = await prepareRenaveMutation("request-stock-exit", {});
+
+    await expect(transport.mutate(headers, prepared)).rejects.toBeInstanceOf(
+      RenaveProtocolError,
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("recusa envelope forjado antes da rede", async () => {
     const request = vi.fn();
     const transport = new HttpRenaveTransport({
