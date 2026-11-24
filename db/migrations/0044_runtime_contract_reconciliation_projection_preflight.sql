@@ -17,7 +17,7 @@ as $$
   with expected_ledger(version, checksum) as (
     values
       ('0042_runtime_contract_reconciliation_worker_capabilities',
-       'a05279e9425ccb8f27080c134129fc8a9b25c04b1d365630c500f7b43e0dbe09'),
+       'b2e70bcdf5ce334cdc6d3f38f46e94c5bc12a4ce7eac558eefd3b3e296a96be1'),
       ('0043_reconciliation_projection_preflight',
        '12964eda018ce1a938a92f303a4b5945ba4d08a6a2b7a8c1246fa0e19c9704e8')
   ),
