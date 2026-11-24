@@ -348,7 +348,7 @@ describe("verified RENAVE profile foundation", () => {
     ).rejects.toMatchObject({ code: "42501" });
   });
 
-  it("nega leitura e escrita direta aos runtimes e não oferece resolvedor", async () => {
+  it("nega leitura e escrita direta aos runtimes", async () => {
     const tableAccess = await adminPool.query<{
       has_any_access: boolean;
       role_name: string;
@@ -402,14 +402,6 @@ describe("verified RENAVE profile foundation", () => {
     for (const access of functionAccess.rows) {
       expect(access.can_execute).toBe(access.role_name === "renave_app");
     }
-
-    await expect(
-      adminPool.query<{ resolver_absent: boolean }>(
-        `select to_regprocedure(
-           'renave.resolve_verified_renave_profiles(text,uuid)'
-         ) is null as resolver_absent`,
-      ),
-    ).resolves.toMatchObject({ rows: [{ resolver_absent: true }] });
 
     await expect(
       withTenant(appPool, tenantA.id, (client) =>

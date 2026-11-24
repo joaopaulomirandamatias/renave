@@ -21,6 +21,12 @@ import type { EligibilityUseCase } from "./renave/use-case.js";
 import type { RenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./renave/preflight-use-case.js";
 import type { RenaveReadinessUseCase } from "./renave/readiness-use-case.js";
+import {
+  registerStockEntryOperationRoute,
+  type Clock,
+  type StockEntryMutationRateLimiter,
+  type StockEntryOperationUseCase,
+} from "./renave/stock-entry-operations.js";
 import type {
   TenantEstablishmentAdministration,
   TenantMutationRateLimiter,
@@ -50,6 +56,19 @@ export interface BuildAppOptions {
   serproQueryLimiter?: SerproQueryLimiter;
   /** Consulta pontual e minimizada de estoque por placa. */
   stockQuery?: StockQueryUseCase;
+  /**
+   * Criação local retida de entrada usada; nunca envia ao SERPRO.
+   * O app chama `destroy` do caso de uso no onClose. O compositor continua
+   * dono dos recursos criptográficos emprestados e deve destruí-los depois de
+   * fechar todos os consumidores que os compartilham.
+   */
+  stockEntryOperation?: StockEntryOperationUseCase;
+  /** Relógio civil explícito da validação da entrada (injetável em testes). */
+  stockEntryClock?: Clock;
+  /** Zona IANA da data civil comercial; padrão seguro: America/Sao_Paulo. */
+  stockEntryBusinessTimeZone?: string;
+  /** Limite distribuído obrigatório da criação local retida. */
+  stockEntryMutationRateLimiter?: StockEntryMutationRateLimiter;
   /** Diretório global mínimo; ausente mantém descoberta de tenants bloqueada. */
   tenantDirectory?: TenantDirectory;
   /** Mutação administrativa atômica; ausente mantém o POST bloqueado. */
@@ -102,6 +121,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       "Administração de estabelecimento exige runner e rate limit distribuído",
     );
   }
+  if (options.stockEntryOperation && !options.stockEntryMutationRateLimiter) {
+    throw new Error("Entrada de estoque exige rate limit distribuído");
+  }
 
   const app = Fastify({
     trustProxy:
@@ -124,6 +146,12 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
             ...(options.logStream ? { stream: options.logStream } : {}),
           },
   });
+
+  if (options.stockEntryOperation?.destroy) {
+    app.addHook("onClose", async () => {
+      options.stockEntryOperation?.destroy?.();
+    });
+  }
 
   const accessGuard = options.identity
     ? createRequestAccessGuard({
@@ -194,6 +222,20 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       ...(options.stockQuery ? { stockQuery: options.stockQuery } : {}),
       ...(options.serproQueryLimiter
         ? { queryLimiter: options.serproQueryLimiter }
+        : {}),
+    });
+    registerStockEntryOperationRoute(app, {
+      accessGuard,
+      publicOrigin: options.identity.config.publicOrigin,
+      ...(options.stockEntryBusinessTimeZone
+        ? { businessTimeZone: options.stockEntryBusinessTimeZone }
+        : {}),
+      ...(options.stockEntryClock ? { clock: options.stockEntryClock } : {}),
+      ...(options.stockEntryMutationRateLimiter
+        ? { mutationRateLimiter: options.stockEntryMutationRateLimiter }
+        : {}),
+      ...(options.stockEntryOperation
+        ? { operation: options.stockEntryOperation }
         : {}),
     });
   }

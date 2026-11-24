@@ -453,4 +453,110 @@ describe("DashboardPage", () => {
     fireEvent.click(reload);
     expect(onReloadLinkStatus).toHaveBeenCalledOnce();
   });
+
+  it("mantém a entrada de estoque bloqueada sem a capability explícita", () => {
+    const onCreateStockEntry = vi.fn();
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="enabled"
+        onCreateStockEntry={onCreateStockEntry}
+        onLogout={vi.fn()}
+        readiness={{
+          certificate: "ready",
+          environment: "homologation",
+          establishmentContact: "ready",
+          integration: "configured",
+          link: "enabled",
+          mutations: "blocked",
+          operatorIdentity: "ready",
+          queries: "ready",
+        }}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        tenants={[{ id: "tenant-a", label: "Organização A" }]}
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(screen.getByText(/capability explícita/i)).toHaveAttribute(
+      "role",
+      "status",
+    );
+    expect(
+      screen.queryByRole("button", { name: "Registrar solicitação local" }),
+    ).toBeNull();
+  });
+
+  it("só exibe o formulário com capability, perfis, vínculo e integração prontos", () => {
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="enabled"
+        onCreateStockEntry={vi.fn(async () => ({
+          createdAt: "2026-11-24T15:00:00.000Z",
+          operationId: "11111111-1111-4111-8111-111111111111",
+          replayed: false,
+          status: "HELD_LOCAL" as const,
+        }))}
+        onLogout={vi.fn()}
+        readiness={{
+          certificate: "warning",
+          environment: "homologation",
+          establishmentContact: "ready",
+          integration: "configured",
+          link: "enabled",
+          mutations: "blocked",
+          operatorIdentity: "ready",
+          queries: "ready",
+        }}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        stockEntryOperationsEnabled
+        tenants={[{ id: "tenant-a", label: "Organização A" }]}
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Registrar solicitação local" }),
+    ).toBeEnabled();
+    expect(screen.getByText(/CPF do operador/i)).toHaveTextContent(
+      /perfis verificados no servidor/i,
+    );
+  });
+
+  it("não confia em um vínculo externo habilitado quando a prontidão diverge", () => {
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="enabled"
+        onCreateStockEntry={vi.fn()}
+        onLogout={vi.fn()}
+        readiness={{
+          certificate: "ready",
+          environment: "homologation",
+          establishmentContact: "ready",
+          integration: "configured",
+          link: "pending",
+          mutations: "blocked",
+          operatorIdentity: "ready",
+          queries: "blocked",
+        }}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        stockEntryOperationsEnabled
+        tenants={[{ id: "tenant-a", label: "Organização A" }]}
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Registrar solicitação local" }),
+    ).toBeNull();
+    expect(screen.getByText(/capability explícita/i)).toBeVisible();
+  });
 });

@@ -111,8 +111,13 @@ export {
 export {
   getEstablishmentRenaveProfileStatus,
   getOperatorIdentityProfileStatus,
+  resolveVerifiedRenavePrincipals,
   renaveProfileStatuses,
+  RenavePrincipalResolutionStorageError,
+  RenavePrincipalResolutionUnavailableError,
   RenaveProfileInputError,
+  type ResolvedRenavePrincipalEnvelope,
+  type ResolvedVerifiedRenavePrincipals,
   type RenaveProfileStatusValue,
 } from "./renave-profiles.js";
 export {

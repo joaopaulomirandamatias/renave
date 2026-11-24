@@ -7,8 +7,8 @@ import { loadMigrations, MigrationError } from "../../src/migrate.js";
 describe("loadMigrations", () => {
   it("lê as migrations versionadas em ordem, com checksum estável", async () => {
     const all = await loadMigrations();
-    const first = all.slice(0, -8);
-    const second = (await loadMigrations()).slice(0, -8);
+    const first = all.slice(0, -10);
+    const second = (await loadMigrations()).slice(0, -10);
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
     expect(first.at(-21)?.version).toBe("0024_runtime_contract_stock_query");
@@ -141,59 +141,81 @@ describe("loadMigrations", () => {
     expect(first.at(-1)?.sql).toContain(first.at(-2)?.checksum);
     expect(first.at(-1)?.sql).toContain(first.at(-3)?.checksum);
     expect(first.at(-1)?.sql).toContain("select pg_catalog.count(*) = 11");
-    expect(all.at(-8)?.version).toBe("0045_identity_authentication_assurance");
-    expect(all.at(-8)?.sql).toContain("authentication_context");
-    expect(all.at(-8)?.sql).toContain(
+    expect(all.at(-10)?.version).toBe("0045_identity_authentication_assurance");
+    expect(all.at(-10)?.sql).toContain("authentication_context");
+    expect(all.at(-10)?.sql).toContain(
       "mfa_verified_at_login boolean not null default false",
     );
-    expect(all.at(-8)?.sql).toContain("authentication_context ~ '^[!-~]+$'");
-    expect(all.at(-7)?.version).toBe(
+    expect(all.at(-10)?.sql).toContain("authentication_context ~ '^[!-~]+$'");
+    expect(all.at(-9)?.version).toBe(
       "0046_runtime_contract_identity_assurance",
+    );
+    expect(all.at(-9)?.sql).toContain(all.at(-10)?.checksum);
+    expect(all.at(-9)?.sql).toContain(
+      "reconciliation_projection_preflight_contract_ready_v0044",
+    );
+    expect(all.at(-8)?.version).toBe("0047_tenant_administration");
+    expect(all.at(-8)?.sql).toContain("lock_current_tenant_admin");
+    expect(all.at(-8)?.sql).toContain("admin_mutation_idempotency");
+    expect(all.at(-7)?.version).toBe(
+      "0048_runtime_contract_tenant_administration",
     );
     expect(all.at(-7)?.sql).toContain(all.at(-8)?.checksum);
     expect(all.at(-7)?.sql).toContain(
-      "reconciliation_projection_preflight_contract_ready_v0044",
+      "tenant_administration_catalog_fingerprint_v0048",
     );
-    expect(all.at(-6)?.version).toBe("0047_tenant_administration");
-    expect(all.at(-6)?.sql).toContain("lock_current_tenant_admin");
-    expect(all.at(-6)?.sql).toContain("admin_mutation_idempotency");
+    expect(all.at(-6)?.version).toBe("0049_held_local_operation");
+    expect(all.at(-6)?.sql).toContain("'HELD_LOCAL'");
+    expect(all.at(-6)?.sql).toContain(
+      "create function renave.create_held_local_operation",
+    );
+    expect(all.at(-6)?.sql).toContain(
+      "revoke all on function renave.create_operation_with_outbox",
+    );
+    expect(all.at(-6)?.sql).not.toContain(
+      "insert into renave.operation_outbox",
+    );
     expect(all.at(-5)?.version).toBe(
-      "0048_runtime_contract_tenant_administration",
+      "0050_runtime_contract_held_local_operation",
     );
     expect(all.at(-5)?.sql).toContain(all.at(-6)?.checksum);
     expect(all.at(-5)?.sql).toContain(
-      "tenant_administration_catalog_fingerprint_v0048",
+      "held_local_operation_catalog_fingerprint_v0050",
     );
-    expect(all.at(-4)?.version).toBe("0049_held_local_operation");
-    expect(all.at(-4)?.sql).toContain("'HELD_LOCAL'");
-    expect(all.at(-4)?.sql).toContain(
-      "create function renave.create_held_local_operation",
-    );
-    expect(all.at(-4)?.sql).toContain(
-      "revoke all on function renave.create_operation_with_outbox",
-    );
-    expect(all.at(-4)?.sql).not.toContain(
-      "insert into renave.operation_outbox",
-    );
+    expect(all.at(-4)?.version).toBe("0051_verified_renave_profiles");
+    expect(all.at(-4)?.sql).toContain("operator_identity_profile");
+    expect(all.at(-4)?.sql).toContain("establishment_renave_profile");
+    expect(all.at(-4)?.sql).toContain("reindexar");
+    expect(all.at(-4)?.sql).toContain("aliases");
+    expect(all.at(-4)?.sql).not.toContain("resolve_verified_renave_profiles");
     expect(all.at(-3)?.version).toBe(
-      "0050_runtime_contract_held_local_operation",
+      "0052_runtime_contract_verified_renave_profiles",
     );
     expect(all.at(-3)?.sql).toContain(all.at(-4)?.checksum);
     expect(all.at(-3)?.sql).toContain(
-      "held_local_operation_catalog_fingerprint_v0050",
+      "renave_profiles_catalog_fingerprint_v0052",
     );
-    expect(all.at(-2)?.version).toBe("0051_verified_renave_profiles");
-    expect(all.at(-2)?.sql).toContain("operator_identity_profile");
-    expect(all.at(-2)?.sql).toContain("establishment_renave_profile");
-    expect(all.at(-2)?.sql).toContain("reindexar");
-    expect(all.at(-2)?.sql).toContain("aliases");
-    expect(all.at(-2)?.sql).not.toContain("resolve_verified_renave_profiles");
+    expect(all.at(-2)?.version).toBe(
+      "0053_verified_renave_principal_resolution",
+    );
+    expect(all.at(-2)?.sql).toContain("resolve_verified_renave_principals");
+    expect(all.at(-2)?.sql).toContain("pg_advisory_xact_lock(");
+    expect(all.at(-2)?.sql).not.toContain("pg_advisory_xact_lock_shared");
+    expect(all.at(-2)!.sql.indexOf("250025")).toBeLessThan(
+      all.at(-2)!.sql.indexOf("170017"),
+    );
+    expect(all.at(-2)?.sql).toContain(
+      "resolve_verified_renave_principals(text, uuid, bytea)",
+    );
+    expect(all.at(-2)?.sql).not.toMatch(
+      /insert into renave\.(operation|operation_outbox)/u,
+    );
     expect(all.at(-1)?.version).toBe(
-      "0052_runtime_contract_verified_renave_profiles",
+      "0054_runtime_contract_verified_renave_principal_resolution",
     );
     expect(all.at(-1)?.sql).toContain(all.at(-2)?.checksum);
     expect(all.at(-1)?.sql).toContain(
-      "renave_profiles_catalog_fingerprint_v0052",
+      "renave_principal_resolution_catalog_fingerprint_v0054",
     );
   });
 

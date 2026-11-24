@@ -20,6 +20,8 @@ import type {
   BrowserRenaveLinkStatus,
   CreateEstablishmentInput,
   CreateEstablishmentResult,
+  CreateStockEntryInput,
+  CreateStockEntryResult,
   EstablishmentManagementCapability,
 } from "../App.js";
 import { ActivationPage } from "./ActivationPage.js";
@@ -27,6 +29,7 @@ import { EstablishmentCreationPanel } from "./EstablishmentCreationPanel.js";
 import { HomologationReadinessPanel } from "./HomologationReadinessPanel.js";
 import { EligibilityPanel } from "./EligibilityPanel.js";
 import { StockSearchPanel } from "./StockSearchPanel.js";
+import { UsedStockEntryPanel } from "./UsedStockEntryPanel.js";
 
 export interface DashboardPageProps {
   authFeedback?: AuthFeedback;
@@ -47,6 +50,9 @@ export interface DashboardPageProps {
   onCreateEstablishment?: (
     input: CreateEstablishmentInput,
   ) => Promise<CreateEstablishmentResult>;
+  onCreateStockEntry?: (
+    input: CreateStockEntryInput,
+  ) => Promise<CreateStockEntryResult>;
   onEstablishmentChange?: (establishmentId: string) => void;
   onLogout: () => void | Promise<void>;
   onReloadLinkStatus?: () => void;
@@ -65,6 +71,7 @@ export interface DashboardPageProps {
   readiness?: BrowserRenaveReadiness;
   readinessError?: boolean;
   readinessLoading?: boolean;
+  stockEntryOperationsEnabled?: boolean;
   tenants?: readonly { id: string; label: string }[];
   userDisplayName: string;
 }
@@ -102,6 +109,7 @@ export function DashboardPage({
   linkStatusLoading = false,
   onCheckEligibility,
   onCreateEstablishment,
+  onCreateStockEntry,
   onEstablishmentChange,
   onLogout,
   onReloadLinkStatus,
@@ -116,6 +124,7 @@ export function DashboardPage({
   readiness,
   readinessError = false,
   readinessLoading = false,
+  stockEntryOperationsEnabled = false,
   tenants = [],
   userDisplayName,
 }: DashboardPageProps) {
@@ -129,6 +138,15 @@ export function DashboardPage({
         (readiness.certificate === "ready" ||
           readiness.certificate === "warning")));
   const queriesReady = readiness?.queries === "ready";
+  const stockEntryAvailable =
+    stockEntryOperationsEnabled &&
+    readiness?.integration === "configured" &&
+    (readiness.certificate === "ready" ||
+      readiness.certificate === "warning") &&
+    readiness.operatorIdentity === "ready" &&
+    readiness.establishmentContact === "ready" &&
+    readiness.link === "enabled" &&
+    linkStatus === "enabled";
   return (
     <AppShell
       environment={environment}
@@ -305,6 +323,14 @@ export function DashboardPage({
             capability={establishmentManagement}
             onCreate={onCreateEstablishment}
             selectionKey={selectedTenantId}
+          />
+        ) : null}
+
+        {onCreateStockEntry && selectedTenantId && selectedEstablishmentId ? (
+          <UsedStockEntryPanel
+            available={stockEntryAvailable}
+            onCreate={onCreateStockEntry}
+            selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
           />
         ) : null}
 

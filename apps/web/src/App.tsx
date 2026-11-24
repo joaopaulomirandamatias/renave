@@ -55,6 +55,31 @@ export interface CreateEstablishmentResult {
   renaveLink: { status: "not_started" };
 }
 
+export interface CreateStockEntryInput {
+  dataCompra: string;
+  emailVendedor: string;
+  idempotencyKey: string;
+  valorCompra: number;
+  veiculo: {
+    codigoSegurancaCrv: string;
+    dataHoraMedicaoHodometro: string;
+    documentoProprietarioAtual: string;
+    numeroCrv?: string;
+    placa: string;
+    quilometragemHodometro: number;
+    renavam?: string;
+    tipoCrv: BrowserCrvType;
+    tipoDocumentoProprietarioAtual: "CPF" | "CNPJ";
+  };
+}
+
+export interface CreateStockEntryResult {
+  createdAt: string;
+  operationId: string;
+  replayed: boolean;
+  status: "HELD_LOCAL";
+}
+
 export type BrowserRenaveLinkStatus =
   | "not_started"
   | "pending"
@@ -128,6 +153,11 @@ export interface SessionClient {
     tenantId: string,
     input: CreateEstablishmentInput,
   ): Promise<CreateEstablishmentResult>;
+  createStockEntry(
+    tenantId: string,
+    establishmentId: string,
+    input: CreateStockEntryInput,
+  ): Promise<CreateStockEntryResult>;
   load(): Promise<BrowserSession>;
   loadEstablishments(tenantId: string): Promise<BrowserEstablishmentCollection>;
   loadTenants(): Promise<readonly BrowserTenant[]>;
@@ -288,6 +318,40 @@ function parseCreatedEstablishment(value: unknown): CreateEstablishmentResult {
       tradeName: value.establishment.tradeName,
     },
     renaveLink: { status: "not_started" },
+  };
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function parseCreatedStockEntry(value: unknown): CreateStockEntryResult {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 4 ||
+    Object.keys(value).some(
+      (key) =>
+        key !== "operationId" &&
+        key !== "status" &&
+        key !== "replayed" &&
+        key !== "createdAt",
+    ) ||
+    typeof value.operationId !== "string" ||
+    !UUID_PATTERN.test(value.operationId) ||
+    value.status !== "HELD_LOCAL" ||
+    typeof value.replayed !== "boolean" ||
+    typeof value.createdAt !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/u.test(
+      value.createdAt,
+    ) ||
+    !Number.isFinite(Date.parse(value.createdAt))
+  ) {
+    throw new Error("Resposta de criação da operação inválida");
+  }
+  return {
+    createdAt: value.createdAt,
+    operationId: value.operationId.toLowerCase(),
+    replayed: value.replayed,
+    status: "HELD_LOCAL",
   };
 }
 
@@ -516,6 +580,17 @@ export class EstablishmentCreationClientError extends Error {
   }
 }
 
+export class StockEntryCreationClientError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code?: string,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super("Criação local da entrada de estoque não concluída");
+    this.name = "StockEntryCreationClientError";
+  }
+}
+
 export const browserSessionClient: SessionClient = {
   async checkVehicleEligibility(tenantId, establishmentId, plate, crvType) {
     const response = await fetch(
@@ -581,6 +656,59 @@ export const browserSessionClient: SessionClient = {
       // Um 2xx ilegível é ambíguo: a criação pode ter sido confirmada. A
       // mesma chave precisa ser preservada para uma repetição idempotente.
       throw new EstablishmentCreationClientError(0, "INVALID_RESPONSE");
+    }
+  },
+  async createStockEntry(tenantId, establishmentId, input) {
+    let response: Response;
+    try {
+      response = await fetch(
+        `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/stock-entry-operations`,
+        {
+          body: JSON.stringify({
+            dataCompra: input.dataCompra,
+            emailVendedor: input.emailVendedor,
+            valorCompra: input.valorCompra,
+            veiculo: input.veiculo,
+          }),
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            "idempotency-key": input.idempotencyKey,
+          },
+          method: "POST",
+        },
+      );
+    } catch {
+      throw new StockEntryCreationClientError(0, "NETWORK_ERROR");
+    }
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      throw new StockEntryCreationClientError(
+        response.status,
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+        Number.isInteger(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+      );
+    }
+    try {
+      const result = parseCreatedStockEntry(value);
+      if (
+        (response.status === 202 && result.replayed) ||
+        (response.status === 200 &&
+          (!result.replayed ||
+            response.headers.get("idempotency-replayed") !== "true")) ||
+        (response.status !== 200 && response.status !== 202)
+      ) {
+        throw new Error("Semântica HTTP incompatível");
+      }
+      return result;
+    } catch {
+      // Um 2xx ilegível é ambíguo; uma repetição precisa manter a chave.
+      throw new StockEntryCreationClientError(0, "INVALID_RESPONSE");
     }
   },
   async load() {
@@ -694,6 +822,7 @@ export interface AppProps {
   locationSearch?: string;
   onAuthErrorConsumed?: () => void;
   redirect?: (url: string) => void;
+  stockEntryOperationsEnabled?: boolean;
 }
 
 export interface AuthFeedback {
@@ -777,6 +906,7 @@ export function App({
   locationSearch = window.location.search,
   onAuthErrorConsumed = clearCurrentAuthError,
   redirect = (url) => window.location.assign(url),
+  stockEntryOperationsEnabled = false,
 }: AppProps) {
   const [authFeedback] = useState(() => authFeedbackFromSearch(locationSearch));
   const [view, setView] = useState<ViewState>({ status: "loading" });
@@ -1226,6 +1356,7 @@ export function App({
         : {})}
       readinessError={renaveReadinessView.status === "error"}
       readinessLoading={renaveReadinessView.status === "loading"}
+      stockEntryOperationsEnabled={stockEntryOperationsEnabled}
       onCheckEligibility={(plate, crvType) =>
         client.checkVehicleEligibility(
           selectedTenantId,
@@ -1235,6 +1366,13 @@ export function App({
         )
       }
       onCreateEstablishment={createEstablishment}
+      onCreateStockEntry={(input) =>
+        client.createStockEntry(
+          selectedTenantId,
+          activeEstablishmentId ?? "",
+          input,
+        )
+      }
       onRunPreflight={() => void runPreflight()}
       onSearchStocks={(plate) =>
         client.searchStocks(

@@ -50,6 +50,12 @@ function clientFor(
       establishment: { id: "created-store", tradeName: input.tradeName },
       renaveLink: { status: "not_started" as const },
     })),
+    createStockEntry: vi.fn(async () => ({
+      createdAt: "2026-11-24T12:00:00.000Z",
+      operationId: "11111111-1111-4111-8111-111111111111",
+      replayed: false,
+      status: "HELD_LOCAL" as const,
+    })),
     load: vi.fn(async () => session),
     loadEstablishments: vi.fn(async () => collection()),
     loadRenaveLinkStatus: vi.fn(async () => ({
@@ -329,6 +335,163 @@ describe("App session boundary", () => {
     ).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 0 });
   });
 
+  it("cria entrada local com chave somente no header e corpo contratual fechado", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json(
+        {
+          createdAt: "2026-11-24T15:00:00.000Z",
+          operationId: "11111111-1111-4111-8111-111111111111",
+          replayed: false,
+          status: "HELD_LOCAL",
+        },
+        { status: 202 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.createStockEntry("tenant-a", "store-a", {
+        dataCompra: "2026-11-23",
+        emailVendedor: "vendedor@example.com",
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+        valorCompra: 55_000.5,
+        veiculo: {
+          codigoSegurancaCrv: "12345678901",
+          dataHoraMedicaoHodometro: "2026-11-24T10:30:00-03:00",
+          documentoProprietarioAtual: "12345678901",
+          numeroCrv: "123456789012",
+          placa: "ABC1D23",
+          quilometragemHodometro: 12_345,
+          renavam: "12345678901",
+          tipoCrv: "DIGITAL",
+          tipoDocumentoProprietarioAtual: "CPF",
+        },
+      }),
+    ).resolves.toEqual({
+      createdAt: "2026-11-24T15:00:00.000Z",
+      operationId: "11111111-1111-4111-8111-111111111111",
+      replayed: false,
+      status: "HELD_LOCAL",
+    });
+
+    const request = fetchMock.mock.calls[0]!;
+    expect(request[0]).toBe(
+      "/api/tenants/tenant-a/establishments/store-a/stock-entry-operations",
+    );
+    expect(request[1]).toEqual(
+      expect.objectContaining({
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: expect.objectContaining({
+          "idempotency-key": "22222222-2222-4222-8222-222222222222",
+        }),
+        method: "POST",
+      }),
+    );
+    const body = JSON.parse(String(request[1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(body).sort()).toEqual([
+      "dataCompra",
+      "emailVendedor",
+      "valorCompra",
+      "veiculo",
+    ]);
+    expect(JSON.stringify(body)).not.toMatch(
+      /cpfOperadorResponsavel|emailEstabelecimento|idempotencyKey/u,
+    );
+  });
+
+  it("trata 2xx ampliado ou semanticamente inválido como outcome ambíguo", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            createdAt: "2026-11-24T15:00:00.000Z",
+            operationId: "11111111-1111-4111-8111-111111111111",
+            replayed: false,
+            serverField: "unexpected",
+            status: "HELD_LOCAL",
+          },
+          { status: 202 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            createdAt: "2026-11-24 15:00:00",
+            operationId: "not-an-operation-id",
+            replayed: "false",
+            status: "HELD_LOCAL",
+          },
+          { status: 200 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const input = {
+      dataCompra: "2026-11-23",
+      emailVendedor: "vendedor@example.com",
+      idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      valorCompra: 55_000.5,
+      veiculo: {
+        codigoSegurancaCrv: "12345678901",
+        dataHoraMedicaoHodometro: "2026-11-24T10:30:00-03:00",
+        documentoProprietarioAtual: "12345678901",
+        placa: "ABC1D23",
+        quilometragemHodometro: 12_345,
+        tipoCrv: "DIGITAL" as const,
+        tipoDocumentoProprietarioAtual: "CPF" as const,
+      },
+    };
+
+    await expect(
+      browserSessionClient.createStockEntry("tenant-a", "store-a", input),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 0 });
+    await expect(
+      browserSessionClient.createStockEntry("tenant-a", "store-a", input),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 0 });
+  });
+
+  it("aceita replay somente com status 200 e confirmação idempotente", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        Response.json(
+          {
+            createdAt: "2026-11-24T15:00:00.000Z",
+            operationId: "11111111-1111-4111-8111-111111111111",
+            replayed: true,
+            status: "HELD_LOCAL",
+          },
+          {
+            headers: { "idempotency-replayed": "true" },
+            status: 200,
+          },
+        ),
+      ),
+    );
+
+    await expect(
+      browserSessionClient.createStockEntry("tenant-a", "store-a", {
+        dataCompra: "2026-11-23",
+        emailVendedor: "vendedor@example.com",
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+        valorCompra: 55_000.5,
+        veiculo: {
+          codigoSegurancaCrv: "12345678901",
+          dataHoraMedicaoHodometro: "2026-11-24T10:30:00-03:00",
+          documentoProprietarioAtual: "12345678901",
+          placa: "ABC1D23",
+          quilometragemHodometro: 12_345,
+          tipoCrv: "DIGITAL",
+          tipoDocumentoProprietarioAtual: "CPF",
+        },
+      }),
+    ).resolves.toMatchObject({ replayed: true, status: "HELD_LOCAL" });
+  });
+
   it("aceita capability fechada e recusa roles ou campos extras na listagem", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -415,6 +578,12 @@ describe("App session boundary", () => {
       createEstablishment: vi.fn(async (_tenantId, input) => ({
         establishment: { id: "created-store", tradeName: input.tradeName },
         renaveLink: { status: "not_started" as const },
+      })),
+      createStockEntry: vi.fn(async () => ({
+        createdAt: "2026-11-24T12:00:00.000Z",
+        operationId: "11111111-1111-4111-8111-111111111111",
+        replayed: false,
+        status: "HELD_LOCAL" as const,
       })),
       load: vi.fn(() => new Promise<BrowserSession>(() => undefined)),
       loadEstablishments: vi.fn(async () => collection()),
