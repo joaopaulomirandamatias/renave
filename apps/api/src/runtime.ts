@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { X509Certificate } from "node:crypto";
 
 import {
@@ -31,6 +30,7 @@ import type { AppConfig } from "./config.js";
 import { createRuntimePool } from "./database.js";
 import { PostgresVehicleEligibilityUseCase } from "./renave/use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
+import { readRenaveMtlsMaterial } from "./renave/mtls-material.js";
 import { PostgresRenaveLinkPreflightUseCase } from "./renave/preflight-use-case.js";
 import type { SerproQueryLimiter } from "./renave/routes.js";
 import { createPostgresTenantDirectory } from "./tenant/directory.js";
@@ -47,6 +47,17 @@ export interface AppRuntime {
   sessionLookupGate?: SessionLookupGate;
   serproQueryLimiter?: SerproQueryLimiter;
   tenantDirectory?: TenantDirectory;
+}
+
+export function areRuntimeDependenciesReady(input: {
+  databasesReady: boolean;
+  mtls?: Pick<HomologationMtlsClient, "isCertificateValidAt">;
+  now?: Date;
+}): boolean {
+  return (
+    input.databasesReady &&
+    (input.mtls?.isCertificateValidAt(input.now ?? new Date()) ?? true)
+  );
 }
 
 export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
@@ -140,11 +151,11 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     let eligibility: PostgresVehicleEligibilityUseCase | undefined;
     let preflight: PostgresRenaveLinkPreflightUseCase | undefined;
     if (config.renave) {
-      const [ca, cert, key] = await Promise.all([
-        readFile(config.renave.caFile, "utf8"),
-        readFile(config.renave.certificateFile, "utf8"),
-        readFile(config.renave.keyFile, "utf8"),
-      ]);
+      const { ca, cert, key } = await readRenaveMtlsMaterial({
+        caFile: config.renave.caFile,
+        certificateFile: config.renave.certificateFile,
+        keyFile: config.renave.keyFile,
+      });
       const certificateThumbprintSha256 = new X509Certificate(
         cert,
       ).fingerprint256
@@ -202,16 +213,20 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       ...(serproQueryLimiter ? { serproQueryLimiter } : {}),
       ...(tenantDirectory ? { tenantDirectory } : {}),
       async ready() {
+        let databasesReady = true;
         try {
           await Promise.all(
             runtimeDatabases.map(({ expectedRole, pool }) =>
               assertRuntimeDatabase(pool, { expectedRole }),
             ),
           );
-          degraded = false;
         } catch {
-          degraded = true;
+          databasesReady = false;
         }
+        degraded = !areRuntimeDependenciesReady({
+          databasesReady,
+          ...(mtls ? { mtls } : {}),
+        });
         return !degraded;
       },
       async close() {

@@ -15,7 +15,9 @@ export {
   RenaveMtlsResponseTooLargeError,
   readBoundedResponseBody,
   type HomologationMtlsClient,
+  type PemMtlsClientOptions,
   type PemMtlsMaterial,
+  type PemMtlsValidationCode,
 } from "./mtls-request.js";
 export {
   renaveMutationRoutes,

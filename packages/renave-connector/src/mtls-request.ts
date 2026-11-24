@@ -1,4 +1,6 @@
 import { Agent, request as httpsRequest } from "node:https";
+import { createPrivateKey, X509Certificate, type KeyObject } from "node:crypto";
+import { createSecureContext } from "node:tls";
 
 import type { RenaveEnvironment } from "./connector.js";
 import type { RenaveHttpRequest } from "./http-transport.js";
@@ -21,8 +23,22 @@ export interface PemMtlsMaterial {
 
 export interface HomologationMtlsClient {
   close(): void;
+  isCertificateValidAt(now?: Date): boolean;
   request: RenaveHttpRequest;
 }
+
+export interface PemMtlsClientOptions {
+  now?: () => Date;
+}
+
+export type PemMtlsValidationCode =
+  | "RENAVE_MTLS_CA_INVALID"
+  | "RENAVE_MTLS_CERT_EXPIRED"
+  | "RENAVE_MTLS_CERT_INVALID"
+  | "RENAVE_MTLS_CERT_NOT_YET_VALID"
+  | "RENAVE_MTLS_CERT_USAGE_INVALID"
+  | "RENAVE_MTLS_KEY_INVALID"
+  | "RENAVE_MTLS_KEY_MISMATCH";
 
 export class PemMtlsProductionBlockedError extends Error {
   readonly code = "PEM_MTLS_PRODUCTION_BLOCKED";
@@ -34,9 +50,10 @@ export class PemMtlsProductionBlockedError extends Error {
 }
 
 export class InvalidPemMtlsMaterialError extends Error {
-  readonly code = "INVALID_PEM_MTLS_MATERIAL";
-
-  constructor(readonly field: "ca" | "cert" | "key") {
+  constructor(
+    readonly field: "ca" | "cert" | "key",
+    readonly code: PemMtlsValidationCode,
+  ) {
     super(`Material mTLS inválido: ${field}`);
     this.name = "InvalidPemMtlsMaterialError";
   }
@@ -79,20 +96,103 @@ export async function readBoundedResponseBody(
   return Buffer.concat(chunks, total);
 }
 
-function assertCertificate(value: string, field: "ca" | "cert"): void {
-  if (!/-----BEGIN CERTIFICATE-----/.test(value)) {
-    throw new InvalidPemMtlsMaterialError(field);
+function invalidMaterial(
+  field: "ca" | "cert" | "key",
+  code: PemMtlsValidationCode,
+): InvalidPemMtlsMaterialError {
+  return new InvalidPemMtlsMaterialError(field, code);
+}
+
+function parseCertificate(
+  value: string,
+  field: "ca" | "cert",
+): X509Certificate {
+  try {
+    return new X509Certificate(value);
+  } catch {
+    throw invalidMaterial(
+      field,
+      field === "ca" ? "RENAVE_MTLS_CA_INVALID" : "RENAVE_MTLS_CERT_INVALID",
+    );
   }
 }
 
-function validateMaterial(material: PemMtlsMaterial): void {
-  assertCertificate(material.cert, "cert");
-  const authorities = Array.isArray(material.ca) ? material.ca : [material.ca];
-  if (authorities.length === 0) throw new InvalidPemMtlsMaterialError("ca");
-  for (const authority of authorities) assertCertificate(authority, "ca");
-  if (!/-----BEGIN (?:EC |RSA |OPENSSH )?PRIVATE KEY-----/.test(material.key)) {
-    throw new InvalidPemMtlsMaterialError("key");
+function parsePrivateKey(material: PemMtlsMaterial): KeyObject {
+  try {
+    return createPrivateKey({
+      key: material.key,
+      ...(material.passphrase === undefined
+        ? {}
+        : { passphrase: material.passphrase }),
+    });
+  } catch {
+    throw invalidMaterial("key", "RENAVE_MTLS_KEY_INVALID");
   }
+}
+
+function validateMaterial(
+  material: PemMtlsMaterial,
+  now: Date,
+): X509Certificate {
+  const authorities = Array.isArray(material.ca) ? material.ca : [material.ca];
+  if (authorities.length === 0) {
+    throw invalidMaterial("ca", "RENAVE_MTLS_CA_INVALID");
+  }
+  for (const authority of authorities) parseCertificate(authority, "ca");
+
+  const certificate = parseCertificate(material.cert, "cert");
+  const privateKey = parsePrivateKey(material);
+  if (!certificate.checkPrivateKey(privateKey)) {
+    throw invalidMaterial("key", "RENAVE_MTLS_KEY_MISMATCH");
+  }
+
+  const nowTime = now.getTime();
+  if (!Number.isFinite(nowTime)) {
+    throw new RangeError("Relógio mTLS inválido");
+  }
+  if (nowTime < certificate.validFromDate.getTime()) {
+    throw invalidMaterial("cert", "RENAVE_MTLS_CERT_NOT_YET_VALID");
+  }
+  if (nowTime >= certificate.validToDate.getTime()) {
+    throw invalidMaterial("cert", "RENAVE_MTLS_CERT_EXPIRED");
+  }
+  if (certificate.ca) {
+    throw invalidMaterial("cert", "RENAVE_MTLS_CERT_USAGE_INVALID");
+  }
+  const extendedKeyUsage = certificate.keyUsage;
+  if (
+    extendedKeyUsage !== undefined &&
+    !extendedKeyUsage.includes("1.3.6.1.5.5.7.3.2")
+  ) {
+    throw invalidMaterial("cert", "RENAVE_MTLS_CERT_USAGE_INVALID");
+  }
+
+  try {
+    createSecureContext({
+      ca: [...authorities],
+      cert: material.cert,
+      key: material.key,
+      minVersion: "TLSv1.2",
+      ...(material.passphrase === undefined
+        ? {}
+        : { passphrase: material.passphrase }),
+    });
+  } catch {
+    throw invalidMaterial("cert", "RENAVE_MTLS_CERT_INVALID");
+  }
+  return certificate;
+}
+
+function isCertificateValidAt(
+  certificate: X509Certificate,
+  now: Date,
+): boolean {
+  const timestamp = now.getTime();
+  return (
+    Number.isFinite(timestamp) &&
+    timestamp >= certificate.validFromDate.getTime() &&
+    timestamp < certificate.validToDate.getTime()
+  );
 }
 
 function responseHeaders(
@@ -112,9 +212,13 @@ function responseHeaders(
 export function createHomologationPemMtlsClient(
   environment: RenaveEnvironment,
   material: PemMtlsMaterial,
+  options: PemMtlsClientOptions = {},
 ): HomologationMtlsClient {
   if (environment === "production") throw new PemMtlsProductionBlockedError();
-  validateMaterial(material);
+  const certificate = validateMaterial(
+    material,
+    (options.now ?? (() => new Date()))(),
+  );
 
   const agent = new Agent({
     ca: [...(Array.isArray(material.ca) ? material.ca : [material.ca])],
@@ -191,5 +295,10 @@ export function createHomologationPemMtlsClient(
     });
   };
 
-  return { close: () => agent.destroy(), request };
+  return {
+    close: () => agent.destroy(),
+    isCertificateValidAt: (now = new Date()) =>
+      isCertificateValidAt(certificate, now),
+    request,
+  };
 }
