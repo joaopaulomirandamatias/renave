@@ -15,6 +15,7 @@ const syftDigest =
 const safeRuntimePreparation = `
 const apiRuntimeDbFiles = new Set([
   "tenant-runtime",
+  "credential-service-scopes",
   "platform-console-rate-limiter",
   "platform-console-reader",
   "platform-digests",
@@ -42,6 +43,7 @@ describe("guard do pruning runtime da API", () => {
       "const apiRuntimeDbFiles = new Set([]);",
     ).map(({ id }) => id);
     assert.ok(found.includes("API_TENANT_RUNTIME_REQUIRED"));
+    assert.ok(found.includes("API_CREDENTIAL_SCOPE_RUNTIME_REQUIRED"));
     assert.ok(found.includes("API_PLATFORM_RUNTIME_REQUIRED"));
     assert.ok(found.includes("API_RUNTIME_IMPORT_GRAPH_REQUIRED"));
   });

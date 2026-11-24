@@ -17,6 +17,7 @@ const apiRuntimeDbFiles = new Set(
     "cnpj",
     "config",
     "credential-links",
+    "credential-service-scopes",
     "establishments",
     "login-rate-limiter",
     "operations",
