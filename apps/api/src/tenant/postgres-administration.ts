@@ -10,15 +10,14 @@ import type { TenantEstablishmentAdministration } from "./admin-establishments.j
  * deliberadamente calculados no pacote DB, que também conhece o tenant RLS.
  */
 export class PostgresTenantEstablishmentAdministration implements TenantEstablishmentAdministration {
-  private readonly hmacKey: Buffer;
   private readonly repository: PostgresTenantAdministration;
 
   constructor(hmacKey: Buffer) {
     if (!Buffer.isBuffer(hmacKey) || hmacKey.length < 32) {
       throw new TypeError("A chave HMAC administrativa deve ter 32 bytes.");
     }
-    this.hmacKey = Buffer.from(hmacKey);
-    this.repository = new PostgresTenantAdministration(this.hmacKey);
+    this.repository = new PostgresTenantAdministration(hmacKey);
+    Object.freeze(this);
   }
 
   async create(
@@ -44,6 +43,5 @@ export class PostgresTenantEstablishmentAdministration implements TenantEstablis
 
   destroy(): void {
     this.repository.destroy();
-    this.hmacKey.fill(0);
   }
 }

@@ -43,6 +43,7 @@ function assertKeyId(keyId: string): void {
 function keyBytes(value: Uint8Array): Buffer {
   const key = Buffer.from(value);
   if (key.length !== KEY_BYTES) {
+    key.fill(0);
     throw new EvidenceConfigurationError(
       "A chave de evidência deve ter exatamente 32 bytes.",
     );
@@ -81,6 +82,7 @@ function serialize(value: unknown): Buffer {
   }
   const bytes = Buffer.from(json, "utf8");
   if (bytes.length === 0 || bytes.length > MAX_PAYLOAD_BYTES) {
+    bytes.fill(0);
     throw new EvidencePayloadError("Tamanho do payload de evidência inválido.");
   }
   return bytes;
@@ -91,7 +93,28 @@ export function decodeEvidenceKeyBase64(value: string): Buffer {
   if (!/^[A-Za-z0-9+/]{43}=$/u.test(value)) {
     throw new EvidenceConfigurationError("Chave de evidência base64 inválida.");
   }
-  return keyBytes(Buffer.from(value, "base64"));
+  const decoded = Buffer.from(value, "base64");
+  try {
+    return keyBytes(decoded);
+  } finally {
+    decoded.fill(0);
+  }
+}
+
+interface EvidenceCipherState {
+  activeKeyId: string;
+  destroyed: boolean;
+  keys: Map<string, Buffer>;
+}
+
+const evidenceCipherState = new WeakMap<EvidenceCipher, EvidenceCipherState>();
+
+function availableState(cipher: EvidenceCipher): EvidenceCipherState {
+  const state = evidenceCipherState.get(cipher);
+  if (!state || state.destroyed) {
+    throw new EvidenceConfigurationError("Cifrador de evidência indisponível.");
+  }
+  return state;
 }
 
 /**
@@ -99,24 +122,41 @@ export function decodeEvidenceKeyBase64(value: string): Buffer {
  * chaves antigas podem permanecer apenas para leitura durante a rotação.
  */
 export class EvidenceCipher {
-  private readonly keys = new Map<string, Buffer>();
-  private readonly activeKeyId: string;
-
   constructor(config: {
     activeKeyId: string;
     keys: ReadonlyMap<string, Uint8Array>;
   }) {
-    assertKeyId(config.activeKeyId);
-    for (const [keyId, value] of config.keys) {
-      assertKeyId(keyId);
-      this.keys.set(keyId, keyBytes(value));
+    const keys = new Map<string, Buffer>();
+    try {
+      const activeKeyId = config.activeKeyId;
+      assertKeyId(activeKeyId);
+      for (const [keyId, value] of config.keys) {
+        assertKeyId(keyId);
+        const key = keyBytes(value);
+        const previousKey = keys.get(keyId);
+        try {
+          keys.set(keyId, key);
+        } catch (error) {
+          key.fill(0);
+          throw error;
+        }
+        previousKey?.fill(0);
+      }
+      if (!keys.has(activeKeyId)) {
+        throw new EvidenceConfigurationError(
+          "A chave ativa não está presente no keyring.",
+        );
+      }
+      evidenceCipherState.set(this, {
+        activeKeyId,
+        destroyed: false,
+        keys,
+      });
+    } catch (error) {
+      for (const key of keys.values()) key.fill(0);
+      keys.clear();
+      throw error;
     }
-    if (!this.keys.has(config.activeKeyId)) {
-      throw new EvidenceConfigurationError(
-        "A chave ativa não está presente no keyring.",
-      );
-    }
-    this.activeKeyId = config.activeKeyId;
   }
 
   encrypt(
@@ -124,24 +164,34 @@ export class EvidenceCipher {
     binding: EvidenceBinding,
     kind: EvidencePayloadKind,
   ): EncryptedEvidencePayload {
+    const state = availableState(this);
     const nonce = randomBytes(NONCE_BYTES);
-    const cipher = createCipheriv(
-      "aes-256-gcm",
-      this.keys.get(this.activeKeyId)!,
-      nonce,
-      { authTagLength: TAG_BYTES },
-    );
-    cipher.setAAD(aad(binding, kind, this.activeKeyId));
-    const ciphertext = Buffer.concat([
-      cipher.update(serialize(value)),
-      cipher.final(),
-    ]);
-    return {
-      authTag: cipher.getAuthTag(),
-      ciphertext,
-      keyId: this.activeKeyId,
-      nonce,
-    };
+    let additionalData: Buffer | undefined;
+    let plaintext: Buffer | undefined;
+    try {
+      additionalData = aad(binding, kind, state.activeKeyId);
+      plaintext = serialize(value);
+      const cipher = createCipheriv(
+        "aes-256-gcm",
+        state.keys.get(state.activeKeyId)!,
+        nonce,
+        { authTagLength: TAG_BYTES },
+      );
+      cipher.setAAD(additionalData);
+      const ciphertext = Buffer.concat([
+        cipher.update(plaintext),
+        cipher.final(),
+      ]);
+      return {
+        authTag: cipher.getAuthTag(),
+        ciphertext,
+        keyId: state.activeKeyId,
+        nonce,
+      };
+    } finally {
+      additionalData?.fill(0);
+      plaintext?.fill(0);
+    }
   }
 
   decrypt<T>(
@@ -149,7 +199,8 @@ export class EvidenceCipher {
     binding: EvidenceBinding,
     kind: EvidencePayloadKind,
   ): T {
-    const key = this.keys.get(payload.keyId);
+    const state = availableState(this);
+    const key = state.keys.get(payload.keyId);
     if (
       !key ||
       payload.nonce.length !== NONCE_BYTES ||
@@ -159,19 +210,34 @@ export class EvidenceCipher {
     ) {
       throw new EvidenceDecryptionError("Evidência não pôde ser autenticada.");
     }
+    let additionalData: Buffer | undefined;
+    let plaintext: Buffer | undefined;
+    const plaintextChunks: Buffer[] = [];
     try {
       const decipher = createDecipheriv("aes-256-gcm", key, payload.nonce, {
         authTagLength: TAG_BYTES,
       });
-      decipher.setAAD(aad(binding, kind, payload.keyId));
+      additionalData = aad(binding, kind, payload.keyId);
+      decipher.setAAD(additionalData);
       decipher.setAuthTag(payload.authTag);
-      const plaintext = Buffer.concat([
-        decipher.update(payload.ciphertext),
-        decipher.final(),
-      ]);
+      plaintextChunks.push(decipher.update(payload.ciphertext));
+      plaintextChunks.push(decipher.final());
+      plaintext = Buffer.concat(plaintextChunks);
       return JSON.parse(plaintext.toString("utf8")) as T;
     } catch {
       throw new EvidenceDecryptionError("Evidência não pôde ser autenticada.");
+    } finally {
+      additionalData?.fill(0);
+      for (const chunk of plaintextChunks) chunk.fill(0);
+      plaintext?.fill(0);
     }
+  }
+
+  destroy(): void {
+    const state = evidenceCipherState.get(this);
+    if (!state || state.destroyed) return;
+    state.destroyed = true;
+    for (const key of state.keys.values()) key.fill(0);
+    state.keys.clear();
   }
 }

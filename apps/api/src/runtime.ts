@@ -97,8 +97,76 @@ export function areRuntimeDependenciesReady(input: {
   );
 }
 
+type RuntimeCleanupTask = () => Promise<void> | void;
+
+export interface RuntimeCleanupCoordinator {
+  close(): Promise<boolean>;
+  registerPool(task: RuntimeCleanupTask): void;
+  registerResource(task: RuntimeCleanupTask): void;
+}
+
+export function createRuntimeCleanupCoordinator(): RuntimeCleanupCoordinator {
+  const resources: RuntimeCleanupTask[] = [];
+  const pools: RuntimeCleanupTask[] = [];
+  let closePromise: Promise<boolean> | undefined;
+
+  function register(tasks: RuntimeCleanupTask[], task: RuntimeCleanupTask) {
+    if (closePromise) {
+      throw new Error("Runtime já está sendo encerrado");
+    }
+    tasks.push(task);
+  }
+
+  return {
+    close() {
+      closePromise ??= (async () => {
+        let failed = false;
+
+        for (const task of [...resources].reverse()) {
+          try {
+            await task();
+          } catch {
+            failed = true;
+          }
+        }
+
+        const poolResults = await Promise.allSettled(
+          pools.map(async (task) => task()),
+        );
+        return (
+          failed || poolResults.some((result) => result.status === "rejected")
+        );
+      })();
+      return closePromise;
+    },
+    registerPool(task) {
+      register(pools, task);
+    },
+    registerResource(task) {
+      register(resources, task);
+    },
+  };
+}
+
+export async function closeRuntimeResources(
+  cleanup: Pick<RuntimeCleanupCoordinator, "close">,
+  reportFailure: boolean,
+): Promise<void> {
+  if ((await cleanup.close()) && reportFailure) {
+    throw new Error("Falha ao encerrar runtime");
+  }
+}
+
+export async function rollbackRuntimeResources(
+  cleanup: Pick<RuntimeCleanupCoordinator, "close">,
+  originalError: unknown,
+): Promise<never> {
+  await closeRuntimeResources(cleanup, false);
+  throw originalError;
+}
+
 export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
-  const pools: Pool[] = [];
+  const cleanup = createRuntimeCleanupCoordinator();
   const runtimeDatabases: Array<{
     expectedRole: typeof APP_ROLE | typeof IDENTITY_APP_ROLE;
     pool: Pool;
@@ -110,7 +178,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     PostgresTenantEstablishmentAdministration | undefined;
   let stockEntryComposition: StockEntryRuntimeComposition | undefined;
   function registerPool(pool: Pool): Pool {
-    pools.push(pool);
+    cleanup.registerPool(() => pool.end());
     pool.on("error", () => {
       degraded = true;
     });
@@ -158,6 +226,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       );
       try {
         loginRateLimiter = new PostgresLoginRateLimiter(identityPool, key);
+        cleanup.registerResource(() => loginRateLimiter!.destroy());
       } finally {
         key.fill(0);
       }
@@ -188,6 +257,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       );
       try {
         serproQueryLimiter = new PostgresSerproQueryLimiter(businessPool, key);
+        cleanup.registerResource(() => serproQueryLimiter!.destroy());
       } finally {
         key.fill(0);
       }
@@ -208,9 +278,11 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
           businessPool,
           key,
         );
+        cleanup.registerResource(() => tenantAdminLimiter!.destroy());
         tenantAdministration = new PostgresTenantEstablishmentAdministration(
           key,
         );
+        cleanup.registerResource(() => tenantAdministration!.destroy());
       } finally {
         key.fill(0);
       }
@@ -236,6 +308,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
           pool: businessPool,
           runner: tenantActionRunner,
         });
+        cleanup.registerResource(() => stockEntryComposition!.destroy());
       } catch (error) {
         destroyStockEntrySecretBundle(bundle);
         throw error;
@@ -275,6 +348,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
           ? {}
           : { passphrase: config.renave.keyPassphrase }),
       });
+      cleanup.registerResource(() => mtls!.close());
       const evidenceKeys = new Map<string, Buffer>();
       let cipher: EvidenceCipher;
       try {
@@ -288,6 +362,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
           activeKeyId: config.renave.evidenceKeyring.activeKeyId,
           keys: evidenceKeys,
         });
+        cleanup.registerResource(() => cipher.destroy());
       } finally {
         for (const value of evidenceKeys.values()) value.fill(0);
       }
@@ -392,19 +467,10 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         return !degraded;
       },
       async close() {
-        mtls?.close();
-        stockEntryComposition?.destroy();
-        tenantAdministration?.destroy();
-        tenantAdminLimiter?.destroy();
-        await Promise.all(pools.map((pool) => pool.end()));
+        await closeRuntimeResources(cleanup, true);
       },
     };
   } catch (error) {
-    mtls?.close();
-    stockEntryComposition?.destroy();
-    tenantAdministration?.destroy();
-    tenantAdminLimiter?.destroy();
-    await Promise.allSettled(pools.map((pool) => pool.end()));
-    throw error;
+    return rollbackRuntimeResources(cleanup, error);
   }
 }

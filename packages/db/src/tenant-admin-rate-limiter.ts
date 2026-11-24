@@ -2,6 +2,19 @@ import { createHmac } from "node:crypto";
 
 import type { Pool } from "pg";
 
+type Query = Pool["query"];
+
+interface TenantAdminRateLimiterState {
+  destroyed: boolean;
+  readonly hmacKey: Buffer;
+  readonly query: Query;
+}
+
+const tenantAdminRateLimiterState = new WeakMap<
+  PostgresTenantAdminRateLimiter,
+  TenantAdminRateLimiterState
+>();
+
 export type TenantAdminRateLimitScope = "actor" | "global" | "tenant";
 export type TenantAdminRateLimitResult =
   | { allowed: true; retryAfterSeconds: 0 }
@@ -56,33 +69,52 @@ function hmac(key: Buffer, domain: string, values: readonly string[]): Buffer {
 }
 
 export class PostgresTenantAdminRateLimiter {
-  private readonly hmacKey: Buffer;
-
-  constructor(
-    private readonly pool: Pool,
-    hmacKey: Buffer,
-  ) {
+  constructor(pool: Pool, hmacKey: Buffer) {
+    let query: Query | undefined;
+    try {
+      query = pool?.query;
+    } catch {
+      throw new TenantAdminRateLimitInputError(
+        "Configuração do limite administrativo inválida.",
+      );
+    }
+    if (typeof query !== "function") {
+      throw new TenantAdminRateLimitInputError(
+        "Configuração do limite administrativo inválida.",
+      );
+    }
     if (!Buffer.isBuffer(hmacKey) || hmacKey.length < 32) {
       throw new TenantAdminRateLimitInputError(
         "A chave HMAC administrativa deve ter ao menos 32 bytes.",
       );
     }
-    this.hmacKey = Buffer.from(hmacKey);
+    tenantAdminRateLimiterState.set(this, {
+      destroyed: false,
+      hmacKey: Buffer.from(hmacKey),
+      query: query.bind(pool),
+    });
+    Object.freeze(this);
   }
 
   async consume(input: {
     subject: string;
     tenantId: string;
   }): Promise<TenantAdminRateLimitResult> {
+    const state = tenantAdminRateLimiterState.get(this);
+    if (!state || state.destroyed) {
+      throw new TenantAdminRateLimitInputError(
+        "Limitador administrativo indisponível.",
+      );
+    }
     const subject = requiredText(input?.subject, "subject");
     const tenantId = requiredText(input?.tenantId, "tenantId");
-    const tenantKey = hmac(this.hmacKey, "tenant-admin-tenant-v1", [tenantId]);
-    const actorKey = hmac(this.hmacKey, "tenant-admin-actor-v1", [
+    const tenantKey = hmac(state.hmacKey, "tenant-admin-tenant-v1", [tenantId]);
+    const actorKey = hmac(state.hmacKey, "tenant-admin-actor-v1", [
       tenantId,
       subject,
     ]);
     try {
-      const { rows } = await this.pool.query<RateLimitRow>(
+      const { rows } = await state.query<RateLimitRow>(
         `select allowed, limited_scope, retry_after_seconds
            from renave_runtime.consume_tenant_admin_rate_limit($1, $2)`,
         [tenantKey, actorKey],
@@ -112,6 +144,9 @@ export class PostgresTenantAdminRateLimiter {
   }
 
   destroy(): void {
-    this.hmacKey.fill(0);
+    const state = tenantAdminRateLimiterState.get(this);
+    if (!state || state.destroyed) return;
+    state.destroyed = true;
+    state.hmacKey.fill(0);
   }
 }

@@ -10,6 +10,16 @@ import {
   type Establishment,
 } from "./establishments.js";
 
+interface TenantAdministrationState {
+  destroyed: boolean;
+  readonly hmacKey: Buffer;
+}
+
+const tenantAdministrationState = new WeakMap<
+  PostgresTenantAdministration,
+  TenantAdministrationState
+>();
+
 export interface CreateAdminEstablishmentInput {
   actorIp: string;
   actorSubject: string;
@@ -131,21 +141,27 @@ function isDatabaseError(value: unknown): value is DatabaseError {
  * mesma transação RLS.
  */
 export class PostgresTenantAdministration {
-  private readonly hmacKey: Buffer;
-
   constructor(hmacKey: Buffer) {
     if (!Buffer.isBuffer(hmacKey) || hmacKey.length < 32) {
       throw new TenantAdminInputError(
         "A chave HMAC administrativa deve ter ao menos 32 bytes.",
       );
     }
-    this.hmacKey = Buffer.from(hmacKey);
+    tenantAdministrationState.set(this, {
+      destroyed: false,
+      hmacKey: Buffer.from(hmacKey),
+    });
+    Object.freeze(this);
   }
 
   async create(
     client: TenantClient,
     input: CreateAdminEstablishmentInput,
   ): Promise<CreateAdminEstablishmentResult> {
+    const state = tenantAdministrationState.get(this);
+    if (!state || state.destroyed) {
+      throw new TenantAdminInputError("Administração do tenant indisponível.");
+    }
     const normalized = validate(input);
     try {
       const locked = await client.query<{ allowed: boolean }>(
@@ -161,13 +177,13 @@ export class PostgresTenantAdministration {
       );
       const tenantId = tenant.rows[0]?.tenant_id;
       if (!tenantId) throw new TenantAdminStorageError();
-      const actorDigest = createHmac("sha256", this.hmacKey)
+      const actorDigest = createHmac("sha256", state.hmacKey)
         .update("tenant-admin-idempotency-actor-v1\0", "utf8")
         .update(tenantId, "utf8")
         .update("\0", "utf8")
         .update(input.actorSubject, "utf8")
         .digest();
-      const idempotencyKeyDigest = createHmac("sha256", this.hmacKey)
+      const idempotencyKeyDigest = createHmac("sha256", state.hmacKey)
         .update("tenant-admin-idempotency-key-v1\0", "utf8")
         .update(tenantId, "utf8")
         .update("\0", "utf8")
@@ -289,6 +305,9 @@ export class PostgresTenantAdministration {
   }
 
   destroy(): void {
-    this.hmacKey.fill(0);
+    const state = tenantAdministrationState.get(this);
+    if (!state || state.destroyed) return;
+    state.destroyed = true;
+    state.hmacKey.fill(0);
   }
 }
