@@ -247,6 +247,28 @@ describe("guard do banco de runtime", () => {
     await expectAppContractReady();
   });
 
+  it("recusa checksum divergente da migration de conclusão SEND", async () => {
+    const original = await adminPool.query<{ checksum: string }>(
+      `select checksum from renave.schema_migrations
+        where version = '0033_operation_complete_send'`,
+    );
+    await adminPool.query(
+      `update renave.schema_migrations set checksum = $1
+        where version = '0033_operation_complete_send'`,
+      ["0".repeat(64)],
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `update renave.schema_migrations set checksum = $1
+          where version = '0033_operation_complete_send'`,
+        [original.rows[0]!.checksum],
+      );
+    }
+    await expectAppContractReady();
+  });
+
   it("recusa RLS desabilitada nas tabelas do outbox", async () => {
     await adminPool.query(
       "alter table renave.operation_outbox disable row level security",
@@ -764,6 +786,60 @@ describe("guard do banco de runtime", () => {
          from expired_send_recovery_acl_probe`,
       );
       await adminPool.query("drop role expired_send_recovery_acl_probe");
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa função de conclusão adulterada ou sem SECURITY DEFINER", async () => {
+    const signature =
+      "renave.complete_operation_send_confirmed(uuid,uuid,uuid,bigint,bigint,text)";
+    const original = await adminPool.query<{ definition: string }>(
+      `select pg_catalog.pg_get_functiondef($1::regprocedure) as definition`,
+      [signature],
+    );
+    await adminPool.query(
+      `create or replace function renave.complete_operation_send_confirmed(
+         p_outbox_id uuid, p_lease_owner uuid, p_lease_token uuid,
+         p_expected_operation_version bigint, p_remote_record_id bigint,
+         p_remote_state text
+       ) returns table (
+         operation_id uuid, send_outbox_id uuid,
+         operation_version bigint, completed_at timestamptz
+       ) language plpgsql security definer set search_path=pg_catalog as $$
+       begin return; end $$`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+
+    await adminPool.query(`alter function ${signature} security invoker`);
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(`alter function ${signature} security definer`);
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa grant inesperado em qualquer conclusão SEND", async () => {
+    await adminPool.query("create role send_completion_acl_probe nologin");
+    await adminPool.query(
+      `grant execute on function
+         renave.complete_operation_send_outcome_unknown(uuid,uuid,uuid,bigint)
+       to send_completion_acl_probe`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `revoke execute on function
+           renave.complete_operation_send_outcome_unknown(uuid,uuid,uuid,bigint)
+         from send_completion_acl_probe`,
+      );
+      await adminPool.query("drop role send_completion_acl_probe");
     }
     await expectAppContractReady();
   });
