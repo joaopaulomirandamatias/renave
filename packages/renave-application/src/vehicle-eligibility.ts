@@ -109,6 +109,30 @@ export interface VehicleEligibilityServiceConfig {
   integratorCnpj: string;
 }
 
+export type EligibilityImpedimentCode =
+  | "UNSPECIFIED_INELIGIBILITY"
+  | "VEHICLE_WRITTEN_OFF"
+  | "VEHICLE_ALARM"
+  | "PROVISIONAL_REGISTRATION"
+  | "CRV_ISSUANCE_PENDING"
+  | "RECALL_PENDING"
+  | "EXTRAJUDICIAL_RESTRICTION"
+  | "DETRAN_BLOCKING_RESTRICTION"
+  | "JUDICIAL_RESTRICTION"
+  | "FEDERAL_REVENUE_RESTRICTION"
+  | "PGFN_RESTRICTION"
+  | "THEFT_OR_ROBBERY"
+  | "ATPV_MISSING"
+  | "TRANSFER_AUTHORIZATION_FOR_DIFFERENT_ESTABLISHMENT"
+  | "SALE_NOTICE_FOR_DIFFERENT_BUYER"
+  | "SALE_INTENT_FOR_DIFFERENT_BUYER";
+
+export interface VehicleEligibilitySummary {
+  detranUnavailable: boolean;
+  impediments: readonly EligibilityImpedimentCode[];
+  status: "eligible" | "ineligible" | "undetermined";
+}
+
 export class EstablishmentUnavailableError extends Error {
   readonly code = "ESTABLISHMENT_UNAVAILABLE";
 
@@ -369,6 +393,74 @@ function validateEligibilityResponse(
   }
 }
 
+const IMPEDIMENT_FIELDS = [
+  ["veiculoBaixado", "VEHICLE_WRITTEN_OFF"],
+  ["veiculoComAlarme", "VEHICLE_ALARM"],
+  ["veiculoComLicenciamentoProvisorio", "PROVISIONAL_REGISTRATION"],
+  ["veiculoComPendenciaDeEmissaoCrv", "CRV_ISSUANCE_PENDING"],
+  ["veiculoComRecall", "RECALL_PENDING"],
+  ["veiculoComRestricaoExtrajudicial", "EXTRAJUDICIAL_RESTRICTION"],
+  ["veiculoComRestricaoImpeditivaNoDetran", "DETRAN_BLOCKING_RESTRICTION"],
+  ["veiculoComRestricaoJudicial", "JUDICIAL_RESTRICTION"],
+  ["veiculoComRestricaoNaReceitaFederal", "FEDERAL_REVENUE_RESTRICTION"],
+  ["veiculoComRestricaoPgfn", "PGFN_RESTRICTION"],
+  ["veiculoComRouboFurto", "THEFT_OR_ROBBERY"],
+  ["veiculoSemAtpv", "ATPV_MISSING"],
+  [
+    "veiculoTemAutorizacaoTransferenciaParaEstabelecimentoDiferenteDoEstabelecimentoConsultante",
+    "TRANSFER_AUTHORIZATION_FOR_DIFFERENT_ESTABLISHMENT",
+  ],
+  [
+    "veiculoTemComunicacaoDeVendaParaCompradorDiferenteDoEstabelecimentoConsultante",
+    "SALE_NOTICE_FOR_DIFFERENT_BUYER",
+  ],
+  [
+    "veiculoTemIntencaoDeVendaParaCompradorDiferenteDoEstabelecimentoConsultante",
+    "SALE_INTENT_FOR_DIFFERENT_BUYER",
+  ],
+] as const satisfies readonly (readonly [
+  Exclude<(typeof DIAGNOSIS_BOOLEAN_FIELDS)[number], "veiculoApto">,
+  EligibilityImpedimentCode,
+])[];
+
+type DiagnosisImpedimentField = Exclude<
+  (typeof DIAGNOSIS_BOOLEAN_FIELDS)[number],
+  "veiculoApto"
+>;
+type MappedImpedimentField = (typeof IMPEDIMENT_FIELDS)[number][0];
+const ALL_IMPEDIMENT_FIELDS_MAPPED: Exclude<
+  DiagnosisImpedimentField,
+  MappedImpedimentField
+> extends never
+  ? true
+  : never = true;
+
+function summarizeEligibility(
+  response: VehicleEligibilityResponse,
+): VehicleEligibilitySummary {
+  const detranUnavailable = response.comunicacaoComDetranFalhou === true;
+  const eligible = response.diagnostico?.veiculoApto;
+  const mappedImpediments = IMPEDIMENT_FIELDS.flatMap(([field, code]) =>
+    response.diagnostico?.[field] === true ? [code] : [],
+  );
+  void ALL_IMPEDIMENT_FIELDS_MAPPED;
+  return {
+    detranUnavailable,
+    impediments:
+      eligible === false && mappedImpediments.length === 0
+        ? ["UNSPECIFIED_INELIGIBILITY"]
+        : mappedImpediments,
+    status:
+      detranUnavailable ||
+      eligible === undefined ||
+      (eligible && mappedImpediments.length > 0)
+        ? "undetermined"
+        : eligible
+          ? "eligible"
+          : "ineligible",
+  };
+}
+
 export class VehicleEligibilityService {
   private readonly certificateThumbprintSha256: string;
   private readonly integratorCnpj: string;
@@ -388,7 +480,7 @@ export class VehicleEligibilityService {
 
   async execute(
     input: VehicleEligibilityInput,
-  ): Promise<VehicleEligibilityResponse> {
+  ): Promise<VehicleEligibilitySummary> {
     const subject = requireText(input.subject, "subject");
     const tenantId = requireText(input.tenantId, "tenantId");
     const establishmentId = requireText(
@@ -516,6 +608,6 @@ export class VehicleEligibilityService {
       outcome: "succeeded",
       responseSha256: sha256(response.result),
     });
-    return response.result;
+    return summarizeEligibility(response.result);
   }
 }

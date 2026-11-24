@@ -108,7 +108,12 @@ async function prepareCredentialLink(
   status: CredentialLinkStatus | "not_started",
 ): Promise<void> {
   if (status === "not_started") return;
-  const path: CredentialLinkStatus[] = ["pending", "confirmed", "enabled"];
+  const path: CredentialLinkStatus[] =
+    status === "rejected"
+      ? ["pending", "rejected"]
+      : status === "deactivated"
+        ? ["pending", "confirmed", "enabled", "deactivated"]
+        : ["pending", "confirmed", "enabled"];
   for (const nextStatus of path) {
     await withTenant(appPool, scenario.tenant.id, (client) =>
       transitionCredentialLink(client, {
@@ -156,6 +161,48 @@ function preflightInput(scenario: PreflightScenario, traceId: string) {
     subject: ADMIN,
     tenantId: scenario.tenant.id,
     traceId,
+  };
+}
+
+function eligibilityInput(scenario: PreflightScenario, traceId: string) {
+  return {
+    actorIp: "198.51.100.10",
+    crvType: "DIGITAL" as const,
+    establishmentId: scenario.store.id,
+    plate: "ABC1D23",
+    subject: ADMIN,
+    tenantId: scenario.tenant.id,
+    traceId,
+  };
+}
+
+function createEligibilityUseCase(
+  getVehicleEligibility: ReturnType<typeof vi.fn>,
+): PostgresVehicleEligibilityUseCase {
+  return new PostgresVehicleEligibilityUseCase({
+    certificateThumbprintSha256: "c".repeat(64),
+    cipher: new EvidenceCipher({
+      activeKeyId: "eligibility-integration-key",
+      keys: new Map([["eligibility-integration-key", Buffer.alloc(32, 7)]]),
+    }),
+    connector: { getVehicleEligibility } as unknown as RenaveConnector,
+    integratorCnpj: INTEGRATOR_CNPJ,
+    pool: appPool,
+  });
+}
+
+function eligibilityResponse(scenario: PreflightScenario) {
+  return {
+    result: {
+      diagnostico: { veiculoApto: true, veiculoComRecall: false },
+    },
+    verifiedIdentity: {
+      confirmedEstablishmentCnpj: scenario.store.cnpj,
+      confirmedIntegratorCnpj: INTEGRATOR_CNPJ,
+      environment: "homologation" as const,
+      establishmentId: scenario.store.id,
+      tenantId: scenario.tenant.id,
+    },
   };
 }
 
@@ -346,48 +393,20 @@ describe("composição PostgreSQL real da API", () => {
   });
 
   it("persiste evidência/auditoria sem manter transação durante o conector", async () => {
+    const scenario = await createPreflightScenario("eligibility-transaction");
+    await prepareCredentialLink(scenario, "confirmed");
     const enteredConnector = deferred<void>();
     const releaseConnector = deferred<void>();
     const connectorCall = vi.fn(async () => {
       enteredConnector.resolve(undefined);
       await releaseConnector.promise;
-      return {
-        result: {
-          diagnostico: { veiculoApto: true, veiculoComRecall: false },
-        },
-        verifiedIdentity: {
-          confirmedEstablishmentCnpj: operatorStore.cnpj,
-          confirmedIntegratorCnpj: INTEGRATOR_CNPJ,
-          environment: "homologation" as const,
-          establishmentId: operatorStore.id,
-          tenantId: tenant.id,
-        },
-      };
+      return eligibilityResponse(scenario);
     });
-    const connector = {
-      getVehicleEligibility: connectorCall,
-    } as unknown as RenaveConnector;
-    const cipher = new EvidenceCipher({
-      activeKeyId: "integration-key",
-      keys: new Map([["integration-key", Buffer.alloc(32, 7)]]),
-    });
-    const useCase = new PostgresVehicleEligibilityUseCase({
-      certificateThumbprintSha256: "c".repeat(64),
-      cipher,
-      connector,
-      integratorCnpj: INTEGRATOR_CNPJ,
-      pool: appPool,
-    });
+    const useCase = createEligibilityUseCase(connectorCall);
 
-    const execution = useCase.execute({
-      actorIp: "198.51.100.10",
-      crvType: "DIGITAL",
-      establishmentId: operatorStore.id,
-      plate: "ABC1D23",
-      subject: OPERATOR,
-      tenantId: tenant.id,
-      traceId: "composition-trace",
-    });
+    const execution = useCase.execute(
+      eligibilityInput(scenario, "composition-trace"),
+    );
     await enteredConnector.promise;
 
     const activity = await adminPool.query<{ open_transactions: string }>(
@@ -401,11 +420,13 @@ describe("composição PostgreSQL real da API", () => {
 
     releaseConnector.resolve(undefined);
     await expect(execution).resolves.toEqual({
-      diagnostico: { veiculoApto: true, veiculoComRecall: false },
+      detranUnavailable: false,
+      impediments: [],
+      status: "eligible",
     });
     expect(connectorCall).toHaveBeenCalledOnce();
 
-    const audits = await withTenant(appPool, tenant.id, (client) =>
+    const audits = await withTenant(appPool, scenario.tenant.id, (client) =>
       listAuditEvents(client),
     );
     expect(audits.map(({ outcome }) => outcome)).toEqual([
@@ -424,7 +445,7 @@ describe("composição PostgreSQL real da API", () => {
               pg_catalog.min(status) as status
          from renave.protected_evidence
         where tenant_id = $1 and establishment_id = $2`,
-      [tenant.id, operatorStore.id],
+      [scenario.tenant.id, scenario.store.id],
     );
     expect(evidence.rows[0]).toEqual({
       count: "1",
@@ -432,6 +453,42 @@ describe("composição PostgreSQL real da API", () => {
       status: "completed",
     });
   });
+
+  it.each([
+    ["not_started", false],
+    ["pending", false],
+    ["rejected", false],
+    ["deactivated", false],
+    ["confirmed", true],
+    ["enabled", true],
+  ] as const)(
+    "aplica vínculo %s antes de consultar aptidão",
+    async (status, allowed) => {
+      const scenario = await createPreflightScenario(
+        `eligibility-link-${status.replaceAll("_", "-")}`,
+      );
+      await prepareCredentialLink(scenario, status);
+      const connectorCall = vi.fn(async () => eligibilityResponse(scenario));
+      const useCase = createEligibilityUseCase(connectorCall);
+      const execution = useCase.execute(
+        eligibilityInput(scenario, `eligibility-link-${status}`),
+      );
+
+      if (allowed) {
+        await expect(execution).resolves.toEqual({
+          detranUnavailable: false,
+          impediments: [],
+          status: "eligible",
+        });
+        expect(connectorCall).toHaveBeenCalledOnce();
+      } else {
+        await expect(execution).rejects.toMatchObject({
+          code: "RENAVE_LINK_NOT_READY",
+        });
+        expect(connectorCall).not.toHaveBeenCalled();
+      }
+    },
+  );
 
   it("confirma o vínculo após preflight sem expor o subject no histórico", async () => {
     const connector = {

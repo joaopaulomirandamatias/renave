@@ -132,13 +132,42 @@ const input = {
   traceId: "trace-123",
 };
 
+const impedimentCases = [
+  ["veiculoBaixado", "VEHICLE_WRITTEN_OFF"],
+  ["veiculoComAlarme", "VEHICLE_ALARM"],
+  ["veiculoComLicenciamentoProvisorio", "PROVISIONAL_REGISTRATION"],
+  ["veiculoComPendenciaDeEmissaoCrv", "CRV_ISSUANCE_PENDING"],
+  ["veiculoComRecall", "RECALL_PENDING"],
+  ["veiculoComRestricaoExtrajudicial", "EXTRAJUDICIAL_RESTRICTION"],
+  ["veiculoComRestricaoImpeditivaNoDetran", "DETRAN_BLOCKING_RESTRICTION"],
+  ["veiculoComRestricaoJudicial", "JUDICIAL_RESTRICTION"],
+  ["veiculoComRestricaoNaReceitaFederal", "FEDERAL_REVENUE_RESTRICTION"],
+  ["veiculoComRestricaoPgfn", "PGFN_RESTRICTION"],
+  ["veiculoComRouboFurto", "THEFT_OR_ROBBERY"],
+  ["veiculoSemAtpv", "ATPV_MISSING"],
+  [
+    "veiculoTemAutorizacaoTransferenciaParaEstabelecimentoDiferenteDoEstabelecimentoConsultante",
+    "TRANSFER_AUTHORIZATION_FOR_DIFFERENT_ESTABLISHMENT",
+  ],
+  [
+    "veiculoTemComunicacaoDeVendaParaCompradorDiferenteDoEstabelecimentoConsultante",
+    "SALE_NOTICE_FOR_DIFFERENT_BUYER",
+  ],
+  [
+    "veiculoTemIntencaoDeVendaParaCompradorDiferenteDoEstabelecimentoConsultante",
+    "SALE_INTENT_FOR_DIFFERENT_BUYER",
+  ],
+] as const;
+
 describe("VehicleEligibilityService", () => {
   it("consulta em homologação usando apenas o CNPJ carregado no servidor", async () => {
     const harness = createHarness();
 
-    await expect(harness.service.execute(input)).resolves.toEqual(
-      successfulResult.result,
-    );
+    await expect(harness.service.execute(input)).resolves.toEqual({
+      detranUnavailable: false,
+      impediments: [],
+      status: "eligible",
+    });
 
     expect(harness.connector).toHaveBeenCalledWith(
       {
@@ -171,6 +200,146 @@ describe("VehicleEligibilityService", () => {
     );
     expect(harness.complete).toHaveBeenCalledOnce();
   });
+
+  it("preserva a resposta integral na evidência e devolve somente códigos seguros", async () => {
+    const rawResponse: VehicleEligibilityResponse = {
+      autorizacaoTransferencia: {
+        cpfOperadorResponsavelAutorizacao: "12345678901",
+        dataHoraAutorizacao: "2026-11-23T10:00:00-03:00",
+      },
+      comunicacaoComDetranFalhou: false,
+      diagnostico: {
+        motivosParaNaoAptidao: ["texto livre externo"],
+        veiculoApto: false,
+        veiculoBaixado: true,
+        veiculoComAlarme: true,
+        veiculoComLicenciamentoProvisorio: true,
+        veiculoComPendenciaDeEmissaoCrv: true,
+        veiculoComRecall: true,
+        veiculoComRestricaoExtrajudicial: true,
+        veiculoComRestricaoImpeditivaNoDetran: true,
+        veiculoComRestricaoJudicial: true,
+        veiculoComRestricaoNaReceitaFederal: true,
+        veiculoComRestricaoPgfn: true,
+        veiculoComRouboFurto: true,
+        veiculoSemAtpv: true,
+        veiculoTemAutorizacaoTransferenciaParaEstabelecimentoDiferenteDoEstabelecimentoConsultante: true,
+        veiculoTemComunicacaoDeVendaParaCompradorDiferenteDoEstabelecimentoConsultante: true,
+        veiculoTemIntencaoDeVendaParaCompradorDiferenteDoEstabelecimentoConsultante: true,
+      },
+      informacoesDebitos: {
+        boletos: [{ codigo: "boleto-sensivel" }],
+        existemDebitos: true,
+        valorDebitoMultas: 123.45,
+      },
+      veiculo: {
+        chassi: "9BWZZZ377VT004251",
+        placa: "ABC1D23",
+        renavam: "12345678901",
+      },
+    };
+    const harness = createHarness({
+      connectorResult: { ...successfulResult, result: rawResponse },
+    });
+
+    const summary = await harness.service.execute(input);
+
+    expect(summary).toEqual({
+      detranUnavailable: false,
+      impediments: [
+        "VEHICLE_WRITTEN_OFF",
+        "VEHICLE_ALARM",
+        "PROVISIONAL_REGISTRATION",
+        "CRV_ISSUANCE_PENDING",
+        "RECALL_PENDING",
+        "EXTRAJUDICIAL_RESTRICTION",
+        "DETRAN_BLOCKING_RESTRICTION",
+        "JUDICIAL_RESTRICTION",
+        "FEDERAL_REVENUE_RESTRICTION",
+        "PGFN_RESTRICTION",
+        "THEFT_OR_ROBBERY",
+        "ATPV_MISSING",
+        "TRANSFER_AUTHORIZATION_FOR_DIFFERENT_ESTABLISHMENT",
+        "SALE_NOTICE_FOR_DIFFERENT_BUYER",
+        "SALE_INTENT_FOR_DIFFERENT_BUYER",
+      ],
+      status: "ineligible",
+    });
+    expect(JSON.stringify(summary)).not.toMatch(
+      /12345678901|9BWZZZ377VT004251|ABC1D23|boleto|chassi|cpf|debito|motivo|placa|renavam|valor/iu,
+    );
+    expect(harness.complete).toHaveBeenCalledWith({
+      payloadReference: PAYLOAD_REFERENCE,
+      response: rawResponse,
+    });
+  });
+
+  it.each(impedimentCases)(
+    "falha fechado quando apto conflita com %s",
+    async (field, code) => {
+      const rawResponse: VehicleEligibilityResponse = {
+        diagnostico: { [field]: true, veiculoApto: true },
+      };
+      const harness = createHarness({
+        connectorResult: { ...successfulResult, result: rawResponse },
+      });
+
+      await expect(harness.service.execute(input)).resolves.toEqual({
+        detranUnavailable: false,
+        impediments: [code],
+        status: "undetermined",
+      });
+      expect(harness.complete).toHaveBeenCalledWith({
+        payloadReference: PAYLOAD_REFERENCE,
+        response: rawResponse,
+      });
+    },
+  );
+
+  it("expõe código seguro quando a inaptidão não possui flag estruturado", async () => {
+    const harness = createHarness({
+      connectorResult: {
+        ...successfulResult,
+        result: {
+          diagnostico: {
+            motivosParaNaoAptidao: ["mensagem livre que não pode vazar"],
+            veiculoApto: false,
+          },
+        },
+      },
+    });
+
+    const summary = await harness.service.execute(input);
+
+    expect(summary).toEqual({
+      detranUnavailable: false,
+      impediments: ["UNSPECIFIED_INELIGIBILITY"],
+      status: "ineligible",
+    });
+    expect(JSON.stringify(summary)).not.toContain("mensagem livre");
+  });
+
+  it.each([
+    [
+      "falha de comunicação com o DETRAN",
+      { comunicacaoComDetranFalhou: true, diagnostico: { veiculoApto: true } },
+      true,
+    ],
+    ["diagnóstico sem decisão", { diagnostico: {} }, false],
+  ] as const)(
+    "marca como indeterminado quando há %s",
+    async (_name, result, detranUnavailable) => {
+      const harness = createHarness({
+        connectorResult: { ...successfulResult, result },
+      });
+
+      await expect(harness.service.execute(input)).resolves.toEqual({
+        detranUnavailable,
+        impediments: [],
+        status: "undetermined",
+      });
+    },
+  );
 
   it("recusa contexto de autorização de outro tenant antes de tocar no SERPRO", async () => {
     const harness = createHarness({

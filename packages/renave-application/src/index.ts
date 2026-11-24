@@ -9,6 +9,7 @@ export {
   type EligibilityAuditOutcome,
   type EligibilityAuditPort,
   type EligibilityAuditRecord,
+  type EligibilityImpedimentCode,
   type EvidenceContext,
   type EstablishmentPort,
   type ProtectedEvidencePort,
@@ -16,6 +17,7 @@ export {
   type VehicleEligibilityInput,
   type VehicleEligibilityPorts,
   type VehicleEligibilityServiceConfig,
+  type VehicleEligibilitySummary,
 } from "./vehicle-eligibility.js";
 export {
   InvalidStockQueryApplicationInputError,

@@ -18,7 +18,12 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import type { BrowserRenaveLinkStatus } from "../App.js";
+import type {
+  BrowserCrvType,
+  BrowserEligibilitySummary,
+  BrowserRenaveLinkStatus,
+} from "../App.js";
+import { EligibilityPanel } from "./EligibilityPanel.js";
 import { StockSearchPanel } from "./StockSearchPanel.js";
 
 export interface DashboardPageProps {
@@ -28,6 +33,10 @@ export interface DashboardPageProps {
   linkStatus?: BrowserRenaveLinkStatus;
   linkStatusError?: boolean;
   linkStatusLoading?: boolean;
+  onCheckEligibility?: (
+    plate: string,
+    crvType: BrowserCrvType,
+  ) => Promise<BrowserEligibilitySummary>;
   onEstablishmentChange?: (establishmentId: string) => void;
   onLogout: () => void | Promise<void>;
   onReloadLinkStatus?: () => void;
@@ -97,6 +106,7 @@ export function DashboardPage({
   linkStatus,
   linkStatusError = false,
   linkStatusLoading = false,
+  onCheckEligibility,
   onEstablishmentChange,
   onLogout,
   onReloadLinkStatus,
@@ -158,17 +168,6 @@ export function DashboardPage({
               </select>
             </div>
           ) : null}
-          <Button
-            variant="primary"
-            leadingIcon={<ClipboardCheck size={18} />}
-            disabled
-            aria-describedby="eligibility-blocked-reason"
-          >
-            Consultar aptidão
-          </Button>
-          <p id="eligibility-blocked-reason" className="sr-only">
-            Disponível após validar o vínculo do estabelecimento no RENAVE.
-          </p>
         </header>
 
         <section
@@ -251,6 +250,17 @@ export function DashboardPage({
             </p>
           ) : null}
         </section>
+
+        {(linkStatus === "confirmed" || linkStatus === "enabled") &&
+        selectedTenantId &&
+        selectedEstablishmentId &&
+        onCheckEligibility ? (
+          <EligibilityPanel
+            key={`eligibility:${selectedTenantId}:${selectedEstablishmentId}`}
+            onCheck={onCheckEligibility}
+            selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
+          />
+        ) : null}
 
         {(linkStatus === "confirmed" || linkStatus === "enabled") &&
         selectedTenantId &&

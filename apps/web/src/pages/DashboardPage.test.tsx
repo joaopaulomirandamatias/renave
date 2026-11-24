@@ -36,13 +36,9 @@ describe("DashboardPage", () => {
     });
     expect(establishmentSelect).toHaveValue("store-belem");
     expect(establishmentSelect).toBeDisabled();
-    const eligibilityButton = screen.getByRole("button", {
-      name: "Consultar aptidão",
-    });
-    expect(eligibilityButton).toBeDisabled();
-    expect(eligibilityButton).toHaveAccessibleDescription(
-      "Disponível após validar o vínculo do estabelecimento no RENAVE.",
-    );
+    expect(
+      screen.queryByRole("heading", { name: "Consultar aptidão do veículo" }),
+    ).toBeNull();
     expect(
       screen.getByRole("region", { name: "Integração ainda protegida" }),
     ).toHaveTextContent(/operações permanecem bloqueadas/i);
@@ -134,13 +130,19 @@ describe("DashboardPage", () => {
     expect(onRunPreflight).toHaveBeenCalledOnce();
   });
 
-  it("só mostra a consulta de estoque com seleção e vínculo confirmado", () => {
+  it("só mostra consultas RENAVE com seleção e vínculo confirmado", () => {
     const onSearchStocks = vi.fn(async () => []);
+    const onCheckEligibility = vi.fn(async () => ({
+      detranUnavailable: false,
+      impediments: [],
+      status: "eligible" as const,
+    }));
     const view = render(
       <DashboardPage
         environment="homologation"
         establishments={establishments}
         linkStatus="pending"
+        onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
         onSearchStocks={onSearchStocks}
         selectedEstablishmentId="store-belem"
@@ -151,12 +153,16 @@ describe("DashboardPage", () => {
     expect(
       screen.queryByRole("heading", { name: "Localizar estoque por placa" }),
     ).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "Consultar aptidão do veículo" }),
+    ).toBeNull();
 
     view.rerender(
       <DashboardPage
         environment="homologation"
         establishments={establishments}
         linkStatus="confirmed"
+        onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
         onSearchStocks={onSearchStocks}
         selectedEstablishmentId="store-belem"
@@ -166,6 +172,9 @@ describe("DashboardPage", () => {
     );
     expect(
       screen.getByRole("heading", { name: "Localizar estoque por placa" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Consultar aptidão do veículo" }),
     ).toBeVisible();
   });
 });

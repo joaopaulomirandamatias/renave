@@ -5,6 +5,7 @@ import {
 import {
   appendAuditEvent,
   getAuthorizationContext,
+  getCredentialLink,
   getEstablishment,
   withTenant,
 } from "@seu-renave/db";
@@ -13,18 +14,17 @@ import {
   VehicleEligibilityService,
   type EligibilityAuditRecord,
   type VehicleEligibilityInput,
+  type VehicleEligibilitySummary,
 } from "@seu-renave/renave-application";
-import type {
-  RenaveConnector,
-  VehicleEligibilityResponse,
-} from "@seu-renave/renave-connector";
+import type { RenaveConnector } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
 
 import type { EvidenceCipher } from "@seu-renave/protected-evidence";
+import { RenaveLinkNotReadyError } from "./stock-query-use-case.js";
 
 export interface EligibilityUseCase {
   authorize(input: VehicleEligibilityInput): Promise<void>;
-  execute(input: VehicleEligibilityInput): Promise<VehicleEligibilityResponse>;
+  execute(input: VehicleEligibilityInput): Promise<VehicleEligibilitySummary>;
 }
 
 export interface PostgresEligibilityUseCaseOptions {
@@ -67,39 +67,42 @@ export class PostgresVehicleEligibilityUseCase implements EligibilityUseCase {
   constructor(private readonly options: PostgresEligibilityUseCaseOptions) {}
 
   async authorize(input: VehicleEligibilityInput): Promise<void> {
-    const context = await withTenant(
-      this.options.pool,
-      input.tenantId,
-      (client) => getAuthorizationContext(client, input.subject),
-    );
-    const decision = authorize(
-      context ?? {
-        grants: [],
-        subject: input.subject,
-        tenantId: input.tenantId,
-      },
-      {
-        action: "renave.vehicle.eligibility.read",
-        establishmentId: input.establishmentId,
-        tenantId: input.tenantId,
-      },
-    );
-    if (!decision.allowed) throw new AuthorizationDeniedError(decision.reason);
-    const establishment = await withTenant(
-      this.options.pool,
-      input.tenantId,
-      (client) => getEstablishment(client, input.establishmentId),
-    );
-    if (!establishment || establishment.status !== "active") {
-      throw Object.assign(new Error("Estabelecimento indisponível"), {
-        code: "ESTABLISHMENT_UNAVAILABLE",
-      });
-    }
+    await withTenant(this.options.pool, input.tenantId, async (client) => {
+      const context = await getAuthorizationContext(client, input.subject);
+      const decision = authorize(
+        context ?? {
+          grants: [],
+          subject: input.subject,
+          tenantId: input.tenantId,
+        },
+        {
+          action: "renave.vehicle.eligibility.read",
+          establishmentId: input.establishmentId,
+          tenantId: input.tenantId,
+        },
+      );
+      if (!decision.allowed) {
+        throw new AuthorizationDeniedError(decision.reason);
+      }
+      const [establishment, link] = await Promise.all([
+        getEstablishment(client, input.establishmentId),
+        getCredentialLink(client, input.establishmentId),
+      ]);
+      if (!establishment || establishment.status !== "active") {
+        throw Object.assign(new Error("Estabelecimento indisponível"), {
+          code: "ESTABLISHMENT_UNAVAILABLE",
+        });
+      }
+      if (link?.status !== "confirmed" && link?.status !== "enabled") {
+        throw new RenaveLinkNotReadyError();
+      }
+    });
   }
 
   async execute(
     input: VehicleEligibilityInput,
-  ): Promise<VehicleEligibilityResponse> {
+  ): Promise<VehicleEligibilitySummary> {
+    await this.authorize(input);
     const { pool } = this.options;
     const evidence = new PostgresProtectedEvidenceStore(
       pool,

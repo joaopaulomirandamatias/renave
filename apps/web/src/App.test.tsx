@@ -26,6 +26,11 @@ function clientFor(
   tenants: readonly BrowserTenant[] = [],
 ): SessionClient {
   return {
+    checkVehicleEligibility: vi.fn(async () => ({
+      detranUnavailable: false,
+      impediments: [],
+      status: "eligible" as const,
+    })),
     load: vi.fn(async () => session),
     loadEstablishments: vi.fn(async () => []),
     loadRenaveLinkStatus: vi.fn(async () => ({
@@ -48,6 +53,128 @@ function deferred<T>() {
 }
 
 describe("App session boundary", () => {
+  it.each(["AZUL", "VERDE", "BRANCO", "DIGITAL"] as const)(
+    "envia aptidão com CRV %s somente no corpo POST e aceita o DTO mínimo",
+    async (crvType) => {
+      const fetchMock = vi.fn<typeof fetch>(async () =>
+        Response.json({
+          detranUnavailable: false,
+          impediments: ["CRV_ISSUANCE_PENDING"],
+          status: "ineligible",
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        browserSessionClient.checkVehicleEligibility(
+          "tenant-a",
+          "store-a",
+          "ABC1D23",
+          crvType,
+        ),
+      ).resolves.toEqual({
+        detranUnavailable: false,
+        impediments: ["CRV_ISSUANCE_PENDING"],
+        status: "ineligible",
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/tenants/tenant-a/establishments/store-a/vehicle-eligibility",
+        expect.objectContaining({
+          body: JSON.stringify({ crvType, plate: "ABC1D23" }),
+          cache: "no-store",
+          credentials: "same-origin",
+          method: "POST",
+        }),
+      );
+      expect(fetchMock.mock.calls[0]?.[0]).not.toContain("ABC1D23");
+    },
+  );
+
+  it("recusa aptidão com campo extra, código desconhecido ou duplicado", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: false,
+          impediments: [],
+          renavam: "12345678901",
+          status: "eligible",
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: false,
+          impediments: ["UNKNOWN_CODE"],
+          status: "ineligible",
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: false,
+          impediments: ["RECALL_PENDING", "RECALL_PENDING"],
+          status: "ineligible",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const check = () =>
+      browserSessionClient.checkVehicleEligibility(
+        "tenant-a",
+        "store-a",
+        "ABC1D23",
+        "DIGITAL",
+      );
+
+    await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+    await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+    await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+  });
+
+  it("recusa combinações semanticamente contraditórias de aptidão", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: true,
+          impediments: [],
+          status: "eligible",
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: false,
+          impediments: ["RECALL_PENDING"],
+          status: "eligible",
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: true,
+          impediments: ["RECALL_PENDING"],
+          status: "ineligible",
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: false,
+          impediments: [],
+          status: "ineligible",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const check = () =>
+      browserSessionClient.checkVehicleEligibility(
+        "tenant-a",
+        "store-a",
+        "ABC1D23",
+        "DIGITAL",
+      );
+
+    await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+    await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+    await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+    await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+  });
+
   it("envia a placa somente no corpo POST same-origin e minimiza a resposta", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json([{ estado: "CONFIRMADO", id: 71, placa: "ABC1D23" }]),
@@ -106,6 +233,11 @@ describe("App session boundary", () => {
 
   it("não mostra login nem painel enquanto verifica a sessão", () => {
     const client: SessionClient = {
+      checkVehicleEligibility: vi.fn(async () => ({
+        detranUnavailable: false,
+        impediments: [],
+        status: "eligible" as const,
+      })),
       load: vi.fn(() => new Promise<BrowserSession>(() => undefined)),
       loadEstablishments: vi.fn(async () => []),
       loadRenaveLinkStatus: vi.fn(async () => ({

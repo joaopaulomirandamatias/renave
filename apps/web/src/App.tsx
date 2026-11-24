@@ -56,7 +56,42 @@ export interface BrowserStockSummary {
   placa: string;
 }
 
+export type BrowserCrvType = "AZUL" | "VERDE" | "BRANCO" | "DIGITAL";
+
+export type BrowserEligibilityStatus =
+  "eligible" | "ineligible" | "undetermined";
+
+export type BrowserEligibilityImpediment =
+  | "UNSPECIFIED_INELIGIBILITY"
+  | "VEHICLE_WRITTEN_OFF"
+  | "VEHICLE_ALARM"
+  | "PROVISIONAL_REGISTRATION"
+  | "CRV_ISSUANCE_PENDING"
+  | "RECALL_PENDING"
+  | "EXTRAJUDICIAL_RESTRICTION"
+  | "DETRAN_BLOCKING_RESTRICTION"
+  | "JUDICIAL_RESTRICTION"
+  | "FEDERAL_REVENUE_RESTRICTION"
+  | "PGFN_RESTRICTION"
+  | "THEFT_OR_ROBBERY"
+  | "ATPV_MISSING"
+  | "TRANSFER_AUTHORIZATION_FOR_DIFFERENT_ESTABLISHMENT"
+  | "SALE_NOTICE_FOR_DIFFERENT_BUYER"
+  | "SALE_INTENT_FOR_DIFFERENT_BUYER";
+
+export interface BrowserEligibilitySummary {
+  detranUnavailable: boolean;
+  impediments: readonly BrowserEligibilityImpediment[];
+  status: BrowserEligibilityStatus;
+}
+
 export interface SessionClient {
+  checkVehicleEligibility(
+    tenantId: string,
+    establishmentId: string,
+    plate: string,
+    crvType: BrowserCrvType,
+  ): Promise<BrowserEligibilitySummary>;
   load(): Promise<BrowserSession>;
   loadEstablishments(
     tenantId: string,
@@ -182,6 +217,77 @@ const stockStates = new Set<BrowserStockState>([
   "FINALIZADO",
 ]);
 
+const eligibilityStatuses = new Set<BrowserEligibilityStatus>([
+  "eligible",
+  "ineligible",
+  "undetermined",
+]);
+
+const eligibilityImpediments = new Set<BrowserEligibilityImpediment>([
+  "UNSPECIFIED_INELIGIBILITY",
+  "VEHICLE_WRITTEN_OFF",
+  "VEHICLE_ALARM",
+  "PROVISIONAL_REGISTRATION",
+  "CRV_ISSUANCE_PENDING",
+  "RECALL_PENDING",
+  "EXTRAJUDICIAL_RESTRICTION",
+  "DETRAN_BLOCKING_RESTRICTION",
+  "JUDICIAL_RESTRICTION",
+  "FEDERAL_REVENUE_RESTRICTION",
+  "PGFN_RESTRICTION",
+  "THEFT_OR_ROBBERY",
+  "ATPV_MISSING",
+  "TRANSFER_AUTHORIZATION_FOR_DIFFERENT_ESTABLISHMENT",
+  "SALE_NOTICE_FOR_DIFFERENT_BUYER",
+  "SALE_INTENT_FOR_DIFFERENT_BUYER",
+]);
+
+function parseEligibility(value: unknown): BrowserEligibilitySummary {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 3 ||
+    Object.keys(value).some(
+      (key) =>
+        key !== "status" &&
+        key !== "detranUnavailable" &&
+        key !== "impediments",
+    ) ||
+    typeof value.status !== "string" ||
+    !eligibilityStatuses.has(value.status as BrowserEligibilityStatus) ||
+    typeof value.detranUnavailable !== "boolean" ||
+    !Array.isArray(value.impediments)
+  ) {
+    throw new Error("Resposta de aptidão inválida");
+  }
+  const seen = new Set<BrowserEligibilityImpediment>();
+  const impediments = value.impediments.map((impediment) => {
+    if (
+      typeof impediment !== "string" ||
+      !eligibilityImpediments.has(impediment as BrowserEligibilityImpediment) ||
+      seen.has(impediment as BrowserEligibilityImpediment)
+    ) {
+      throw new Error("Resposta de aptidão inválida");
+    }
+    const code = impediment as BrowserEligibilityImpediment;
+    seen.add(code);
+    return code;
+  });
+  const status = value.status as BrowserEligibilityStatus;
+  const semanticallyInvalid =
+    (status === "eligible" &&
+      (value.detranUnavailable || impediments.length > 0)) ||
+    (status === "ineligible" &&
+      (value.detranUnavailable || impediments.length === 0));
+  if (semanticallyInvalid) {
+    throw new Error("Resposta de aptidão inválida");
+  }
+  return {
+    detranUnavailable: value.detranUnavailable,
+    impediments,
+    status,
+  };
+}
+
 function parseStocks(value: unknown): readonly BrowserStockSummary[] {
   if (!Array.isArray(value)) throw new Error("Resposta de estoque inválida");
   const ids = new Set<number>();
@@ -217,7 +323,38 @@ class StockSearchClientError extends Error {
   }
 }
 
+class EligibilityClientError extends Error {
+  constructor(readonly code?: string) {
+    super("Consulta de aptidão não concluída");
+    this.name = "EligibilityClientError";
+  }
+}
+
 export const browserSessionClient: SessionClient = {
+  async checkVehicleEligibility(tenantId, establishmentId, plate, crvType) {
+    const response = await fetch(
+      `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/vehicle-eligibility`,
+      {
+        body: JSON.stringify({ crvType, plate }),
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+    );
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      throw new EligibilityClientError(
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+      );
+    }
+    return parseEligibility(value);
+  },
   async load() {
     const response = await fetch("/api/session", {
       credentials: "same-origin",
@@ -599,6 +736,14 @@ export function App({
         : {})}
       linkStatusError={renaveLinkView.status === "error"}
       linkStatusLoading={renaveLinkView.status === "loading"}
+      onCheckEligibility={(plate, crvType) =>
+        client.checkVehicleEligibility(
+          selectedTenantId,
+          activeEstablishmentId ?? "",
+          plate,
+          crvType,
+        )
+      }
       onRunPreflight={() => void runPreflight()}
       onSearchStocks={(plate) =>
         client.searchStocks(

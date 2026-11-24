@@ -351,19 +351,24 @@ footer {
   font-weight: 700;
 }
 
-.stock-search__field input {
+.stock-search__field input,
+.stock-search__field select {
   min-height: var(--sr-touch-target-min);
   padding: 0 0.75rem;
   color: var(--sr-color-text);
   font: inherit;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   background: var(--sr-color-surface);
   border: 1px solid var(--sr-color-border-strong);
   border-radius: var(--sr-radius-control);
 }
 
-.stock-search__field input:focus-visible {
+.stock-search__field input {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stock-search__field input:focus-visible,
+.stock-search__field select:focus-visible {
   outline: 3px solid var(--sr-color-focus);
   outline-offset: 2px;
 }
@@ -395,6 +400,31 @@ footer {
 .stock-search__result li > div {
   display: grid;
   gap: 0.2rem;
+}
+
+.eligibility-panel__summary {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.875rem;
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-control);
+}
+
+.eligibility-panel__summary.is-eligible {
+  border-color: var(--sr-color-brand-border);
+  background: var(--sr-color-brand-soft);
+}
+
+.eligibility-panel__summary.is-ineligible {
+  border-color: var(--sr-color-warning-border);
+  background: var(--sr-color-warning-soft);
+}
+
+.eligibility-panel__summary ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.25rem;
 }
 
 @media (max-width: 46rem) {

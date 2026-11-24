@@ -27,7 +27,9 @@ function setup(
     async () => undefined,
   );
   const execute = vi.fn<EligibilityUseCase["execute"]>(async (_input) => ({
-    diagnostico: { veiculoApto: true },
+    detranUnavailable: false,
+    impediments: [],
+    status: "eligible",
   }));
   const getSession = vi.fn(async () =>
     options.authenticated === false
@@ -190,7 +192,14 @@ describe("rota autenticada de aptidão", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ diagnostico: { veiculoApto: true } });
+    expect(response.json()).toEqual({
+      detranUnavailable: false,
+      impediments: [],
+      status: "eligible",
+    });
+    expect(response.body).not.toMatch(
+      /autorizacao|boleto|chassi|cpf|debito|motivo|placa|renavam|valor/iu,
+    );
     expect(getSession).toHaveBeenCalledWith("opaque-session");
     expect(execute).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -278,6 +287,30 @@ describe("rota autenticada de aptidão", () => {
     expect(execute).not.toHaveBeenCalled();
     expect(release).not.toHaveBeenCalled();
   });
+
+  it.each(["not_started", "pending", "rejected", "deactivated"] as const)(
+    "bloqueia vínculo %s antes de adquirir lease ou chamar o SERPRO",
+    async () => {
+      const { acquire, app, authorizeEligibility, execute, release } = setup();
+      authorizeEligibility.mockRejectedValueOnce(
+        Object.assign(new Error("estado interno do vínculo"), {
+          code: "RENAVE_LINK_NOT_READY",
+        }),
+      );
+
+      const response = await request(app, {
+        plate: "ABC1D23",
+        crvType: "DIGITAL",
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({ code: "RENAVE_LINK_NOT_READY" });
+      expect(response.body).not.toContain("estado interno");
+      expect(acquire).not.toHaveBeenCalled();
+      expect(execute).not.toHaveBeenCalled();
+      expect(release).not.toHaveBeenCalled();
+    },
+  );
 
   it("protege as rotas RENAVE com o mesmo gate da sessão", async () => {
     const { app, execute, getSession } = setup({
