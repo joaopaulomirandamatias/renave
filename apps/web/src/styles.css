@@ -532,6 +532,104 @@ footer {
   text-align: right;
 }
 
+.activation__guide {
+  display: grid;
+  gap: 0.875rem;
+  padding: 1rem;
+  background: var(--sr-color-navy-soft);
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-control);
+}
+
+.activation__guide-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.activation__guide-heading > svg {
+  flex: 0 0 auto;
+  color: var(--sr-color-navy);
+}
+
+.activation__guide-heading p,
+.activation__guide-heading h3,
+.activation__guide-summary,
+.activation__guide-steps,
+.activation__guide-steps p,
+.activation__guide-security {
+  margin: 0;
+}
+
+.activation__guide-heading p {
+  margin-bottom: 0.25rem;
+  color: var(--sr-color-brand);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activation__guide-heading h3 {
+  color: var(--sr-color-navy);
+  font-size: 0.9375rem;
+}
+
+.activation__guide-summary,
+.activation__guide-steps p,
+.activation__guide-security {
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.activation__guide-steps {
+  display: grid;
+  gap: 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.activation__guide-steps li {
+  padding-left: 0.25rem;
+}
+
+.activation__guide-steps li::marker {
+  color: var(--sr-color-brand);
+  font-weight: 800;
+}
+
+.activation__guide-steps strong {
+  color: var(--sr-color-navy);
+  font-size: 0.8125rem;
+}
+
+.activation__guide-steps p {
+  margin-top: 0.2rem;
+}
+
+.activation__guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.activation__guide-security {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  color: var(--sr-color-navy);
+  background: var(--sr-color-surface);
+  border-radius: var(--sr-radius-control);
+}
+
+.activation__guide-security svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+  color: var(--sr-color-brand);
+}
+
 .readiness-panel {
   display: grid;
   gap: 0.875rem;
@@ -1206,6 +1304,10 @@ footer {
   .activation__steps strong {
     grid-column: 2;
     text-align: left;
+  }
+
+  .activation__guide-actions .sr-button {
+    width: 100%;
   }
 
   .readiness-panel__items {
