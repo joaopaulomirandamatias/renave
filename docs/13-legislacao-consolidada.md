@@ -8,7 +8,7 @@
 
 ## 13.1 Quadro-resumo
 
-| Tema | Situação | Impacto no Seu Renave |
+| Tema | Situação | Impacto no RenavEstoque |
 |---|---|---|
 | Norma-base | **Res. CONTRAN 1.026/2026** (DOU 30/06/2026) [OF] | Somos o *sistema de integração* operado por **integradora autorizada** |
 | Obrigatoriedade | Todas as operações (entrada, saída, transferência, consignação) passam por integradora autorizada; o RENAVE é o **único** meio de escrituração [OF] | Mercado obrigatório |
@@ -81,8 +81,8 @@
 
 **Pontos em aberto, a confirmar com SENATRAN e SERPRO na Fase 0:**
 1. **Quem é o contratante do SERPRO no novo modelo:** a loja (como antes) ou a integradora?
-   - Se for a **loja**: o Seu Renave cobra só o preço de integração por registro, e a tarifa SERPRO segue faturada à loja.
-   - Se for a **integradora**: o Seu Renave paga o SERPRO e **repassa** os R$ 5,48 de forma discriminada, junto com o preço de integração.
+   - Se for a **loja**: o RenavEstoque cobra só o preço de integração por registro, e a tarifa SERPRO segue faturada à loja.
+   - Se for a **integradora**: o RenavEstoque paga o SERPRO e **repassa** os R$ 5,48 de forma discriminada, junto com o preço de integração.
 2. **Unidade "por veículo do estoque":** cobra-se por movimento (entrada e saída) ou por veículo (ciclo)?
 3. **Quais operações são faturáveis** (transferência, consignação, cancelamentos)?
 4. **Formato da faixa da integradora:** por operação, por volume, por tipo?

@@ -8,7 +8,7 @@ export interface BrandLogoProps {
 
 export function BrandLogo({
   compact = false,
-  label = "Seu Renave",
+  label = "RenavEstoque",
   className,
 }: BrandLogoProps) {
   const size = compact ? 44 : 68;
@@ -75,7 +75,8 @@ export function BrandLogo({
       </svg>
       {!compact && (
         <span className="sr-brand__name">
-          <span>Seu</span> <strong>Renave</strong>
+          <span>Renav</span>
+          <strong>Estoque</strong>
         </span>
       )}
     </div>

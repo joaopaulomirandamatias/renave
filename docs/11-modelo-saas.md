@@ -1,8 +1,8 @@
 # 11 — Modelo SaaS: operação da plataforma, clientes e cobrança por registro
 
-> O Seu Renave é um **SaaS B2B multi-tenant**. **Nós somos o operador da plataforma** (a integradora). Concessionárias, revendas, grupos, montadoras, ITEs e instituições credoras são **clientes (tenants)** e assinam o serviço, cada um com seus estabelecimentos (matriz e filiais) e usuários.
+> O RenavEstoque é um **SaaS B2B multi-tenant**. **Nós somos o operador da plataforma** (a integradora). Concessionárias, revendas, grupos, montadoras, ITEs e instituições credoras são **clientes (tenants)** e assinam o serviço, cada um com seus estabelecimentos (matriz e filiais) e usuários.
 > Este documento especifica a camada SaaS: backoffice do operador, ciclo de vida do cliente, cobrança por registro RENAVE, parceiros e a conta do cliente.
-> **Escopo:** o Seu Renave é **exclusivamente um sistema RENAVE** (sistema de integração da Res. CONTRAN 1.026/2026). Não é, nem terá módulos de, gestão de veículos, de loja ou comercial (DMS), atividade vedada à integradora.
+> **Escopo:** o RenavEstoque é **exclusivamente um sistema RENAVE** (sistema de integração da Res. CONTRAN 1.026/2026). Não é, nem terá módulos de, gestão de veículos, de loja ou comercial (DMS), atividade vedada à integradora.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```mermaid
 flowchart TD
-  P[Plataforma — Seu Renave<br/>equipe interna: Super admin, Operações, Suporte, Financeiro, CS, Compliance]
+  P[Plataforma — RenavEstoque<br/>equipe interna: Super admin, Operações, Suporte, Financeiro, CS, Compliance]
   PA[Parceiro DMS/ERP<br/>opcional · white-label · revenue share]
   T1[Tenant: Grupo Auto Prime<br/>contrato · faturamento por registro]
   T2[Tenant: Revenda Bom Negócio]
@@ -83,7 +83,7 @@ stateDiagram-v2
 
 ## 11.4 Modelo de cobrança: **por registro RENAVE realizado**
 
-> **Decisão do patrocinador:** o Seu Renave **não cobra mensalidade da plataforma** e **não tem planos nem add-ons**. O cliente paga **por registro RENAVE realizado** (confirmado), com **valores definidos pela autoridade**. Todas as funcionalidades da plataforma ficam incluídas para todos os clientes, conforme o tipo de estabelecimento.
+> **Decisão do patrocinador:** o RenavEstoque **não cobra mensalidade da plataforma** e **não tem planos nem add-ons**. O cliente paga **por registro RENAVE realizado** (confirmado), com **valores definidos pela autoridade**. Todas as funcionalidades da plataforma ficam incluídas para todos os clientes, conforme o tipo de estabelecimento.
 
 ### Base regulatória
 
@@ -123,13 +123,13 @@ A pesquisa legislativa (doc 13 §13.4) mostra **dois componentes**, ambos regula
 | Componente | Quem define | Quem recebe | Valor em 23/11/2026 | Base |
 |---|---|---|---|---|
 | **Tarifa SERPRO** do "Registro de Entrada ou Saída de Veículo do Estoque" | SENATRAN (portaria de preços) | **SERPRO**, com pagamento direto | **R$ 5,48 por registro** (reajuste anual pelo IPCA) | Portaria SENATRAN 417/2026 |
-| **Preço de integração** da integradora | SENATRAN fixa **mínimo e máximo** | **Integradora** (Seu Renave) | **Ato ainda não publicado** | Res. 1.026 art. 32 |
+| **Preço de integração** da integradora | SENATRAN fixa **mínimo e máximo** | **Integradora** (RenavEstoque) | **Ato ainda não publicado** | Res. 1.026 art. 32 |
 
 **Consequências para o modelo:**
 - A cobrança **por registro** é coerente com a norma. A SENATRAN indicou, na consulta pública, que a faixa terá "regras específicas de acordo com a operação".
 - "Quem define os valores" é a **SENATRAN**: ela fixa a tarifa paga ao SERPRO e a faixa da integradora. O **SERPRO** é quem **recebe a tarifa** e **opera** o sistema.
 - **A confirmar na Fase 0:** quem é o contratante do SERPRO no novo modelo (loja ou integradora), se a tarifa é por movimento ou por veículo, e quais operações são faturáveis.
-- O extrato e a fatura **discriminam** os dois componentes. Se o contratante do SERPRO for a loja, a fatura do Seu Renave traz apenas o preço de integração.
+- O extrato e a fatura **discriminam** os dois componentes. Se o contratante do SERPRO for a loja, a fatura do RenavEstoque traz apenas o preço de integração.
 - Enquanto o ato do art. 32 não sair, o preço de integração fica `[A DEFINIR — aguardando ato SENATRAN]`, e a **contratação em produção** depende dessa publicação.
 
 ## 11.5 Medição e faturamento
@@ -315,7 +315,7 @@ As telas estão no mesmo canvas do protótipo, nas páginas **"Gestão do SaaS (
 
 ### Matriz de reuso — camada SaaS
 
-| Tema | Origem | Classe | Como usar no Seu Renave |
+| Tema | Origem | Classe | Como usar no RenavEstoque |
 |---|---|---|---|
 | Escopo obrigatório de tenant na aplicação (extensão Prisma que injeta e confere o tenant; falha se a consulta vier sem escopo) | `baconian/packages/db/src/scoped.ts` | 🟢 | Primeira barreira; **RLS por cima** (doc 02, `withTenantTransaction`) |
 | FKs compostas `(tenant_id, id)` + check de CI de colunas de tenant | `baconian/packages/db` (convenções do schema), `scripts/check-tenant-columns.ts` | 🟢 | Integridade cross-tenant no banco |

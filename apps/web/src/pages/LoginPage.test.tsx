@@ -22,7 +22,7 @@ describe("LoginPage", () => {
     const { container } = render(<LoginPage />);
 
     expect(screen.getByRole("main")).toBeVisible();
-    expect(screen.getByRole("img", { name: "Seu Renave" })).toBeVisible();
+    expect(screen.getByRole("img", { name: "RenavEstoque" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent(
       "Ambiente: Desenvolvimento",
     );
@@ -244,7 +244,7 @@ describe("@seu-renave/ui acessibilidade e semântica", () => {
   it("BrandLogo mantém nome acessível mesmo no modo compacto", () => {
     const { container } = render(<BrandLogo compact />);
 
-    expect(screen.getByRole("img", { name: "Seu Renave" })).toBeVisible();
+    expect(screen.getByRole("img", { name: "RenavEstoque" })).toBeVisible();
     expect(container.querySelector("svg")).toHaveAttribute(
       "aria-hidden",
       "true",

@@ -260,7 +260,7 @@ export function ActivationPage({
             <strong>Solicite o vínculo com a integradora</strong>
             <p>
               Quando a função estiver disponível para o seu perfil, escolha a
-              natureza RENAVE e a integradora Seu Renave, revise os dados e
+              natureza RENAVE e a integradora RenavEstoque, revise os dados e
               conclua a manifestação exibida pelo Credencia.
             </p>
           </li>
@@ -268,7 +268,7 @@ export function ActivationPage({
             <strong>Acompanhe e verifique</strong>
             <p>
               Aguarde as confirmações e habilitações aplicáveis. Depois, volte
-              ao Seu Renave e use a verificação de vínculo. Esta tela não
+              ao RenavEstoque e use a verificação de vínculo. Esta tela não
               concede a ativação.
             </p>
           </li>
@@ -299,8 +299,8 @@ export function ActivationPage({
 
         <p className="activation__guide-security">
           <LockKeyhole size={17} aria-hidden="true" />
-          Não compartilhe certificado, chave privada ou senha. O Seu Renave não
-          solicita CPF ou CNPJ nesta etapa.
+          Não compartilhe certificado, chave privada ou senha. O RenavEstoque
+          não solicita CPF ou CNPJ nesta etapa.
         </p>
       </aside>
     </section>

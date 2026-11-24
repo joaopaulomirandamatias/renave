@@ -17,7 +17,7 @@
 | RF-M1-02 | **Consultar CNPJ** em fonte oficial ou espelho e **sugerir** os dados (razão social, CNAE principal e secundários, situação, endereço), que o usuário confirma, com proveniência registrada. | M | F1 | ADE-01, ADE-02 |
 | RF-M1-03 | Validar **CNAE e objeto social** contra a lista de atividades elegíveis versionada e mostrar o resultado (elegível / não elegível / verificar). | M | F1 | ADE-01 |
 | RF-M1-04 | Classificar o **tipo de estabelecimento**: revenda de usados, concessionária, montadora/importadora, ITE, instituição credora, reforma/recuperação (futuro). Isso define os módulos habilitados. | M | F1 | ADE-03 |
-| RF-M1-05 | Conduzir a **jornada de adesão** em 7 etapas (cadastro → elegibilidade → adesão no Credencia → **vínculo do Seu Renave como integradora no Credencia** → contratação SERPRO (se aplicável) → homologação → produção; o envio de certificado da loja só existe no modo legado), com status, checklist de documentos e próxima ação em cada etapa. | M | F1 | ADE-06, ADE-07 |
+| RF-M1-05 | Conduzir a **jornada de adesão** em 7 etapas (cadastro → elegibilidade → adesão no Credencia → **vínculo do RenavEstoque como integradora no Credencia** → contratação SERPRO (se aplicável) → homologação → produção; o envio de certificado da loja só existe no modo legado), com status, checklist de documentos e próxima ação em cada etapa. | M | F1 | ADE-06, ADE-07 |
 | RF-M1-06 | Registrar o **pedido no Credencia** (protocolo, datas, status, pendências), acompanhar os prazos de 30+30 dias e alertar sobre pendência não sanada. | M | F1 | ADE-06 |
 | RF-M1-07 | Registrar o **vínculo formal** estabelecimento ↔ sistema de integração homologado da integradora. | M | F1 | ADE-04 |
 | RF-M1-08 | Registrar o **aceite de termos** (uso, privacidade, sigilo), com versão, data, IP e usuário. | M | F1 | AUD-01 |
@@ -31,7 +31,7 @@
 
 | ID | Requisito | Prio | Fase | RN |
 |---|---|---|---|---|
-| RF-M2-10 | Registrar e acompanhar o **vínculo Credencia** (loja → Seu Renave) por estabelecimento e natureza (Concessionário/Lojista, ITE, Montadora): pendente, confirmado, habilitado, desativado, rejeitado | M | F1 | RN-INT-SRP-02 |
+| RF-M2-10 | Registrar e acompanhar o **vínculo Credencia** (loja → RenavEstoque) por estabelecimento e natureza (Concessionário/Lojista, ITE, Montadora): pendente, confirmado, habilitado, desativado, rejeitado | M | F1 | RN-INT-SRP-02 |
 | RF-M2-11 | Verificar o vínculo com `GET /api/cliente-autenticado` + `CNPJ-Estabelecimento` (`cnpj` e `cnpjIntegradora` esperados) e bloquear em divergência | M | F1 | RN-INT-SRP-03 |
 | RF-M2-12 | Gerenciar o **certificado da integradora** em HSM, com redundância (dois válidos), rotação escalonada e teste diário de handshake | M | F1 | RN-INT-SRP-05 |
 

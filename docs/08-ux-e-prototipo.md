@@ -20,7 +20,7 @@
 
 ## 8.2 Design system — "Clean Operacional"
 
-> **Atualização:** com o logo oficial do Seu Renave, o acento teal (`#0F766E`) foi substituído por **verde UI `#067A45`** (hover `#05663A`, suave `#E7F6EE`), e a marca e o backoffice passaram a usar **azul-marinho `#0B2550`**. O âmbar `#F2A90C` é só acento pontual. Detalhes no doc 12 §12.7. A tabela abaixo mantém a estrutura de tokens; os valores de acento seguem esta atualização.
+> **Atualização:** com o logo oficial do RenavEstoque, o acento teal (`#0F766E`) foi substituído por **verde UI `#067A45`** (hover `#05663A`, suave `#E7F6EE`), e a marca e o backoffice passaram a usar **azul-marinho `#0B2550`**. O âmbar `#F2A90C` é só acento pontual. Detalhes no doc 12 §12.7. A tabela abaixo mantém a estrutura de tokens; os valores de acento seguem esta atualização.
 
 | Token | Valor | Uso |
 |---|---|---|

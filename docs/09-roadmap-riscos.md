@@ -146,7 +146,7 @@ Os cenários negativos H-04 a H-07 possuem uma pré-validação offline determin
 | # | Decisão | Opções | Recomendação |
 |---|---|---|---|
 | D1 | Modelo de entrada no mercado | A — integradora autorizada própria · B — parceria/white-label com integradora autorizada · A+B — começar em B e migrar para A | **A+B**: iniciar a ISO 27001 e a autorização já; operar em parceria até a autorização sair, **se** a SENATRAN admitir o modelo |
-| D2 | Marca **Seu Renave** (definida pelo patrocinador) | Registrar como marca mista · manter marca corporativa distinta como plano B | **Risco alto de registrabilidade e de confusão com o sistema oficial** (doc 12 §12.6): parecer de PI e busca no INPI (classes 9, 35 e 42) antes do lançamento; domínios (`seurenave.com.br`); aviso "plataforma privada, não oficial" em todas as peças |
+| D2 | Marca **RenavEstoque** (definida pelo patrocinador) | Registrar como marca mista · manter marca corporativa distinta como plano B | **Risco alto de registrabilidade e de confusão com o sistema oficial** (doc 12 §12.6): parecer de PI e busca no INPI (classes 9, 35 e 42) antes do lançamento; domínios (`renavestoque.com.br` e variações); aviso "plataforma privada, não oficial" em todas as peças |
 | D3 | Identidade | Keycloak próprio · auth própria (padrão `despachante`) | Keycloak (MFA/SSO prontos, ajuda na ISO) |
 | D4 | Fila | BullMQ (Redis) · pg-boss (Postgres) | pg-boss no MVP (menos infraestrutura, transacional com o outbox); BullMQ se o volume exigir |
 | D5 | Nuvem | AWS `sa-east-1` · GCP `southamerica-east1` · Azure Brazil South · nuvem nacional | Onde houver HSM gerenciado e equipe com experiência; avaliar custo de CloudHSM |

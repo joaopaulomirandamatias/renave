@@ -1,6 +1,6 @@
-# 12 — Marca e storytelling: Seu Renave
+# 12 — Marca e storytelling: RenavEstoque
 
-> **Seu Renave. O RENAVE da sua empresa, do seu jeito.**
+> **RenavEstoque. O RENAVE da sua empresa, do seu jeito.**
 > Identidade visual completa (logo em vários estilos, cores, tipografia, iconografia, storytelling e aplicações): **canvas "Seu Renave — Marca e Storytelling"**: https://claude.ai/artifact/HTS8j4iXxAz8RbqX5eU3nZ
 
 ---
@@ -9,19 +9,19 @@
 
 > Toda empresa precisa de praticidade para cuidar das suas operações RENAVE.
 >
-> Por isso nasceu o **Seu Renave**: uma plataforma simples, segura e feita para facilitar o dia a dia das empresas.
+> Por isso nasceu o **RenavEstoque**: uma plataforma simples, segura e feita para facilitar o dia a dia das empresas.
 >
-> Com o Seu Renave, você organiza suas operações, acompanha seus processos e ganha mais tranquilidade para trabalhar.
+> Com o RenavEstoque, você organiza suas operações, acompanha seus processos e ganha mais tranquilidade para trabalhar.
 >
-> **Seu Renave. O RENAVE da sua empresa, do seu jeito.**
+> **RenavEstoque. O RENAVE da sua empresa, do seu jeito.**
 
-*Histórico de nomes: Renave Integra (provisório) → ViaAuto → **Seu Renave** (atual).*
+*Histórico de nomes: Renave Integra (provisório) → ViaAuto → Seu Renave (nome anterior) → **RenavEstoque** (atual).*
 
 ## 12.2 Plataforma de marca
 
 | Elemento | Definição |
 |---|---|
-| **Nome** | Seu Renave: "Seu" traz proximidade e posse ("o RENAVE da sua empresa"); "Renave" deixa explícito que o produto é **exclusivamente RENAVE** |
+| **Nome** | RenavEstoque conecta o domínio público RENAVE à tarefa central de estoque; o contraste visual entre "Renav" e "Estoque" reforça o escopo do produto sem confundi-lo com o sistema oficial |
 | **Assinatura (tagline)** | *O RENAVE da sua empresa, do seu jeito.* |
 | **Taglines de apoio** | "RENAVE sem complicação." · "Suas operações RENAVE em dia." · "Simples, seguro e do seu jeito." · "Você paga só pelo registro realizado." |
 | **Promessa** | Praticidade para cuidar das operações RENAVE, com segurança e tranquilidade |
@@ -37,7 +37,7 @@
 |---|---|---|
 | **1. A obrigação** | Toda entrada, saída, transferência e consignação precisa estar no RENAVE, com prazo e regra | Res. CONTRAN 1.026/2026 (doc 01) |
 | **2. A dor** | Regras técnicas, documentos, certificados, retornos do DETRAN, risco de multa gravíssima | — |
-| **3. O Seu Renave** | Uma plataforma simples e segura, feita para o dia a dia da empresa | Assistentes guiados ("Dar entrada", "Registrar saída") |
+| **3. O RenavEstoque** | Uma plataforma simples e segura, feita para o dia a dia da empresa | Assistentes guiados ("Dar entrada", "Registrar saída") |
 | **4. Organização** | Você organiza suas operações e acompanha seus processos num só lugar | Painel, fila de pendências, prazos de escrituração |
 | **5. Tranquilidade** | Cada registro conferido, protegido e comprovado | Pré-condições, reconciliação sem duplicidade, trilha imutável, dossiê |
 | **6. Do seu jeito** | Por tela, por API ou dentro do seu sistema; paga só pelo registro realizado | API e webhooks, cobrança por registro, sem mensalidade |
@@ -62,17 +62,17 @@
 
 ## 12.6 Diretrizes de posicionamento e riscos do nome
 
-1. **Exclusivamente RENAVE.** O Seu Renave é o *sistema de integração* da Res. 1.026. Não tem gestão de veículos, de loja ou comercial (vedação à integradora).
+1. **Exclusivamente RENAVE.** O RenavEstoque é o *sistema de integração* da Res. 1.026. Não tem gestão de veículos, de loja ou comercial (vedação à integradora).
 2. **Produto privado, claramente não oficial.** O nome contém "Renave", que é a denominação do sistema público. Por isso:
-   - toda peça (site, login, e-mails, redes, propostas, contratos) traz a frase: *"O Seu Renave é uma plataforma privada de integração com o RENAVE. Não é o sistema oficial do governo."*;
+   - toda peça (site, login, e-mails, redes, propostas, contratos) traz a frase: *"O RenavEstoque é uma plataforma privada de integração com o RENAVE. Não é o sistema oficial do governo."*;
    - nada de estética governamental: sem brasão, verde-amarelo, padrão gov.br ou tipografia oficial;
    - nunca usar "oficial", "do governo" ou "SENATRAN/SERPRO" como se fossem marca ou endosso;
-   - na interface, "RENAVE" em maiúsculas designa o sistema oficial e "Seu Renave" designa o produto.
+   - na interface, "RENAVE" em maiúsculas designa o sistema oficial e "RenavEstoque" designa o produto.
 3. **Registrabilidade no INPI (risco alto).** A Lei 9.279/1996 (art. 124) tende a negar registro a sinais genéricos, descritivos ou ligados a denominação pública. Além disso, já há players com nomes parecidos (Renave.net, RenaveBrasil).
    - **Recomendações:**
      - fazer busca de anterioridade e pedir **parecer de propriedade intelectual** antes do investimento em lançamento;
      - registrar a marca **mista** (logo + nome), que tem mais chance que a nominativa;
-     - garantir os domínios (`seurenave.com.br` e variações) e os perfis sociais;
+     - garantir os domínios (`renavestoque.com.br` e variações) e os perfis sociais;
      - manter uma marca-mãe ou corporativa distinta, registrável, como plano B.
 4. **Preço transparente.** "Você paga só pelo registro realizado, no valor oficial, sem mensalidade" (doc 11).
 
@@ -89,7 +89,7 @@
 | **Carro** | Sedã de frente, silhueta marinho | O veículo em estoque |
 | **Estrada** | Curva verde com tracejado branco e faixa âmbar | O caminho, a agilidade, seguir em frente |
 
-**Wordmark:** "**Seu**" em azul-marinho + "**Renave**" em verde, numa sans geométrica **arredondada e muito pesada** (referência: Nunito 900 / Baloo 2 800).
+**Wordmark:** "**Renav**" em azul-marinho + "**Estoque**" em verde, numa sans geométrica **arredondada e muito pesada** (referência: Nunito 900 / Baloo 2 800).
 
 ### Paleta oficial
 

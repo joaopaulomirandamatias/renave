@@ -109,7 +109,7 @@ O **Registro Nacional de Veículos em Estoque (Renave)** é o sistema eletrônic
 - É **vedado** cobrar fora da faixa ou **condicionar o acesso ao Renave à contratação de outros serviços**.
 - Os preços cobrados devem ter **ampla publicidade**, com acesso prévio pelos estabelecimentos.
 
-> **Implicação de produto:** o Seu Renave é **exclusivamente RENAVE** e cobra **por registro RENAVE confirmado**, no valor oficial, sem mensalidade, planos ou serviços acoplados. A tabela de preços é pública. Não haverá módulos de gestão (DMS, CRM, pátio), por causa da vedação do Anexo (seção 1.10).
+> **Implicação de produto:** o RenavEstoque é **exclusivamente RENAVE** e cobra **por registro RENAVE confirmado**, no valor oficial, sem mensalidade, planos ou serviços acoplados. A tabela de preços é pública. Não haverá módulos de gestão (DMS, CRM, pátio), por causa da vedação do Anexo (seção 1.10).
 
 ## 1.10 Requisitos para ser **integradora autorizada** (Anexo)
 
@@ -128,7 +128,7 @@ O **Registro Nacional de Veículos em Estoque (Renave)** é o sistema eletrônic
 **Vedações cruzadas posteriores** (ver doc 13):
 - **Res. CONTRAN 1.027/2026**, Anexos I e II, item 1.2.1.5: integradoras Renave **não podem** ser plataformas de transferência eletrônica nem de assinatura eletrônica.
 - **Res. CONTRAN 1.032/2026**, item 1.3.2.7: integradoras Renave **não podem** ser integradoras de vistoria veicular.
-- O Seu Renave **integra-se** a essas plataformas. A comunicação de venda **poderá** ser realizada automaticamente por integração entre o Renave e plataformas homologadas, condicionada aos requisitos da SENATRAN (Res. 1.027, Art. 28 §6º), mas o Seu Renave **não as opera**.
+- O RenavEstoque **integra-se** a essas plataformas. A comunicação de venda **poderá** ser realizada automaticamente por integração entre o Renave e plataformas homologadas, condicionada aos requisitos da SENATRAN (Res. 1.027, Art. 28 §6º), mas o RenavEstoque **não as opera**.
 
 A vedação alcança também quem tenha **participação societária ou controle** nessas empresas.
 
@@ -195,7 +195,7 @@ A leitura do Swagger de produção e de homologação, em 23/11/2026, mostra que
 | Termos de entrega para entrada e saída (assinatura do proprietário) | Só os termos de entrada/saída do estoque (o de saída "deve ser extinto") | Acompanhar o Regulatory Watch |
 | Contrato eletrônico de consignação | **Só em homologação** (`/api/consignados/*` + mocks de DETRAN); sem contrato | Implementar contra a homologação, atrás de feature flag |
 | Integradora identificada na API | Em homologação, `cliente-autenticado` passou a ter `cnpjIntegradora` e `nomeIntegradora` | Indica o modelo de integradora em transição |
-| ATPV-e gerada pelo órgão máximo executivo de trânsito | Base normativa confirmada pela Res. 1.027, Art. 27 §1º; o manual ainda cita normas revogadas e a API não expõe toda a jornada | O Seu Renave não gera a ATPV-e; recebe e acompanha por integração. Só poderá solicitá-la se houver autorização técnica e normativa expressa no canal SERPRO |
+| ATPV-e gerada pelo órgão máximo executivo de trânsito | Base normativa confirmada pela Res. 1.027, Art. 27 §1º; o manual ainda cita normas revogadas e a API não expõe toda a jornada | O RenavEstoque não gera a ATPV-e; recebe e acompanha por integração. Só poderá solicitá-la se houver autorização técnica e normativa expressa no canal SERPRO |
 
 > **Conclusão:** a arquitetura precisa de **adapters versionados por capacidade** e **feature flags por data de vigência**, porque a norma está à frente da API.
 

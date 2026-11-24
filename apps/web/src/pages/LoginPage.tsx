@@ -80,7 +80,7 @@ export function LoginPage({
             {
               id: "no-local-credentials",
               icon: <LockKeyhole size={18} />,
-              text: "A senha e o código MFA não passam pelo Seu Renave.",
+              text: "A senha e o código MFA não passam pelo RenavEstoque.",
             },
             {
               id: "mfa-privileged",

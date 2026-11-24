@@ -31,7 +31,7 @@ Quando houver divergência, usar: **(1)** `v2/api-docs` vivo para o contrato té
 
 ```mermaid
 flowchart LR
-  subgraph SR[Seu Renave]
+  subgraph SR[RenavEstoque]
     OP[Operação do tenant/estabelecimento X]
     VC{Vínculo Credencia<br/>ativo e habilitado<br/>para a natureza?}
     CX[Conector RENAVE<br/>mTLS com e-CNPJ da INTEGRADORA<br/>chave em HSM]
@@ -108,10 +108,10 @@ Fontes oficiais: Central de Ajuda, diagrama “Fluxo de entrada em estoque” e 
 | **API de consumo** | Não encontrada; o consumo deve aparecer na Área do Cliente SERPRO [INF] |
 | **Preço da integradora** | Faixa da SENATRAN (art. 32), **não publicada** (doc 13) |
 
-**Implicação no faturamento do Seu Renave** (doc 11 §11.4a):
+**Implicação no faturamento do RenavEstoque** (doc 11 §11.4a):
 - Um item faturável por **entrada ou saída confirmada**, alinhado à unidade do SERPRO e à competência 21→20, para facilitar a conciliação.
 - Reenvio idempotente e cancelamento **não** são cobrados até confirmação oficial.
-- Se a loja for a contratante do SERPRO, a fatura do Seu Renave traz **só o preço de integração**. Se formos nós, discrimina o repasse da tarifa.
+- Se a loja for a contratante do SERPRO, a fatura do RenavEstoque traz **só o preço de integração**. Se formos nós, discrimina o repasse da tarifa.
 
 ## 14.6 Credencia para integradoras
 
@@ -127,9 +127,9 @@ Funções identificadas no bundle público do Credencia (`credencia.serpro.gov.b
 4. O órgão habilita.
 5. A operação é liberada.
 
-**No Seu Renave:**
+**No RenavEstoque:**
 - **RF-SRP-01:** cadastro e acompanhamento do **estado do vínculo Credencia** por estabelecimento e natureza: pendente, confirmado, habilitado, desativado, rejeitado. Não há API pública do Credencia; o estado é **informado e verificado** pela chamada a `cliente-autenticado`.
-- **RF-SRP-02:** **guia passo a passo** no onboarding, para a loja vincular o Seu Renave no Credencia (substitui a etapa "enviar certificado").
+- **RF-SRP-02:** **guia passo a passo** no onboarding, para a loja vincular o RenavEstoque no Credencia (substitui a etapa "enviar certificado").
 - **RF-SRP-03:** console da integradora com a fila de **vínculos pendentes de confirmação**.
 
 ## 14.7 Contatos e canais oficiais

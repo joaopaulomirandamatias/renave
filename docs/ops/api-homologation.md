@@ -1,6 +1,6 @@
 # Operação segura da API em homologação
 
-Este runbook prepara a API do Seu Renave para consultas no RENAVE-WS de
+Este runbook prepara a API do RenavEstoque para consultas no RENAVE-WS de
 homologação. Ele não autoriza produção nem mutações. O objetivo é validar cada
 controle separadamente, manter o tráfego externo fechado até o último gate e
 preservar uma forma rápida de interromper a integração sem derrubar o acesso
