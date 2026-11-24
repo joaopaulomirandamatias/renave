@@ -15,7 +15,11 @@ import {
 import type { ReadonlyCanaryPort } from "./features/homologation-canary/index.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import type { StockInventoryItem } from "./pages/StockInventoryPanel.js";
-import { resolveWorkspaceRoute } from "./workspace-routes.js";
+import type { StockDetail } from "./pages/StockDetailPage.js";
+import {
+  resolveStockDetailId,
+  resolveWorkspaceRoute,
+} from "./workspace-routes.js";
 
 interface AnonymousSession {
   authenticated: false;
@@ -221,6 +225,12 @@ export interface SessionClient {
     establishmentId: string,
     signal?: AbortSignal,
   ): Promise<readonly StockInventoryItem[]>;
+  loadStockDetail(
+    tenantId: string,
+    establishmentId: string,
+    stockId: number,
+    signal?: AbortSignal,
+  ): Promise<StockDetail>;
   logout(): Promise<{ endSessionUrl?: string }>;
   runRenaveLinkPreflight(
     tenantId: string,
@@ -732,6 +742,139 @@ function parseStockInventory(value: unknown): readonly StockInventoryItem[] {
   });
 }
 
+function parseStockDetailMovement(
+  value: unknown,
+  allowedKeys: ReadonlySet<string>,
+):
+  | { dataHora?: string; dataHoraRegistro?: string; motivo?: string }
+  | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !allowedKeys.has(key)) ||
+    (value.dataHora !== undefined &&
+      (typeof value.dataHora !== "string" ||
+        !stockRegistrationTime.test(value.dataHora))) ||
+    (value.dataHoraRegistro !== undefined &&
+      (typeof value.dataHoraRegistro !== "string" ||
+        !stockRegistrationTime.test(value.dataHoraRegistro))) ||
+    (value.motivo !== undefined &&
+      (typeof value.motivo !== "string" ||
+        value.motivo.trim().length === 0 ||
+        value.motivo.length > 200))
+  ) {
+    throw new Error("Movimentação do estoque inválida");
+  }
+  return {
+    ...(typeof value.dataHora === "string" ? { dataHora: value.dataHora } : {}),
+    ...(typeof value.dataHoraRegistro === "string"
+      ? { dataHoraRegistro: value.dataHoraRegistro }
+      : {}),
+    ...(typeof value.motivo === "string" ? { motivo: value.motivo } : {}),
+  };
+}
+
+function parseStockDetail(
+  value: unknown,
+  expectedStockId: number,
+): StockDetail {
+  const allowedKeys = new Set([
+    "cancelamento",
+    "chassi",
+    "dataHoraMedicaoHodometro",
+    "entrada",
+    "estado",
+    "id",
+    "placa",
+    "quilometragemHodometro",
+    "renavam",
+    "restricoes",
+    "saida",
+    "tipoCrv",
+  ]);
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !allowedKeys.has(key)) ||
+    !Number.isSafeInteger(value.id) ||
+    (value.id as number) <= 0 ||
+    value.id !== expectedStockId ||
+    typeof value.placa !== "string" ||
+    !/^[A-Z0-9]{7}$/u.test(value.placa) ||
+    typeof value.estado !== "string" ||
+    !stockStates.has(value.estado as BrowserStockState) ||
+    !Array.isArray(value.restricoes) ||
+    (value.chassi !== undefined &&
+      (typeof value.chassi !== "string" ||
+        !/^[A-Z0-9]{3,64}$/u.test(value.chassi))) ||
+    (value.renavam !== undefined &&
+      (typeof value.renavam !== "string" ||
+        !/^\d{9,11}$/u.test(value.renavam))) ||
+    (value.tipoCrv !== undefined &&
+      (typeof value.tipoCrv !== "string" ||
+        !crvTypes.has(value.tipoCrv as BrowserCrvType))) ||
+    (value.dataHoraMedicaoHodometro !== undefined &&
+      (typeof value.dataHoraMedicaoHodometro !== "string" ||
+        !stockRegistrationTime.test(value.dataHoraMedicaoHodometro))) ||
+    (value.quilometragemHodometro !== undefined &&
+      (!Number.isSafeInteger(value.quilometragemHodometro) ||
+        (value.quilometragemHodometro as number) < 0))
+  ) {
+    throw new Error("Resposta de detalhe do estoque inválida");
+  }
+  const restrictions = value.restricoes.map((restriction) => {
+    if (
+      !isRecord(restriction) ||
+      Object.keys(restriction).some(
+        (key) => key !== "codigoTipo" && key !== "tipo",
+      ) ||
+      (restriction.codigoTipo !== undefined &&
+        (typeof restriction.codigoTipo !== "string" ||
+          restriction.codigoTipo.length > 100)) ||
+      (restriction.tipo !== undefined &&
+        (typeof restriction.tipo !== "string" || restriction.tipo.length > 256))
+    ) {
+      throw new Error("Restrição do estoque inválida");
+    }
+    return {
+      ...(typeof restriction.codigoTipo === "string"
+        ? { codigoTipo: restriction.codigoTipo }
+        : {}),
+      ...(typeof restriction.tipo === "string"
+        ? { tipo: restriction.tipo }
+        : {}),
+    };
+  });
+  const movementKeys = new Set(["dataHora", "dataHoraRegistro"]);
+  const exitKeys = new Set(["dataHora", "dataHoraRegistro", "motivo"]);
+  const cancellationKeys = new Set(["dataHora", "motivo"]);
+  const entrada = parseStockDetailMovement(value.entrada, movementKeys);
+  const saida = parseStockDetailMovement(value.saida, exitKeys);
+  const cancelamento = parseStockDetailMovement(
+    value.cancelamento,
+    cancellationKeys,
+  );
+  return {
+    ...(cancelamento ? { cancelamento } : {}),
+    ...(typeof value.chassi === "string" ? { chassi: value.chassi } : {}),
+    ...(typeof value.dataHoraMedicaoHodometro === "string"
+      ? { dataHoraMedicaoHodometro: value.dataHoraMedicaoHodometro }
+      : {}),
+    ...(entrada ? { entrada } : {}),
+    estado: value.estado as BrowserStockState,
+    id: value.id as number,
+    placa: value.placa,
+    ...(typeof value.quilometragemHodometro === "number"
+      ? { quilometragemHodometro: value.quilometragemHodometro }
+      : {}),
+    ...(typeof value.renavam === "string" ? { renavam: value.renavam } : {}),
+    restricoes: restrictions,
+    ...(saida ? { saida } : {}),
+    ...(typeof value.tipoCrv === "string"
+      ? { tipoCrv: value.tipoCrv as BrowserCrvType }
+      : {}),
+  };
+}
+
 function parseVehicle(value: unknown): BrowserVehicle {
   const allowedKeys = new Set([
     "chassi",
@@ -1077,6 +1220,28 @@ export const browserSessionClient: SessionClient = {
     }
     return parseStockInventory(value);
   },
+  async loadStockDetail(tenantId, establishmentId, stockId, signal) {
+    const response = await fetch(
+      `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/stocks/${stockId}`,
+      {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { accept: "application/json" },
+        method: "GET",
+        redirect: "error",
+        ...(signal ? { signal } : {}),
+      },
+    );
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      throw new StockSearchClientError(
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+      );
+    }
+    return parseStockDetail(value, stockId);
+  },
   async searchStocks(tenantId, establishmentId, plate, signal) {
     const response = await fetch(
       `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/stocks/search`,
@@ -1262,6 +1427,7 @@ export function App({
   const platformConsoleRequested =
     platformConsoleEnabled && platformConsolePathRequested;
   const workspaceRoute = resolveWorkspaceRoute(locationPathname);
+  const stockDetailId = resolveStockDetailId(locationPathname);
   const unknownWorkspacePath =
     !platformConsolePathRequested && workspaceRoute === undefined;
   const disabledStockEntryPath =
@@ -2047,6 +2213,19 @@ export function App({
           signal,
         )
       }
+      {...(stockDetailId === undefined
+        ? {}
+        : {
+            stockDetailId,
+            onBackStockDetail: () => redirect("/estoque"),
+            onLoadStockDetail: (stockId: number, signal: AbortSignal) =>
+              client.loadStockDetail(
+                selectedTenantId,
+                activeEstablishmentId ?? "",
+                stockId,
+                signal,
+              ),
+          })}
       onReloadLinkStatus={() => setLinkReloadVersion((current) => current + 1)}
       preflightAvailable={
         renaveLinkView.status === "ready" &&

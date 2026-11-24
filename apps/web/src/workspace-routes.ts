@@ -1,5 +1,10 @@
 export type WorkspaceRoute =
-  "dashboard" | "stock" | "stock-entry" | "compliance" | "establishments";
+  | "dashboard"
+  | "stock"
+  | "stock-detail"
+  | "stock-entry"
+  | "compliance"
+  | "establishments";
 
 export interface WorkspaceNavigationDefinition {
   href: string;
@@ -28,5 +33,16 @@ const routes = new Map<string, WorkspaceRoute>([
 export function resolveWorkspaceRoute(
   pathname: string,
 ): WorkspaceRoute | undefined {
+  if (resolveStockDetailId(pathname) !== undefined) return "stock-detail";
   return routes.get(pathname);
+}
+
+const stockDetailPath = /^\/estoque\/([1-9]\d{0,15})$/u;
+
+/** Extrai somente um ID inteiro positivo e seguro de uma rota canônica. */
+export function resolveStockDetailId(pathname: string): number | undefined {
+  const match = stockDetailPath.exec(pathname);
+  if (!match?.[1]) return undefined;
+  const stockId = Number(match[1]);
+  return Number.isSafeInteger(stockId) ? stockId : undefined;
 }

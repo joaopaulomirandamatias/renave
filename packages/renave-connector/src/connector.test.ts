@@ -35,6 +35,7 @@ function transportWithIdentity(identity: AuthenticatedClientIdentity) {
   const transport: RenaveTransport = {
     environment: "homologation",
     findRecentStocks: vi.fn(async () => []),
+    findStockById: vi.fn(async () => ({})),
     findStocksByPlate: vi.fn(async () => []),
     getAuthenticatedClient,
     getVehicleEligibility: vi.fn(async () => ({
@@ -129,6 +130,11 @@ describe("RenaveQueryConnector", () => {
     });
     const { mutate: _mutate, ...queryTransport } = fake.transport;
     const connector = new RenaveQueryConnector(queryTransport);
+    vi.mocked(queryTransport.findStockById).mockResolvedValue({
+      estado: "CONFIRMADO",
+      id: 7,
+      placa: "QTP4H82",
+    });
 
     await expect(
       connector.getVehicleEligibility(context, {
@@ -140,6 +146,16 @@ describe("RenaveQueryConnector", () => {
       verifiedIdentity: {
         confirmedEstablishmentCnpj: "85106037000585",
         confirmedIntegratorCnpj: "69418503000188",
+      },
+    });
+    await expect(connector.getStockById(context, 7)).resolves.toMatchObject({
+      result: {
+        publicResult: {
+          estado: "CONFIRMADO",
+          id: 7,
+          placa: "QTP4H82",
+          restricoes: [],
+        },
       },
     });
 
@@ -514,6 +530,166 @@ describe("RenaveConnector", () => {
     ).toBeLessThan(
       vi.mocked(fake.transport.findRecentStocks).mock.invocationCallOrder[0]!,
     );
+  });
+
+  it("consulta detalhe por ID após a identidade e separa evidência da projeção mínima", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    const evidence = {
+      cancelamentoEstoque: {
+        dataHoraCancelamentoEstoque: "2026-11-24T11:00:00-03:00",
+        motivoCancelamentoEstoque: "DESISTENCIA",
+      },
+      chassi: "9BWZZZ377VT004251",
+      codigoSegurancaCrv: "12345678901",
+      dataHoraMedicaoHodometro: "2026-11-23T14:58:00-03:00",
+      entradaEstoque: {
+        cpfOperadorResponsavel: "12345678901",
+        dataHora: "2026-11-23T15:00:00-03:00",
+        dataHoraRegistro: "2026-11-23T15:02:00-03:00",
+        vendedor: { cpf: "98765432100" },
+      },
+      estado: "CONFIRMADO" as const,
+      id: 7,
+      numeroCrv: "123456789012",
+      notaFiscal: { chave: "nao-vazar" },
+      placa: "QTP4H82",
+      quilometragemHodometro: 42000,
+      renavam: "00607701676",
+      restricoesVeiculo: [
+        { codigoTipoRestricao: "JUD", tipoRestricao: "JUDICIAL" },
+      ],
+      saidaEstoque: {
+        comprador: { cpf: "11122233344" },
+        cpfOperadorResponsavel: "12345678901",
+        dataHora: "2026-11-24T10:00:00-03:00",
+        dataHoraRegistro: "2026-11-24T10:01:00-03:00",
+        motivo: "VENDA",
+        notaFiscal: { chave: "nao-vazar" },
+      },
+      tipoCrv: "DIGITAL" as const,
+    };
+    vi.mocked(fake.transport.findStockById).mockResolvedValue(evidence);
+    const controller = new AbortController();
+
+    const response = await new RenaveConnector(fake.transport).getStockById(
+      context,
+      7,
+      { signal: controller.signal },
+    );
+
+    expect(response.result.evidence).toBe(evidence);
+    expect(response.result.publicResult).toEqual({
+      cancelamento: {
+        dataHora: "2026-11-24T11:00:00-03:00",
+        motivo: "DESISTENCIA",
+      },
+      chassi: "9BWZZZ377VT004251",
+      dataHoraMedicaoHodometro: "2026-11-23T14:58:00-03:00",
+      entrada: {
+        dataHora: "2026-11-23T15:00:00-03:00",
+        dataHoraRegistro: "2026-11-23T15:02:00-03:00",
+      },
+      estado: "CONFIRMADO",
+      id: 7,
+      placa: "QTP4H82",
+      quilometragemHodometro: 42000,
+      renavam: "00607701676",
+      restricoes: [{ codigoTipo: "JUD", tipo: "JUDICIAL" }],
+      saida: {
+        dataHora: "2026-11-24T10:00:00-03:00",
+        dataHoraRegistro: "2026-11-24T10:01:00-03:00",
+        motivo: "VENDA",
+      },
+      tipoCrv: "DIGITAL",
+    });
+    expect(JSON.stringify(response.result.publicResult)).not.toMatch(
+      /cpf|numeroCrv|codigoSegurancaCrv|vendedor|comprador|notaFiscal/i,
+    );
+    expect(fake.getAuthenticatedClient).toHaveBeenCalledWith(
+      { "CNPJ-Estabelecimento": "85106037000585" },
+      { signal: controller.signal },
+    );
+    expect(fake.transport.findStockById).toHaveBeenCalledWith(
+      { "CNPJ-Estabelecimento": "85106037000585" },
+      7,
+      { signal: controller.signal },
+    );
+    expect(
+      fake.getAuthenticatedClient.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(fake.transport.findStockById).mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53])(
+    "recusa ID de estoque inválido antes da identidade e da leitura: %s",
+    async (stockId) => {
+      const fake = transportWithIdentity({
+        cnpj: "85106037000585",
+        cnpjIntegradora: "69418503000188",
+      });
+
+      await expect(
+        new RenaveConnector(fake.transport).getStockById(context, stockId),
+      ).rejects.toMatchObject({ code: "INVALID_STOCK_ID_QUERY" });
+      expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
+      expect(fake.transport.findStockById).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["ID divergente", { estado: "CONFIRMADO", id: 8, placa: "QTP4H82" }],
+    [
+      "hodômetro decimal",
+      {
+        estado: "CONFIRMADO",
+        id: 7,
+        placa: "QTP4H82",
+        quilometragemHodometro: 1.5,
+      },
+    ],
+    [
+      "data inválida",
+      {
+        dataHoraMedicaoHodometro: "ontem",
+        estado: "CONFIRMADO",
+        id: 7,
+        placa: "QTP4H82",
+      },
+    ],
+  ])("falha fechado no detalhe com %s", async (_label, record) => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    vi.mocked(fake.transport.findStockById).mockResolvedValue(record as never);
+
+    await expect(
+      new RenaveConnector(fake.transport).getStockById(context, 7),
+    ).rejects.toMatchObject({ code: "RENAVE_STOCK_QUERY_RESULT_INVALID" });
+  });
+
+  it("bloqueia detalhe em produção antes de qualquer rede", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    const productionTransport: RenaveTransport = {
+      ...fake.transport,
+      environment: "production",
+    };
+
+    await expect(
+      new RenaveConnector(productionTransport).getStockById(
+        { ...context, environment: "production" },
+        7,
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_PRODUCTION_BLOCKED" });
+    expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(fake.transport.findStockById).not.toHaveBeenCalled();
   });
 
   it("falha fechado quando o inventário recente contém tipos incompatíveis", async () => {

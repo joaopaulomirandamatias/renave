@@ -22,6 +22,7 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - descoberta de tenants/estabelecimentos para a UX e rate limit distribuído no login — **implementados**;
 - workspace do cliente separado em Painel, Estoque, Entrada, Compliance e Estabelecimentos, com allowlist exata, 404 fail-closed e componentes de página independentes — **implementado**;
 - inventário recente somente leitura em `/estoque`, usando o `GET /api/estoques` oficial sem filtros, com identidade confirmada em toda chamada, evidência rica cifrada e projeção pública mínima — **implementado e bloqueado por configuração até existirem credenciais reais de homologação**;
+- ficha somente leitura em `/estoque/:id`, usando o `GET /api/estoques/{id}` oficial, com rota canônica, nova autorização por estabelecimento, evidência rica cifrada e projeção pública sem CPF, comprador, endereço ou segredos do CRV — **implementada e bloqueada pela mesma configuração segura**;
 - console global protegido por capability de banco antes da apresentação, com grant verificado antes de MFA e reautorização atômica em cada leitura da fila — **implementado**;
 - manter mutações indisponíveis até cofre/HSM, vínculo, outbox e âncora/WORM;
 - adicionar outbox/idempotência somente quando a primeira mutação entrar no escopo.
@@ -49,6 +50,7 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - consulta de aptidão por placa, RENAVAM ou CRV, com exatamente um identificador e confirmação de identidade também nas leituras;
 - rota BFF usa POST local para não colocar placa em URL/log e deriva a autoridade do `subject` + RBAC local;
 - inventário recente usa GET local sem aceitar filtros arbitrários, aplica o mesmo RBAC e limite distribuído da consulta pontual e não devolve CPF, número/código de segurança do CRV ou resposta bruta; datas sem fuso permanecem strings e são exibidas sem `Date.parse`;
+- detalhe por ID aceita somente inteiro positivo seguro tanto no navegador quanto no BFF, revalida o vínculo e a identidade em cada abertura, limita a resposta upstream a 1 MiB/50 mil nós e conserva campos protegidos somente na evidência cifrada; o parser allowlist do navegador recusa qualquer campo inesperado;
 - consultas SERPRO usam limites de volume/concorrência global, por tenant e por operador/estabelecimento, com leases expiráveis e nenhum SQL aberto durante a chamada;
 - request/response da consulta são cifrados com AES-256-GCM; AAD liga versão, key id, tenant, evidência, estabelecimento, ação e tipo;
 - evidência pendente acima do SLA gera incidente operacional idempotente; o job não lê ciphertext, não apaga prova e não inventa desfecho;

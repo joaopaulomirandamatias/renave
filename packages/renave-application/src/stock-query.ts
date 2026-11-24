@@ -14,6 +14,8 @@ import {
   type RenaveServerContext,
   type RenaveStockRecord,
   type RenaveStockState,
+  type StockDetail,
+  type StockDetailQueryResult,
   type StockQueryResult,
   type StockSummary,
 } from "@seu-renave/renave-connector";
@@ -42,6 +44,9 @@ export interface StockQueryInput {
 }
 
 export type StockInventoryQueryInput = Omit<StockQueryInput, "plate">;
+export type StockDetailQueryInput = StockInventoryQueryInput & {
+  stockId: number;
+};
 
 export interface StockQueryAuthorizationContextPort {
   load(input: {
@@ -58,6 +63,10 @@ export interface StockQueryEstablishmentPort {
 }
 
 export interface StockQueryConnectorPort {
+  getStockById(
+    context: RenaveServerContext,
+    stockId: number,
+  ): Promise<MutationResult<StockDetailQueryResult>>;
   getRecentStocks(
     context: RenaveServerContext,
   ): Promise<MutationResult<StockInventoryQueryResult>>;
@@ -71,7 +80,7 @@ export interface StockQueryEvidenceContext {
   action: typeof ACTION;
   actorSubject: string;
   establishmentId: string;
-  request: { placa?: string };
+  request: { placa?: string; stockId?: number };
   tenantId: string;
   traceId?: string;
 }
@@ -109,7 +118,7 @@ export interface StockQueryAuditPort {
 export interface StockQueryFinalizationPort {
   succeed(input: {
     audit: StockQueryAuditRecord;
-    evidenceResponse: readonly RenaveStockRecord[];
+    evidenceResponse: unknown;
     payloadReference: string;
   }): Promise<void>;
   fail(input: {
@@ -136,7 +145,7 @@ export interface StockQueryServiceConfig {
 export class InvalidStockQueryApplicationInputError extends Error {
   readonly code = "INVALID_STOCK_QUERY_APPLICATION_INPUT";
 
-  constructor(readonly field: keyof StockQueryInput) {
+  constructor(readonly field: keyof StockQueryInput | "stockId") {
     super("A consulta pontual de estoque contém dados inválidos");
     this.name = "InvalidStockQueryApplicationInputError";
   }
@@ -450,6 +459,150 @@ function rebuildInventoryPublicResult(result: StockInventoryQueryResult): {
   };
 }
 
+const DETAIL_DATE_TIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?$/u;
+
+function optionalDetailText(
+  value: unknown,
+  pattern: RegExp,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.trim() !== value ||
+    !pattern.test(value)
+  ) {
+    throw new StockQueryResultInvalidError();
+  }
+  return value;
+}
+
+function detailMovementFromEvidence(
+  value: unknown,
+  includeReason = false,
+):
+  | { dataHora?: string; dataHoraRegistro?: string; motivo?: string }
+  | undefined {
+  if (value === undefined) return undefined;
+  const source = recordObject(value);
+  const dataHora = optionalDetailText(source.dataHora, DETAIL_DATE_TIME);
+  const dataHoraRegistro = optionalDetailText(
+    source.dataHoraRegistro,
+    DETAIL_DATE_TIME,
+  );
+  const motivo = includeReason
+    ? optionalDetailText(source.motivo, /^[A-Z0-9_]{1,80}$/u)
+    : undefined;
+  return Object.freeze({
+    ...(dataHora === undefined ? {} : { dataHora }),
+    ...(dataHoraRegistro === undefined ? {} : { dataHoraRegistro }),
+    ...(motivo === undefined ? {} : { motivo }),
+  });
+}
+
+function detailCancellationFromEvidence(
+  value: unknown,
+): { dataHora?: string; motivo?: string } | undefined {
+  if (value === undefined) return undefined;
+  const source = recordObject(value);
+  const dataHora = optionalDetailText(
+    source.dataHoraCancelamentoEstoque,
+    DETAIL_DATE_TIME,
+  );
+  const motivo = optionalDetailText(
+    source.motivoCancelamentoEstoque,
+    /^[A-Z0-9_]{1,80}$/u,
+  );
+  return Object.freeze({
+    ...(dataHora === undefined ? {} : { dataHora }),
+    ...(motivo === undefined ? {} : { motivo }),
+  });
+}
+
+function detailRestrictionsFromEvidence(
+  value: unknown,
+): StockDetail["restricoes"] {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value) || value.length > 256) {
+    throw new StockQueryResultInvalidError();
+  }
+  return Object.freeze(
+    value.map((item) => {
+      const source = recordObject(item);
+      const codigoTipo = optionalDetailText(
+        source.codigoTipoRestricao,
+        /^[A-Za-z0-9_.-]{1,64}$/u,
+      );
+      const tipo = optionalDetailText(source.tipoRestricao, /^.{1,256}$/u);
+      return Object.freeze({
+        ...(codigoTipo === undefined ? {} : { codigoTipo }),
+        ...(tipo === undefined ? {} : { tipo }),
+      });
+    }),
+  );
+}
+
+function rebuildStockDetail(
+  result: StockDetailQueryResult,
+  expectedId: number,
+): { evidence: RenaveStockRecord; publicResult: StockDetail } {
+  if (!result || typeof result !== "object") {
+    throw new StockQueryResultInvalidError();
+  }
+  const evidence = recordObject(result.evidence);
+  const id = evidence.id;
+  const plate = resultPlate(evidence.placa);
+  const state = evidence.estado;
+  const chassi = optionalDetailText(evidence.chassi, /^[A-Z0-9]{3,64}$/u);
+  const renavam = optionalDetailText(evidence.renavam, /^\d{9,11}$/u);
+  const tipoCrv = optionalDetailText(evidence.tipoCrv, /^[A-Z]+$/u);
+  if (
+    id !== expectedId ||
+    !Number.isSafeInteger(id) ||
+    typeof state !== "string" ||
+    !STOCK_STATES.has(state as RenaveStockState) ||
+    (tipoCrv !== undefined && !CRV_TYPES.has(tipoCrv as CrvType)) ||
+    (evidence.quilometragemHodometro !== undefined &&
+      (!Number.isSafeInteger(evidence.quilometragemHodometro) ||
+        (evidence.quilometragemHodometro as number) < 0 ||
+        (evidence.quilometragemHodometro as number) > 2_147_483_647))
+  ) {
+    throw new StockQueryResultInvalidError();
+  }
+  const dataHoraMedicaoHodometro = optionalDetailText(
+    evidence.dataHoraMedicaoHodometro,
+    DETAIL_DATE_TIME,
+  );
+  const entrada = detailMovementFromEvidence(evidence.entradaEstoque);
+  const saida = detailMovementFromEvidence(evidence.saidaEstoque, true);
+  const cancelamento = detailCancellationFromEvidence(
+    evidence.cancelamentoEstoque,
+  );
+  const expected = Object.freeze({
+    ...(cancelamento === undefined ? {} : { cancelamento }),
+    ...(chassi === undefined ? {} : { chassi }),
+    ...(dataHoraMedicaoHodometro === undefined
+      ? {}
+      : { dataHoraMedicaoHodometro }),
+    ...(entrada === undefined ? {} : { entrada }),
+    estado: state as RenaveStockState,
+    id: id as number,
+    placa: plate,
+    ...(evidence.quilometragemHodometro === undefined
+      ? {}
+      : { quilometragemHodometro: evidence.quilometragemHodometro as number }),
+    ...(renavam === undefined ? {} : { renavam }),
+    restricoes: detailRestrictionsFromEvidence(evidence.restricoesVeiculo),
+    ...(saida === undefined ? {} : { saida }),
+    ...(tipoCrv === undefined ? {} : { tipoCrv: tipoCrv as CrvType }),
+  });
+  if (canonicalize(result.publicResult) !== canonicalize(expected)) {
+    throw new StockQueryResultInvalidError();
+  }
+  return { evidence: result.evidence, publicResult: expected };
+}
+
 export class StockQueryService {
   private readonly certificateThumbprintSha256: string;
   private readonly integratorCnpj: string;
@@ -488,15 +641,28 @@ export class StockQueryService {
     );
   }
 
-  private async executeQuery<TResult, TPublic>(
+  async executeById(input: StockDetailQueryInput): Promise<StockDetail> {
+    if (!Number.isSafeInteger(input.stockId) || input.stockId <= 0) {
+      throw new InvalidStockQueryApplicationInputError("stockId");
+    }
+    const stockId = input.stockId;
+    return this.executeQuery(
+      input,
+      { stockId },
+      (context) => this.ports.connector.getStockById(context, stockId),
+      (result) => rebuildStockDetail(result, stockId),
+    );
+  }
+
+  private async executeQuery<TResult, TOutput>(
     input: StockInventoryQueryInput,
-    request: { placa?: string },
+    request: { placa?: string; stockId?: number },
     query: (context: RenaveServerContext) => Promise<MutationResult<TResult>>,
     rebuild: (result: TResult) => {
-      evidence: readonly RenaveStockRecord[];
-      publicResult: readonly TPublic[];
+      evidence: unknown;
+      publicResult: TOutput;
     },
-  ): Promise<readonly TPublic[]> {
+  ): Promise<TOutput> {
     const subject = requireText(input.subject, "subject");
     const tenantId = requireText(input.tenantId, "tenantId");
     const establishmentId = requireText(

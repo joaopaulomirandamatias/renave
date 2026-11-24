@@ -72,6 +72,43 @@ export interface StockInventoryQueryResult {
   publicResult: readonly StockInventorySummary[];
 }
 
+export interface StockDetailMovement {
+  dataHora?: string;
+  dataHoraRegistro?: string;
+}
+
+export interface StockDetailExit extends StockDetailMovement {
+  motivo?: string;
+}
+
+export interface StockDetailCancellation {
+  dataHora?: string;
+  motivo?: string;
+}
+
+export interface StockDetailRestriction {
+  codigoTipo?: string;
+  tipo?: string;
+}
+
+export interface StockDetail extends StockSummary {
+  cancelamento?: StockDetailCancellation;
+  chassi?: string;
+  dataHoraMedicaoHodometro?: string;
+  entrada?: StockDetailMovement;
+  quilometragemHodometro?: number;
+  renavam?: string;
+  restricoes: readonly StockDetailRestriction[];
+  saida?: StockDetailExit;
+  tipoCrv?: CrvType;
+}
+
+export interface StockDetailQueryResult {
+  /** Resposta validada para persistência cifrada; nunca deve ser serializada pelo BFF. */
+  evidence: RenaveStockRecord;
+  publicResult: StockDetail;
+}
+
 export interface RenaveReadOptions {
   signal?: AbortSignal;
 }
@@ -95,6 +132,11 @@ export interface RenaveReadOnlyTransport {
     headers: EstablishmentHeaders,
     options?: RenaveReadOptions,
   ): Promise<RenaveStockRecord[]>;
+  findStockById(
+    headers: EstablishmentHeaders,
+    stockId: number,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord>;
 }
 
 export interface RenaveVehicleLookupTransport {
@@ -142,6 +184,22 @@ export class InvalidVehiclePlateQueryError extends Error {
     super("Informe uma placa RENAVE válida para consultar o veículo");
     this.name = "InvalidVehiclePlateQueryError";
   }
+}
+
+export class InvalidStockIdQueryError extends Error {
+  readonly code = "INVALID_STOCK_ID_QUERY";
+
+  constructor() {
+    super("Informe um identificador RENAVE válido para consultar o estoque");
+    this.name = "InvalidStockIdQueryError";
+  }
+}
+
+function validatedStockId(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+    throw new InvalidStockIdQueryError();
+  }
+  return value as number;
 }
 
 export class RenaveProtocolCapabilityError extends Error {
@@ -210,11 +268,14 @@ export class RenaveVehicleLookupConnector {
 export class RenaveQueryConnector {
   constructor(private readonly transport: RenaveQueryTransport) {}
 
-  private async authorize(context: RenaveServerContext): Promise<{
+  private async authorize(
+    context: RenaveServerContext,
+    options?: RenaveReadOptions,
+  ): Promise<{
     headers: EstablishmentHeaders;
     verifiedIdentity: VerifiedRenaveIdentity;
   }> {
-    return authorizeRead(this.transport, context);
+    return authorizeRead(this.transport, context, options);
   }
 
   async verifyIdentity(
@@ -270,6 +331,30 @@ export class RenaveQueryConnector {
       result: {
         evidence: Object.freeze(records),
         publicResult: Object.freeze(publicResult),
+      },
+      verifiedIdentity,
+    };
+  }
+
+  async getStockById(
+    context: RenaveServerContext,
+    stockId: number,
+    options?: RenaveReadOptions,
+  ): Promise<MutationResult<StockDetailQueryResult>> {
+    const validatedId = validatedStockId(stockId);
+    const { headers, verifiedIdentity } = await this.authorize(
+      context,
+      options,
+    );
+    const record = await this.transport.findStockById(
+      headers,
+      validatedId,
+      options,
+    );
+    return {
+      result: {
+        evidence: record,
+        publicResult: stockDetailFrom(record, validatedId),
       },
       verifiedIdentity,
     };
@@ -470,6 +555,121 @@ function stockInventorySummaryFrom(
     placa,
     ...(renavam === undefined ? {} : { renavam }),
     ...(record.tipoCrv === undefined ? {} : { tipoCrv: record.tipoCrv }),
+  });
+}
+
+const STOCK_DATE_TIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?$/u;
+const STOCK_REASON = /^[A-Z0-9_]{1,80}$/u;
+
+function detailMovementFrom(
+  source: RenaveStockRecord["entradaEstoque"],
+): StockDetailMovement | undefined {
+  if (source === undefined) return undefined;
+  const dataHora = optionalInventoryText(source.dataHora, STOCK_DATE_TIME);
+  const dataHoraRegistro = optionalInventoryText(
+    source.dataHoraRegistro,
+    STOCK_DATE_TIME,
+  );
+  return Object.freeze({
+    ...(dataHora === undefined ? {} : { dataHora }),
+    ...(dataHoraRegistro === undefined ? {} : { dataHoraRegistro }),
+  });
+}
+
+function detailExitFrom(
+  source: RenaveStockRecord["saidaEstoque"],
+): StockDetailExit | undefined {
+  if (source === undefined) return undefined;
+  const movement = detailMovementFrom(source);
+  const motivo = optionalInventoryText(source.motivo, STOCK_REASON);
+  return Object.freeze({
+    ...movement,
+    ...(motivo === undefined ? {} : { motivo }),
+  });
+}
+
+function detailCancellationFrom(
+  source: RenaveStockRecord["cancelamentoEstoque"],
+): StockDetailCancellation | undefined {
+  if (source === undefined) return undefined;
+  const dataHora = optionalInventoryText(
+    source.dataHoraCancelamentoEstoque,
+    STOCK_DATE_TIME,
+  );
+  const motivo = optionalInventoryText(
+    source.motivoCancelamentoEstoque,
+    STOCK_REASON,
+  );
+  return Object.freeze({
+    ...(dataHora === undefined ? {} : { dataHora }),
+    ...(motivo === undefined ? {} : { motivo }),
+  });
+}
+
+function detailRestrictionsFrom(
+  source: RenaveStockRecord["restricoesVeiculo"],
+): readonly StockDetailRestriction[] {
+  if (source === undefined) return Object.freeze([]);
+  if (!Array.isArray(source) || source.length > 256) {
+    throw new RenaveStockQueryResultError();
+  }
+  return Object.freeze(
+    source.map((restriction) => {
+      const codigoTipo = optionalInventoryText(
+        restriction.codigoTipoRestricao,
+        /^[A-Za-z0-9_.-]{1,64}$/u,
+      );
+      const tipo = optionalInventoryText(
+        restriction.tipoRestricao,
+        /^.{1,256}$/u,
+      );
+      return Object.freeze({
+        ...(codigoTipo === undefined ? {} : { codigoTipo }),
+        ...(tipo === undefined ? {} : { tipo }),
+      });
+    }),
+  );
+}
+
+function stockDetailFrom(
+  record: RenaveStockRecord,
+  expectedId: number,
+): StockDetail {
+  const base = stockInventorySummaryFrom(record);
+  if (base.id !== expectedId) throw new RenaveStockQueryResultError();
+  if (
+    record.quilometragemHodometro !== undefined &&
+    (!Number.isSafeInteger(record.quilometragemHodometro) ||
+      record.quilometragemHodometro < 0 ||
+      record.quilometragemHodometro > 2_147_483_647)
+  ) {
+    throw new RenaveStockQueryResultError();
+  }
+  const dataHoraMedicaoHodometro = optionalInventoryText(
+    record.dataHoraMedicaoHodometro,
+    STOCK_DATE_TIME,
+  );
+  const entrada = detailMovementFrom(record.entradaEstoque);
+  const saida = detailExitFrom(record.saidaEstoque);
+  const cancelamento = detailCancellationFrom(record.cancelamentoEstoque);
+  return Object.freeze({
+    ...(base.chassi === undefined ? {} : { chassi: base.chassi }),
+    ...(cancelamento === undefined ? {} : { cancelamento }),
+    ...(dataHoraMedicaoHodometro === undefined
+      ? {}
+      : { dataHoraMedicaoHodometro }),
+    ...(entrada === undefined ? {} : { entrada }),
+    ...(record.quilometragemHodometro === undefined
+      ? {}
+      : { quilometragemHodometro: record.quilometragemHodometro }),
+    estado: base.estado,
+    id: base.id,
+    placa: base.placa,
+    ...(base.renavam === undefined ? {} : { renavam: base.renavam }),
+    restricoes: detailRestrictionsFrom(record.restricoesVeiculo),
+    ...(saida === undefined ? {} : { saida }),
+    ...(base.tipoCrv === undefined ? {} : { tipoCrv: base.tipoCrv }),
   });
 }
 
@@ -773,11 +973,14 @@ function validateVehicleEligibilityQuery(
 export class RenaveConnector {
   constructor(private readonly transport: RenaveTransport) {}
 
-  private async authorize(context: RenaveServerContext): Promise<{
+  private async authorize(
+    context: RenaveServerContext,
+    options?: RenaveReadOptions,
+  ): Promise<{
     headers: EstablishmentHeaders;
     verifiedIdentity: VerifiedRenaveIdentity;
   }> {
-    return authorizeRead(this.transport, context);
+    return authorizeRead(this.transport, context, options);
   }
 
   /** Confirma o vínculo sem executar consulta veicular nem mutação. */
@@ -881,6 +1084,30 @@ export class RenaveConnector {
       result: {
         evidence: Object.freeze(records),
         publicResult: Object.freeze(publicResult),
+      },
+      verifiedIdentity,
+    };
+  }
+
+  async getStockById(
+    context: RenaveServerContext,
+    stockId: number,
+    options?: RenaveReadOptions,
+  ): Promise<MutationResult<StockDetailQueryResult>> {
+    const validatedId = validatedStockId(stockId);
+    const { headers, verifiedIdentity } = await this.authorize(
+      context,
+      options,
+    );
+    const record = await this.transport.findStockById(
+      headers,
+      validatedId,
+      options,
+    );
+    return {
+      result: {
+        evidence: record,
+        publicResult: stockDetailFrom(record, validatedId),
       },
       verifiedIdentity,
     };

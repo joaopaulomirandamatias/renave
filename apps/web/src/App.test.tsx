@@ -77,6 +77,12 @@ function clientFor(
       queries: "blocked" as const,
     })),
     loadRecentStocks: vi.fn(async () => []),
+    loadStockDetail: vi.fn(async (_tenantId, _establishmentId, stockId) => ({
+      estado: "CONFIRMADO" as const,
+      id: stockId,
+      placa: "ABC1D23",
+      restricoes: [],
+    })),
     loadTenants: vi.fn(async () => tenants),
     logout: vi.fn(async () => ({})),
     lookupVehicle: vi.fn(async () => ({
@@ -275,6 +281,49 @@ describe("App session boundary", () => {
     await expect(
       browserSessionClient.loadRecentStocks("tenant-a", "store-a"),
     ).rejects.toThrow("Item do inventário inválido");
+  });
+
+  it("carrega a ficha por ID com parser allowlist e rejeita segredo protegido", async () => {
+    const safeDetail = {
+      chassi: "9BWZZZ377VT004251",
+      dataHoraMedicaoHodometro: "2026-11-24T14:30-03:00",
+      entrada: { dataHoraRegistro: "2026-11-24T14:31-03:00" },
+      estado: "CONFIRMADO",
+      id: 71,
+      placa: "ABC1D23",
+      quilometragemHodometro: 45120,
+      renavam: "00607701676",
+      restricoes: [{ codigoTipo: "01", tipo: "Administrativa" }],
+      tipoCrv: "DIGITAL",
+    };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(safeDetail))
+      .mockResolvedValueOnce(
+        Response.json({ ...safeDetail, codigoSegurancaCrv: "12345678901" }),
+      )
+      .mockResolvedValueOnce(Response.json({ ...safeDetail, id: 72 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.loadStockDetail("tenant-a", "store-a", 71),
+    ).resolves.toEqual(safeDetail);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/tenants/tenant-a/establishments/store-a/stocks/71",
+      expect.objectContaining({
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+        redirect: "error",
+      }),
+    );
+    await expect(
+      browserSessionClient.loadStockDetail("tenant-a", "store-a", 71),
+    ).rejects.toThrow("Resposta de detalhe do estoque inválida");
+    await expect(
+      browserSessionClient.loadStockDetail("tenant-a", "store-a", 71),
+    ).rejects.toThrow("Resposta de detalhe do estoque inválida");
   });
 
   it("envia a placa somente no corpo POST same-origin e minimiza a resposta", async () => {
@@ -907,6 +956,12 @@ describe("App session boundary", () => {
         queries: "blocked" as const,
       })),
       loadRecentStocks: vi.fn(async () => []),
+      loadStockDetail: vi.fn(async (_tenantId, _establishmentId, stockId) => ({
+        estado: "CONFIRMADO" as const,
+        id: stockId,
+        placa: "ABC1D23",
+        restricoes: [],
+      })),
       loadTenants: vi.fn(async () => []),
       logout: vi.fn(async () => ({})),
       lookupVehicle: vi.fn(async () => ({
@@ -1255,6 +1310,134 @@ describe("App session boundary", () => {
     expect(
       screen.queryByRole("region", { name: "Resumo do estabelecimento" }),
     ).toBeNull();
+  });
+
+  it("abre a ficha em rota própria e mantém Estoque como seção ativa", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }]),
+    );
+    vi.mocked(client.loadRenaveLinkStatus).mockResolvedValue({
+      preflightAvailable: false,
+      status: "enabled",
+    });
+    vi.mocked(client.loadRenaveReadiness).mockResolvedValue({
+      certificate: "ready",
+      environment: "homologation",
+      establishmentContact: "verified",
+      integration: "configured",
+      link: "enabled",
+      mutations: "blocked",
+      operatorIdentity: "verified",
+      queries: "ready",
+    });
+    vi.mocked(client.loadStockDetail).mockResolvedValue({
+      estado: "CONFIRMADO",
+      id: 71,
+      placa: "ABC1D23",
+      restricoes: [],
+    });
+    const redirect = vi.fn();
+
+    render(
+      <App
+        client={client}
+        locationPathname="/estoque/71"
+        redirect={redirect}
+      />,
+    );
+
+    expect(await screen.findByText("ABC1D23")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Ficha do estoque" }),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Estoque" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(client.loadStockDetail).toHaveBeenCalledWith(
+      "tenant-a",
+      "store-a",
+      71,
+      expect.any(AbortSignal),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Voltar ao estoque" }));
+    expect(redirect).toHaveBeenCalledWith("/estoque");
+    expect(screen.queryByText("Consultar aptidão do veículo")).toBeNull();
+  });
+
+  it.each([
+    "/estoque/0",
+    "/estoque/01",
+    "/estoque/1.5",
+    "/estoque/9007199254740992",
+  ])(
+    "recusa rota de ficha não canônica %s antes da sessão",
+    async (locationPathname) => {
+      const client = clientFor({
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      });
+
+      render(<App client={client} locationPathname={locationPathname} />);
+
+      expect(
+        await screen.findByRole("heading", { name: "Página não encontrada" }),
+      ).toBeVisible();
+      expect(client.load).not.toHaveBeenCalled();
+      expect(client.loadStockDetail).not.toHaveBeenCalled();
+    },
+  );
+
+  it("explica quando a ficha está bloqueada pela prontidão", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }]),
+    );
+    vi.mocked(client.loadRenaveLinkStatus).mockResolvedValue({
+      preflightAvailable: false,
+      status: "enabled",
+    });
+    vi.mocked(client.loadRenaveReadiness).mockResolvedValue({
+      certificate: "blocked",
+      environment: "homologation",
+      establishmentContact: "verified",
+      integration: "configured",
+      link: "enabled",
+      mutations: "blocked",
+      operatorIdentity: "verified",
+      queries: "blocked",
+    });
+
+    render(<App client={client} locationPathname="/estoque/71" />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Consulta do estoque indisponível",
+      }),
+    ).toBeVisible();
+    expect(client.loadStockDetail).not.toHaveBeenCalled();
   });
 
   it("explica acesso ainda não vinculado sem mostrar navegação operacional", async () => {

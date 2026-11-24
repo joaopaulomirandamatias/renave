@@ -451,6 +451,9 @@ function createStockQueryUseCase(
   getRecentStocks: ReturnType<typeof vi.fn> = vi.fn(async () => {
     throw new Error("capacidade não configurada neste ensaio");
   }),
+  getStockById: ReturnType<typeof vi.fn> = vi.fn(async () => {
+    throw new Error("capacidade não configurada neste ensaio");
+  }),
 ): PostgresStockQueryUseCase {
   return new PostgresStockQueryUseCase({
     certificateThumbprintSha256: "f".repeat(64),
@@ -460,6 +463,7 @@ function createStockQueryUseCase(
     }),
     connector: {
       getRecentStocks,
+      getStockById,
       getStocksByPlate,
     } as unknown as RenaveConnector,
     integratorCnpj: INTEGRATOR_CNPJ,
@@ -485,6 +489,13 @@ function stockInventoryInput(scenario: PreflightScenario, traceId: string) {
     subject: ADMIN,
     tenantId: scenario.tenant.id,
     traceId,
+  };
+}
+
+function stockDetailInput(scenario: PreflightScenario, traceId: string) {
+  return {
+    ...stockInventoryInput(scenario, traceId),
+    stockId: 71,
   };
 }
 
@@ -595,6 +606,54 @@ function successfulStockInventoryConnector(scenario: PreflightScenario) {
   }));
 }
 
+function successfulStockDetailConnector(scenario: PreflightScenario) {
+  return vi.fn(async () => ({
+    result: {
+      evidence: {
+        chassi: "9BWZZZ377VT004251",
+        codigoSegurancaCrv: "12345678901",
+        dataHoraMedicaoHodometro: "2026-11-24T14:20-03:00",
+        entradaEstoque: {
+          cpfOperadorResponsavel: "12345678901",
+          dataHoraRegistro: "2026-11-24T14:30-03:00",
+        },
+        estado: "CONFIRMADO" as const,
+        id: 71,
+        numeroCrv: "123456789012",
+        placa: "ABC1D23",
+        quilometragemHodometro: 48_210,
+        renavam: "00607701676",
+        restricoesVeiculo: [
+          {
+            codigoTipoRestricao: "01",
+            tipoRestricao: "Administrativa",
+          },
+        ],
+        tipoCrv: "DIGITAL" as const,
+      },
+      publicResult: {
+        chassi: "9BWZZZ377VT004251",
+        dataHoraMedicaoHodometro: "2026-11-24T14:20-03:00",
+        entrada: { dataHoraRegistro: "2026-11-24T14:30-03:00" },
+        estado: "CONFIRMADO" as const,
+        id: 71,
+        placa: "ABC1D23",
+        quilometragemHodometro: 48_210,
+        renavam: "00607701676",
+        restricoes: [{ codigoTipo: "01", tipo: "Administrativa" }],
+        tipoCrv: "DIGITAL" as const,
+      },
+    },
+    verifiedIdentity: {
+      confirmedEstablishmentCnpj: scenario.store.cnpj,
+      confirmedIntegratorCnpj: INTEGRATOR_CNPJ,
+      environment: "homologation" as const,
+      establishmentId: scenario.store.id,
+      tenantId: scenario.tenant.id,
+    },
+  }));
+}
+
 const VEHICLE_PLATE = "ABC1D23";
 const VEHICLE_RENAVAM = "00607701676";
 const VEHICLE_CHASSIS = "9BWZZZ377VT004251";
@@ -659,6 +718,9 @@ function vehicleLookupHarness(
   const stockConnector = new RenaveQueryConnector({
     environment: "homologation",
     findRecentStocks: vi.fn(async () => {
+      throw new Error("capacidade não utilizada no ensaio de veículo");
+    }),
+    findStockById: vi.fn(async () => {
       throw new Error("capacidade não utilizada no ensaio de veículo");
     }),
     findStocksByPlate,
@@ -1831,6 +1893,57 @@ describe("composição PostgreSQL real da API", () => {
     ]);
     expect(getRecentStocks).toHaveBeenCalledOnce();
     expect(getStocksByPlate).not.toHaveBeenCalled();
+    expect(await stockEvidenceState(scenario)).toEqual([
+      {
+        failure_code: null,
+        request_clear_absent: true,
+        response_ciphertext_present: true,
+        response_clear_absent: true,
+        status: "completed",
+      },
+    ]);
+    expect(await stockAuditOutcomes(scenario)).toEqual([
+      "attempted",
+      "succeeded",
+    ]);
+  });
+
+  it("consulta detalhe por ID e mantém os segredos somente na evidência cifrada", async () => {
+    const scenario = await createPreflightScenario("stock-detail-success");
+    await prepareCredentialLink(scenario, "confirmed");
+    const getStocksByPlate = vi.fn(async () => {
+      throw new Error("busca por placa não deve ser usada");
+    });
+    const getRecentStocks = vi.fn(async () => {
+      throw new Error("inventário não deve ser usado");
+    });
+    const getStockById = successfulStockDetailConnector(scenario);
+    const useCase = createStockQueryUseCase(
+      scenario,
+      getStocksByPlate,
+      getRecentStocks,
+      getStockById,
+    );
+
+    await expect(
+      useCase.executeById(
+        stockDetailInput(scenario, "stock-detail-success-trace"),
+      ),
+    ).resolves.toEqual({
+      chassi: "9BWZZZ377VT004251",
+      dataHoraMedicaoHodometro: "2026-11-24T14:20-03:00",
+      entrada: { dataHoraRegistro: "2026-11-24T14:30-03:00" },
+      estado: "CONFIRMADO",
+      id: 71,
+      placa: "ABC1D23",
+      quilometragemHodometro: 48_210,
+      renavam: "00607701676",
+      restricoes: [{ codigoTipo: "01", tipo: "Administrativa" }],
+      tipoCrv: "DIGITAL",
+    });
+    expect(getStockById).toHaveBeenCalledOnce();
+    expect(getStocksByPlate).not.toHaveBeenCalled();
+    expect(getRecentStocks).not.toHaveBeenCalled();
     expect(await stockEvidenceState(scenario)).toEqual([
       {
         failure_code: null,

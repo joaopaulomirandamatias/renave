@@ -16,12 +16,14 @@ import {
 } from "@seu-renave/protected-evidence";
 import {
   StockQueryService,
+  type StockDetailQueryInput,
   type StockQueryAuditRecord,
   type StockInventoryQueryInput,
   type StockQueryInput,
 } from "@seu-renave/renave-application";
 import type {
   RenaveQueryConnector,
+  StockDetail,
   StockInventorySummary,
   StockSummary,
 } from "@seu-renave/renave-connector";
@@ -43,7 +45,10 @@ export class RenaveLinkNotReadyError extends Error {
 export interface PostgresStockQueryUseCaseOptions {
   certificateThumbprintSha256: string;
   cipher: EvidenceCipher;
-  connector: Pick<RenaveQueryConnector, "getRecentStocks" | "getStocksByPlate">;
+  connector: Pick<
+    RenaveQueryConnector,
+    "getRecentStocks" | "getStockById" | "getStocksByPlate"
+  >;
   integratorCnpj: string;
   pool: Pool;
 }
@@ -128,6 +133,11 @@ export class PostgresStockQueryUseCase {
   ): Promise<readonly StockInventorySummary[]> {
     await this.authorize(input);
     return this.service(input).executeRecent(input);
+  }
+
+  async executeById(input: StockDetailQueryInput): Promise<StockDetail> {
+    await this.authorize(input);
+    return this.service(input).executeById(input);
   }
 
   private service(

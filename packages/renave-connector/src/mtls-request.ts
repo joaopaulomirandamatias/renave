@@ -165,6 +165,20 @@ function isAllowedReadUrl(input: string): boolean {
   }
   if (input === HOMOLOGATION_IDENTITY_URL) return true;
   if (input === HOMOLOGATION_STOCKS_URL) return true;
+  if (
+    url.search === "" &&
+    url.pathname.startsWith("/renave-ws/api/estoques/")
+  ) {
+    const rawStockId = url.pathname.slice("/renave-ws/api/estoques/".length);
+    const stockId = Number(rawStockId);
+    return (
+      /^[1-9]\d*$/u.test(rawStockId) &&
+      Number.isSafeInteger(stockId) &&
+      stockId > 0 &&
+      String(stockId) === rawStockId &&
+      input === `${HOMOLOGATION_STOCKS_URL}/${rawStockId}`
+    );
+  }
   if (url.pathname === "/renave-ws/api/aptidao-veiculo-estoque") {
     const entries = [...url.searchParams.entries()];
     if (entries.length !== 2 || entries[0]?.[0] !== "tipoCrv") return false;

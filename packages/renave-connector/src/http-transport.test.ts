@@ -102,6 +102,19 @@ describe("HttpRenaveTransport", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("bloqueia detalhe de estoque em produção antes da rede", async () => {
+    const request = vi.fn();
+    const transport = new HttpRenaveTransport({
+      environment: "production",
+      request,
+    });
+
+    await expect(transport.findStockById(headers, 7)).rejects.toBeInstanceOf(
+      RenaveProductionBlockedError,
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["placa ausente", { restricoes: [] }],
     ["placa divergente", { placa: "ABC1D23" }],
@@ -517,6 +530,113 @@ describe("HttpRenaveTransport", () => {
     );
   });
 
+  it("consulta detalhe de estoque pela rota canônica e preserva a evidência validada", async () => {
+    const payload = {
+      cancelamentoEstoque: {
+        dataHoraCancelamentoEstoque: "2026-11-24T11:00:00-03:00",
+        motivoCancelamentoEstoque: "DESISTENCIA",
+      },
+      chassi: "9BWZZZ377VT004251",
+      codigoSegurancaCrv: "12345678901",
+      dataHoraMedicaoHodometro: "2026-11-23T14:58:00-03:00",
+      entradaEstoque: {
+        cpfOperadorResponsavel: "12345678901",
+        dataHoraRegistro: "2026-11-23T15:02:00-03:00",
+        vendedor: { cpf: "98765432100" },
+      },
+      estado: "CONFIRMADO",
+      id: 7,
+      numeroCrv: "123456789012",
+      placa: "QTP4H82",
+      quilometragemHodometro: 42000,
+      renavam: "00607701676",
+      restricoesVeiculo: [
+        { codigoTipoRestricao: "JUD", tipoRestricao: "JUDICIAL" },
+      ],
+      saidaEstoque: {
+        comprador: { cpf: "11122233344" },
+        dataHoraRegistro: "2026-11-24T10:01:00-03:00",
+        motivo: "VENDA",
+      },
+      tipoCrv: "DIGITAL",
+    };
+    const request = vi.fn(async () => Response.json(payload));
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await expect(transport.findStockById(headers, 7)).resolves.toEqual(payload);
+    expect(request).toHaveBeenCalledWith(
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques/7",
+      expect.objectContaining({
+        headers: { accept: "application/json", ...headers },
+        method: "GET",
+        redirect: "error",
+      }),
+    );
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53])(
+    "recusa ID inválido no transporte antes da rede: %s",
+    async (stockId) => {
+      const request = vi.fn(async () => Response.json({}));
+      const transport = new HttpRenaveTransport({
+        environment: "homologation",
+        request,
+      });
+
+      await expect(
+        transport.findStockById(headers, stockId),
+      ).rejects.toMatchObject({
+        code: "RENAVE_PROTOCOL_ERROR",
+        operation: "find-stock-by-id",
+      });
+      expect(request).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["array", []],
+    ["estado", { estado: 1, id: 7 }],
+    ["hodômetro", { id: 7, quilometragemHodometro: -1 }],
+    ["saída", { id: 7, saidaEstoque: { motivo: 1 } }],
+    ["restrição", { id: 7, restricoesVeiculo: [{ tipoRestricao: false }] }],
+  ])("recusa detalhe com tipo incompatível em %s", async (_label, payload) => {
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(async () => Response.json(payload)),
+    });
+
+    await expect(transport.findStockById(headers, 7)).rejects.toMatchObject({
+      code: "RENAVE_PROTOCOL_ERROR",
+      operation: "find-stock-by-id",
+    });
+  });
+
+  it("recusa detalhe acima do limite de corpo e de complexidade", async () => {
+    const oversized = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(async () =>
+        Response.json({}, { headers: { "content-length": "1048577" } }),
+      ),
+    });
+    const deeplyNested = Array.from({ length: 18 }).reduce<
+      Record<string, unknown>
+    >((child) => ({ child }), {});
+    const complex = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(async () => Response.json(deeplyNested)),
+    });
+
+    for (const transport of [oversized, complex]) {
+      await expect(transport.findStockById(headers, 7)).rejects.toMatchObject({
+        code: "RENAVE_PROTOCOL_ERROR",
+        operation: "find-stock-by-id",
+      });
+    }
+  });
+
   it.each([
     ["chassi", { chassi: 123, id: 7 }],
     ["data de registro", { entradaEstoque: { dataHoraRegistro: 123 }, id: 7 }],
@@ -917,7 +1037,9 @@ describe("HttpRenaveReadOnlyTransport", () => {
           })
         : url.includes("/aptidao-veiculo-estoque?")
           ? Response.json({ diagnostico: { veiculoApto: true } })
-          : Response.json([{ id: 7, placa: "QTP4H82" }]),
+          : url.endsWith("/estoques/7")
+            ? Response.json({ id: 7, placa: "QTP4H82" })
+            : Response.json([{ id: 7, placa: "QTP4H82" }]),
     );
     const transport = new HttpRenaveReadOnlyTransport({
       environment: "homologation",
@@ -937,6 +1059,10 @@ describe("HttpRenaveReadOnlyTransport", () => {
     await expect(transport.findRecentStocks(headers)).resolves.toEqual([
       { id: 7, placa: "QTP4H82" },
     ]);
+    await expect(transport.findStockById(headers, 7)).resolves.toEqual({
+      id: 7,
+      placa: "QTP4H82",
+    });
     await expect(
       transport.getVehicleEligibility(headers, {
         placa: "QTP4H82",
@@ -946,11 +1072,12 @@ describe("HttpRenaveReadOnlyTransport", () => {
 
     expect(transport.environment).toBe("homologation");
     expect("mutate" in transport).toBe(false);
-    expect(baseRequest).toHaveBeenCalledTimes(4);
+    expect(baseRequest).toHaveBeenCalledTimes(5);
     expect(baseRequest.mock.calls.map(([url]) => url)).toEqual([
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/cliente-autenticado",
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82",
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques/7",
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque?tipoCrv=DIGITAL&placa=QTP4H82",
     ]);
     for (const [, init] of baseRequest.mock.calls) {

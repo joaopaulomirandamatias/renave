@@ -302,6 +302,7 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
   ] as const;
   const recentStocksUrl =
     "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques";
+  const stockDetailUrl = `${recentStocksUrl}/7`;
   const stocksUrl = `${recentStocksUrl}?placa=QTP4H82`;
   const vehiclesUrl =
     "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/veiculos?placa=QTP4H82";
@@ -326,6 +327,10 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       method: "GET",
       redirect: "error",
     });
+    await capability.request(stockDetailUrl, {
+      method: "GET",
+      redirect: "error",
+    });
     await capability.request(vehiclesUrl, {
       method: "GET",
       redirect: "error",
@@ -334,7 +339,7 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       await capability.request(url, { method: "GET", redirect: "error" });
     }
 
-    expect(baseRequest).toHaveBeenCalledTimes(7);
+    expect(baseRequest).toHaveBeenCalledTimes(8);
     for (const [, init] of baseRequest.mock.calls) {
       expect(init).toMatchObject({ method: "GET", redirect: "error" });
       expect(init.body).toBeUndefined();
@@ -403,6 +408,41 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
     [
       "query adicional no estoque",
       `${stocksUrl}&pagina=1`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "ID de estoque com zero à esquerda",
+      `${recentStocksUrl}/07`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "ID de estoque zero",
+      `${recentStocksUrl}/0`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "ID de estoque decimal",
+      `${recentStocksUrl}/1.5`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "ID de estoque acima do inteiro seguro",
+      `${recentStocksUrl}/9007199254740992`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "query no detalhe de estoque",
+      `${stockDetailUrl}?expand=true`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "segmento extra no detalhe de estoque",
+      `${stockDetailUrl}/cancelar`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "separador codificado no ID de estoque",
+      `${recentStocksUrl}/7%2Fcancelar`,
       { method: "GET", redirect: "error" },
     ],
     [

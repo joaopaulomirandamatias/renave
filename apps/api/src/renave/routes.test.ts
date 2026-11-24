@@ -76,6 +76,22 @@ function setup(
       },
     ],
   );
+  const stockDetailExecute = vi.fn<StockQueryUseCase["executeById"]>(
+    async () => ({
+      chassi: "9BWZZZ377VT004251",
+      entrada: {
+        dataHoraRegistro: "2026-11-24T14:30-03:00",
+        motivo: "COMPRA",
+      },
+      estado: "CONFIRMADO",
+      id: 7,
+      placa: "ABC1D23",
+      quilometragemHodometro: 48_210,
+      renavam: "00607701676",
+      restricoes: [{ codigoTipo: "01", tipo: "ADMINISTRATIVA" }],
+      tipoCrv: "DIGITAL",
+    }),
+  );
   const authorizeVehicleLookup = vi.fn<VehicleLookupUseCase["authorize"]>(
     async () => undefined,
   );
@@ -126,6 +142,7 @@ function setup(
     stockQuery: {
       authorize: authorizeStockQuery,
       execute: stockQueryExecute,
+      executeById: stockDetailExecute,
       executeRecent: stockInventoryExecute,
     },
     vehicleLookup: {
@@ -151,6 +168,7 @@ function setup(
     readinessExecute,
     release,
     stockQueryExecute,
+    stockDetailExecute,
     stockInventoryExecute,
     vehicleLookupExecute,
   };
@@ -194,6 +212,18 @@ async function stockInventoryRequest(
   return await app.inject({
     method: "GET",
     url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/stocks${suffix}`,
+    headers: { cookie: "renave_session=opaque-session" },
+  });
+}
+
+async function stockDetailRequest(
+  app: ReturnType<typeof buildApp>,
+  stockId = "7",
+  suffix = "",
+) {
+  return await app.inject({
+    method: "GET",
+    url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/stocks/${stockId}${suffix}`,
     headers: { cookie: "renave_session=opaque-session" },
   });
 }
@@ -646,6 +676,126 @@ describe("rota autenticada do inventário recente", () => {
     expect(stockInventoryExecute).toHaveBeenCalledOnce();
     expect(release).toHaveBeenCalledOnce();
     expect(response.body).not.toContain("segredo do banco");
+  });
+});
+
+describe("rota autenticada do detalhe de estoque", () => {
+  it("autoriza antes do limitador e devolve projeção pública com no-store", async () => {
+    const { acquire, app, authorizeStockQuery, release, stockDetailExecute } =
+      setup();
+
+    const response = await stockDetailRequest(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      chassi: "9BWZZZ377VT004251",
+      entrada: {
+        dataHoraRegistro: "2026-11-24T14:30-03:00",
+        motivo: "COMPRA",
+      },
+      estado: "CONFIRMADO",
+      id: 7,
+      placa: "ABC1D23",
+      quilometragemHodometro: 48_210,
+      renavam: "00607701676",
+      restricoes: [{ codigoTipo: "01", tipo: "ADMINISTRATIVA" }],
+      tipoCrv: "DIGITAL",
+    });
+    expect(response.body).not.toMatch(
+      /cpf|numeroCrv|codigoSegurancaCrv|email|notaFiscal/iu,
+    );
+    const executionInput = expect.objectContaining({
+      establishmentId: ESTABLISHMENT_ID,
+      stockId: 7,
+      subject: "oidc|operator-1",
+      tenantId: TENANT_ID,
+    });
+    expect(authorizeStockQuery).toHaveBeenCalledWith(executionInput);
+    expect(stockDetailExecute).toHaveBeenCalledWith(executionInput);
+    expect(authorizeStockQuery.mock.invocationCallOrder[0]).toBeLessThan(
+      acquire.mock.invocationCallOrder[0]!,
+    );
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it.each(["0", "01", "-1", "1.5", "9007199254740992", "abc"])(
+    "recusa o identificador inválido %s antes de autorizar ou limitar",
+    async (stockId) => {
+      const { acquire, app, authorizeStockQuery, stockDetailExecute } = setup();
+
+      const response = await stockDetailRequest(app, stockId);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ code: "INVALID_REQUEST" });
+      expect(authorizeStockQuery).not.toHaveBeenCalled();
+      expect(acquire).not.toHaveBeenCalled();
+      expect(stockDetailExecute).not.toHaveBeenCalled();
+    },
+  );
+
+  it("recusa query não contratada antes de autorizar ou limitar", async () => {
+    const { acquire, app, authorizeStockQuery, stockDetailExecute } = setup();
+
+    const response = await stockDetailRequest(app, "7", "?sensitive=true");
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ code: "INVALID_REQUEST" });
+    expect(authorizeStockQuery).not.toHaveBeenCalled();
+    expect(acquire).not.toHaveBeenCalled();
+    expect(stockDetailExecute).not.toHaveBeenCalled();
+  });
+
+  it("nega BOLA antes de adquirir lease ou consultar o detalhe", async () => {
+    const { acquire, app, authorizeStockQuery, release, stockDetailExecute } =
+      setup();
+    authorizeStockQuery.mockRejectedValueOnce(
+      Object.assign(new Error("registro de outro estabelecimento"), {
+        code: "AUTHORIZATION_DENIED",
+      }),
+    );
+
+    const response = await stockDetailRequest(app);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "AUTHORIZATION_DENIED" });
+    expect(response.body).not.toContain("outro estabelecimento");
+    expect(acquire).not.toHaveBeenCalled();
+    expect(stockDetailExecute).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("retorna 429 com Retry-After sem consultar o detalhe", async () => {
+    const { acquire, app, release, stockDetailExecute } = setup();
+    acquire.mockResolvedValueOnce({
+      allowed: false,
+      retryAfterSeconds: 23,
+      scope: "establishment_rate",
+    });
+
+    const response = await stockDetailRequest(app);
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBe("23");
+    expect(response.json()).toEqual({ code: "RENAVE_QUERY_LIMITED" });
+    expect(stockDetailExecute).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("libera o lease e não expõe a mensagem quando o detalhe falha", async () => {
+    const { app, release, stockDetailExecute } = setup();
+    stockDetailExecute.mockRejectedValueOnce(
+      Object.assign(new Error("CPF 12345678901 e CRV secreto"), {
+        code: "RENAVE_PROTOCOL_ERROR",
+      }),
+    );
+
+    const response = await stockDetailRequest(app);
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toMatchObject({ code: "RENAVE_PROTOCOL_ERROR" });
+    expect(response.body).not.toMatch(/cpf|12345678901|crv|secreto/iu);
+    expect(release).toHaveBeenCalledOnce();
   });
 });
 

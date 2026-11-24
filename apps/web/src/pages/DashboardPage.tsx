@@ -31,6 +31,7 @@ import type {
 } from "../App.js";
 import { type ReadonlyCanaryPort } from "../features/homologation-canary/index.js";
 import type { StockInventoryItem } from "./StockInventoryPanel.js";
+import { StockDetailPage, type StockDetail } from "./StockDetailPage.js";
 import {
   type WorkspaceRoute,
   workspaceNavigation,
@@ -83,6 +84,11 @@ export interface DashboardPageProps {
   onLoadRecentStocks?: (
     signal: AbortSignal,
   ) => Promise<readonly StockInventoryItem[]>;
+  onLoadStockDetail?: (
+    stockId: number,
+    signal: AbortSignal,
+  ) => Promise<StockDetail>;
+  onBackStockDetail?: () => void;
   onReloadCredentialLinkQueue?: () => void;
   onTenantChange?: (tenantId: string) => void;
   selectedEstablishmentId?: string;
@@ -94,6 +100,7 @@ export interface DashboardPageProps {
   readinessError?: boolean;
   readinessLoading?: boolean;
   route?: WorkspaceRoute;
+  stockDetailId?: number;
   stockEntryOperationsEnabled?: boolean;
   tenants?: readonly { id: string; label: string }[];
   userDisplayName: string;
@@ -102,6 +109,7 @@ export interface DashboardPageProps {
 const navigationIcons: Record<WorkspaceRoute, ReactNode> = {
   dashboard: <LayoutDashboard size={19} />,
   stock: <CarFront size={19} />,
+  "stock-detail": <CarFront size={19} />,
   "stock-entry": <ArrowDownToLine size={19} />,
   compliance: <ShieldCheck size={19} />,
   establishments: <Building2 size={19} />,
@@ -118,6 +126,10 @@ const routeHeadings: Record<
   stock: {
     eyebrow: "Operação de estoque",
     title: () => "Estoque RENAVE",
+  },
+  "stock-detail": {
+    eyebrow: "Operação de estoque",
+    title: () => "Ficha do estoque RENAVE",
   },
   "stock-entry": {
     eyebrow: "Operação de estoque",
@@ -160,6 +172,8 @@ export function DashboardPage({
   onSearchStocks,
   onLookupVehicle,
   onLoadRecentStocks,
+  onLoadStockDetail,
+  onBackStockDetail,
   onReloadCredentialLinkQueue,
   onTenantChange,
   selectedEstablishmentId,
@@ -171,6 +185,7 @@ export function DashboardPage({
   readinessError = false,
   readinessLoading = false,
   route = "dashboard",
+  stockDetailId,
   stockEntryOperationsEnabled = false,
   tenants = [],
   userDisplayName,
@@ -183,7 +198,8 @@ export function DashboardPage({
     )
     .map((item) => ({
       ...item,
-      current: item.id === route,
+      current:
+        item.id === route || (item.id === "stock" && route === "stock-detail"),
       icon: navigationIcons[item.id],
     }));
   const routeHeading = routeHeadings[route];
@@ -225,6 +241,52 @@ export function DashboardPage({
           {...(selectedTenantId ? { selectedTenantId } : {})}
         />
       );
+      break;
+    case "stock-detail":
+      if (linkStatusLoading || readinessLoading) {
+        routeContent = (
+          <p className="context-feedback" role="status">
+            Verificando se a consulta do estoque está disponível…
+          </p>
+        );
+      } else if (linkStatusError || readinessError) {
+        routeContent = (
+          <section
+            className="context-feedback context-feedback--error"
+            role="alert"
+          >
+            <h2>Ficha temporariamente indisponível</h2>
+            <p>Não foi possível confirmar a prontidão da integração.</p>
+          </section>
+        );
+      } else if (
+        (linkStatus !== "confirmed" && linkStatus !== "enabled") ||
+        readiness?.queries !== "ready"
+      ) {
+        routeContent = (
+          <section className="context-feedback" role="status">
+            <h2>Consulta do estoque indisponível</h2>
+            <p>
+              O estabelecimento ainda não está habilitado para consultar este
+              registro.
+            </p>
+          </section>
+        );
+      } else {
+        routeContent =
+          stockDetailId &&
+          onLoadStockDetail &&
+          onBackStockDetail &&
+          selectedTenantId &&
+          selectedEstablishmentId ? (
+            <StockDetailPage
+              onBack={onBackStockDetail}
+              onLoad={onLoadStockDetail}
+              selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
+              stockId={stockDetailId}
+            />
+          ) : null;
+      }
       break;
     case "stock-entry":
       routeContent = (

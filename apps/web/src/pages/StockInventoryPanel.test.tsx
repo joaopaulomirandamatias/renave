@@ -128,7 +128,7 @@ describe("StockInventoryPanel", () => {
     await waitFor(() => expect(onLoad).toHaveBeenCalledTimes(2));
   });
 
-  it("oferece atualização explícita sem habilitar ações de estoque", async () => {
+  it("oferece atualização e uma navegação somente leitura para a ficha", async () => {
     const onLoad = vi.fn(async () => [
       { estado: "FINALIZADO" as const, id: 90, placa: "BRA2E19" },
     ]);
@@ -139,8 +139,12 @@ describe("StockInventoryPanel", () => {
     await screen.findByText("BRA2E19");
     fireEvent.click(screen.getByRole("button", { name: "Atualizar estoque" }));
     await waitFor(() => expect(onLoad).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("link", { name: "Abrir ficha" })).toHaveAttribute(
+      "href",
+      "/estoque/90",
+    );
     expect(
-      screen.queryByRole("link", { name: /abrir|saída|transferir/i }),
+      screen.queryByRole("link", { name: /saída|transferir/i }),
     ).toBeNull();
   });
 });

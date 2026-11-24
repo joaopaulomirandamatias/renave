@@ -44,6 +44,7 @@ export {
   type VehicleEligibilityVehicle,
 } from "./operations.js";
 export {
+  InvalidStockIdQueryError,
   InvalidVehicleEligibilityQueryError,
   InvalidVehiclePlateQueryError,
   RenaveConnector,
@@ -74,6 +75,12 @@ export {
   type StockQueryResult,
   type StockInventoryQueryResult,
   type StockInventorySummary,
+  type StockDetail,
+  type StockDetailCancellation,
+  type StockDetailExit,
+  type StockDetailMovement,
+  type StockDetailQueryResult,
+  type StockDetailRestriction,
   type StockSummary,
   type ReconciliationReadErrorCategory,
   type ReconciliationReadResult,

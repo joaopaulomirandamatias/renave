@@ -137,6 +137,7 @@ export function StockInventoryPanel({
                   <th scope="col">Tipo do CRV</th>
                   <th scope="col">Registro da entrada</th>
                   <th scope="col">Situação RENAVE</th>
+                  <th scope="col">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,6 +171,11 @@ export function StockInventoryPanel({
                         ) : (
                           "Não informado"
                         )}
+                      </td>
+                      <td>
+                        <Button href={`/estoque/${item.id}`} variant="quiet">
+                          Abrir ficha
+                        </Button>
                       </td>
                       <td>
                         <StatusBadge tone={presentation.tone}>

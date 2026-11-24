@@ -34,6 +34,7 @@ function transport(records: unknown[] = []): RenaveReadOnlyTransport {
   return {
     environment: "homologation",
     findRecentStocks: vi.fn(async () => records as never),
+    findStockById: vi.fn(async () => records[0] as never),
     findStocksByPlate: vi.fn(async () => records as never),
     getAuthenticatedClient: vi.fn(async () => ({
       cnpj: "85106037000585",

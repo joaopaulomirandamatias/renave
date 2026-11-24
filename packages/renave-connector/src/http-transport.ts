@@ -80,6 +80,7 @@ type RenaveHttpOperation =
   | "get-vehicle-eligibility"
   | "get-vehicle-by-plate"
   | "find-recent-stocks"
+  | "find-stock-by-id"
   | "find-stocks-by-plate"
   | RenaveMutationOperation;
 
@@ -155,6 +156,8 @@ const MAX_RECENT_STOCK_ITEMS = 10_000;
 const MAX_RECENT_STOCK_JSON_DEPTH = 16;
 const MAX_RECENT_STOCK_JSON_NODES = 200_000;
 const MAX_RECENT_STOCK_STRING_LENGTH = 65_536;
+const MAX_STOCK_DETAIL_RESPONSE_BYTES = 1024 * 1024;
+const MAX_STOCK_DETAIL_JSON_NODES = 50_000;
 
 async function parseJson(
   response: Response,
@@ -204,27 +207,28 @@ async function parseJson(
   }
 }
 
-function assertRecentStockJsonComplexity(value: unknown): void {
+function assertStockJsonComplexity(
+  value: unknown,
+  operation: "find-recent-stocks" | "find-stock-by-id",
+  maxNodes: number,
+): void {
   const stack: Array<{ depth: number; value: unknown }> = [{ depth: 0, value }];
   let nodes = 0;
   while (stack.length > 0) {
     const current = stack.pop()!;
     nodes += 1;
-    if (
-      nodes > MAX_RECENT_STOCK_JSON_NODES ||
-      current.depth > MAX_RECENT_STOCK_JSON_DEPTH
-    ) {
-      throw new RenaveProtocolError("find-recent-stocks");
+    if (nodes > maxNodes || current.depth > MAX_RECENT_STOCK_JSON_DEPTH) {
+      throw new RenaveProtocolError(operation);
     }
     if (typeof current.value === "string") {
       if (current.value.length > MAX_RECENT_STOCK_STRING_LENGTH) {
-        throw new RenaveProtocolError("find-recent-stocks");
+        throw new RenaveProtocolError(operation);
       }
       continue;
     }
     if (Array.isArray(current.value)) {
       if (current.value.length > MAX_RECENT_STOCK_ITEMS) {
-        throw new RenaveProtocolError("find-recent-stocks");
+        throw new RenaveProtocolError(operation);
       }
       for (const child of current.value) {
         stack.push({ depth: current.depth + 1, value: child });
@@ -234,7 +238,7 @@ function assertRecentStockJsonComplexity(value: unknown): void {
     if (current.value && typeof current.value === "object") {
       const values = Object.values(current.value);
       if (values.length > 256) {
-        throw new RenaveProtocolError("find-recent-stocks");
+        throw new RenaveProtocolError(operation);
       }
       for (const child of values) {
         stack.push({ depth: current.depth + 1, value: child });
@@ -684,7 +688,7 @@ async function vehicleResponseFrom(
 
 function stockRecordFrom(
   value: unknown,
-  operation: "find-recent-stocks" | "find-stocks-by-plate",
+  operation: "find-recent-stocks" | "find-stocks-by-plate" | "find-stock-by-id",
 ): RenaveStockRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new RenaveProtocolError(operation);
@@ -704,6 +708,7 @@ function stockRecordFrom(
     [
       "chassi",
       "codigoSegurancaCrv",
+      "dataHoraMedicaoHodometro",
       "numeroCrv",
       "placa",
       "renavam",
@@ -744,17 +749,60 @@ function stockRecordFrom(
         throw new RenaveProtocolError(operation);
       }
     }
-    entradaEstoque = {
-      ...(typeof entry.cpfOperadorResponsavel === "string"
-        ? { cpfOperadorResponsavel: entry.cpfOperadorResponsavel }
-        : {}),
-      ...(typeof entry.dataHora === "string"
-        ? { dataHora: entry.dataHora }
-        : {}),
-      ...(typeof entry.dataHoraRegistro === "string"
-        ? { dataHoraRegistro: entry.dataHoraRegistro }
-        : {}),
-    };
+    entradaEstoque = entry;
+  }
+
+  let saidaEstoque: RenaveStockRecord["saidaEstoque"];
+  if (candidate.saidaEstoque !== undefined) {
+    const exit = requireObject(candidate.saidaEstoque, operation);
+    validateOptionalStrings(
+      exit,
+      ["cpfOperadorResponsavel", "dataHora", "dataHoraRegistro", "motivo"],
+      operation,
+    );
+    saidaEstoque = exit;
+  }
+
+  let cancelamentoEstoque: RenaveStockRecord["cancelamentoEstoque"];
+  if (candidate.cancelamentoEstoque !== undefined) {
+    const cancellation = requireObject(
+      candidate.cancelamentoEstoque,
+      operation,
+    );
+    validateOptionalStrings(
+      cancellation,
+      ["dataHoraCancelamentoEstoque", "motivoCancelamentoEstoque"],
+      operation,
+    );
+    cancelamentoEstoque = cancellation;
+  }
+
+  let restricoesVeiculo: RenaveStockRecord["restricoesVeiculo"];
+  if (candidate.restricoesVeiculo !== undefined) {
+    if (
+      !Array.isArray(candidate.restricoesVeiculo) ||
+      candidate.restricoesVeiculo.length > 256
+    ) {
+      throw new RenaveProtocolError(operation);
+    }
+    restricoesVeiculo = candidate.restricoesVeiculo.map((restriction) => {
+      const parsed = requireObject(restriction, operation);
+      validateOptionalStrings(
+        parsed,
+        ["codigoTipoRestricao", "tipoRestricao"],
+        operation,
+      );
+      return parsed;
+    });
+  }
+
+  if (
+    candidate.quilometragemHodometro !== undefined &&
+    (!Number.isSafeInteger(candidate.quilometragemHodometro) ||
+      (candidate.quilometragemHodometro as number) < 0 ||
+      (candidate.quilometragemHodometro as number) > 2_147_483_647)
+  ) {
+    throw new RenaveProtocolError(operation);
   }
 
   return {
@@ -763,9 +811,7 @@ function stockRecordFrom(
       ? { chassi: candidate.chassi }
       : {}),
     ...(entradaEstoque === undefined ? {} : { entradaEstoque }),
-    ...(candidate.cancelamentoEstoque === undefined
-      ? {}
-      : { cancelamentoEstoque: candidate.cancelamentoEstoque }),
+    ...(cancelamentoEstoque === undefined ? {} : { cancelamentoEstoque }),
     ...(typeof candidate.codigoSegurancaCrv === "string"
       ? { codigoSegurancaCrv: candidate.codigoSegurancaCrv }
       : {}),
@@ -779,9 +825,14 @@ function stockRecordFrom(
       ? { numeroCrv: candidate.numeroCrv }
       : {}),
     ...(typeof candidate.placa === "string" ? { placa: candidate.placa } : {}),
+    ...(typeof candidate.quilometragemHodometro === "number"
+      ? { quilometragemHodometro: candidate.quilometragemHodometro }
+      : {}),
     ...(typeof candidate.renavam === "string"
       ? { renavam: candidate.renavam }
       : {}),
+    ...(restricoesVeiculo === undefined ? {} : { restricoesVeiculo }),
+    ...(saidaEstoque === undefined ? {} : { saidaEstoque }),
     ...(typeof candidate.tipoCrv === "string"
       ? {
           tipoCrv: candidate.tipoCrv as NonNullable<
@@ -1040,13 +1091,64 @@ export class HttpRenaveTransport
       "find-recent-stocks",
       MAX_RECENT_STOCK_RESPONSE_BYTES,
     );
-    assertRecentStockJsonComplexity(result);
+    assertStockJsonComplexity(
+      result,
+      "find-recent-stocks",
+      MAX_RECENT_STOCK_JSON_NODES,
+    );
     if (!Array.isArray(result) || result.length > MAX_RECENT_STOCK_ITEMS) {
       throw new RenaveProtocolError("find-recent-stocks");
     }
     return result.map((record) =>
       stockRecordFrom(record, "find-recent-stocks"),
     );
+  }
+
+  async findStockById(
+    headers: EstablishmentHeaders,
+    stockId: number,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord> {
+    const state = httpTransportState(this, "find-stock-by-id");
+    if (state.environment === "production") {
+      throw new RenaveProductionBlockedError();
+    }
+    if (!Number.isSafeInteger(stockId) || stockId <= 0) {
+      throw new RenaveProtocolError("find-stock-by-id");
+    }
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls[state.environment]}/api/estoques/${String(stockId)}`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "find-stock-by-id");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "find-stock-by-id");
+    }
+    const result = await parseJson(
+      response,
+      "find-stock-by-id",
+      MAX_STOCK_DETAIL_RESPONSE_BYTES,
+    );
+    assertStockJsonComplexity(
+      result,
+      "find-stock-by-id",
+      MAX_STOCK_DETAIL_JSON_NODES,
+    );
+    return stockRecordFrom(result, "find-stock-by-id");
   }
 
   async mutate<TResult>(
@@ -1314,13 +1416,61 @@ export class HttpRenaveReadOnlyTransport
       "find-recent-stocks",
       MAX_RECENT_STOCK_RESPONSE_BYTES,
     );
-    assertRecentStockJsonComplexity(result);
+    assertStockJsonComplexity(
+      result,
+      "find-recent-stocks",
+      MAX_RECENT_STOCK_JSON_NODES,
+    );
     if (!Array.isArray(result) || result.length > MAX_RECENT_STOCK_ITEMS) {
       throw new RenaveProtocolError("find-recent-stocks");
     }
     return result.map((record) =>
       stockRecordFrom(record, "find-recent-stocks"),
     );
+  }
+
+  async findStockById(
+    headers: EstablishmentHeaders,
+    stockId: number,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord> {
+    const state = httpReadOnlyTransportState(this, "find-stock-by-id");
+    if (!Number.isSafeInteger(stockId) || stockId <= 0) {
+      throw new RenaveProtocolError("find-stock-by-id");
+    }
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls.homologation}/api/estoques/${String(stockId)}`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "find-stock-by-id");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "find-stock-by-id");
+    }
+    const result = await parseJson(
+      response,
+      "find-stock-by-id",
+      MAX_STOCK_DETAIL_RESPONSE_BYTES,
+    );
+    assertStockJsonComplexity(
+      result,
+      "find-stock-by-id",
+      MAX_STOCK_DETAIL_JSON_NODES,
+    );
+    return stockRecordFrom(result, "find-stock-by-id");
   }
 }
 

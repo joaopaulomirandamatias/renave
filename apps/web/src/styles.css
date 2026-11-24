@@ -1693,6 +1693,170 @@ footer {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+.stock-detail,
+.stock-detail__content {
+  display: grid;
+  gap: 1rem;
+}
+
+.stock-detail__breadcrumb {
+  display: flex;
+  min-height: var(--sr-touch-target-min);
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--sr-color-text-muted);
+  font-size: 0.875rem;
+}
+
+.stock-detail__hero,
+.stock-detail__card,
+.stock-detail__cancellation,
+.stock-detail__feedback {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-card);
+  box-shadow: var(--sr-shadow-card);
+}
+
+.stock-detail__hero,
+.stock-detail__feedback {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stock-detail__hero-copy,
+.stock-detail__feedback > div,
+.stock-detail__card,
+.stock-detail__cancellation {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.stock-detail__hero-copy > p:first-child {
+  color: var(--sr-color-brand);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.stock-detail__hero h2,
+.stock-detail__hero p,
+.stock-detail__feedback h2,
+.stock-detail__feedback p,
+.stock-detail__card h3,
+.stock-detail__card p,
+.stock-detail__cancellation h3,
+.stock-detail__cancellation p,
+.stock-detail__card dl,
+.stock-detail__cancellation dl {
+  margin: 0;
+}
+
+.stock-detail__identity-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.stock-detail__plate {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  padding: 0 0.75rem;
+  border: 2px solid var(--sr-color-text);
+  border-radius: 0.375rem;
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.stock-detail__record,
+.stock-detail__feedback p,
+.stock-detail__card p,
+.stock-detail__restrictions li span,
+.stock-detail__date small {
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.stock-detail__feedback {
+  color: var(--sr-color-danger);
+}
+
+.stock-detail__cancellation {
+  color: var(--sr-color-danger);
+  background: var(--sr-color-danger-soft);
+  border-color: var(--sr-color-danger);
+  box-shadow: none;
+}
+
+.stock-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.stock-detail__card h3,
+.stock-detail__cancellation h3,
+.stock-detail__feedback h2 {
+  color: var(--sr-color-text);
+  font-size: 1rem;
+}
+
+.stock-detail__card dl,
+.stock-detail__cancellation dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.stock-detail__card dl > div,
+.stock-detail__cancellation dl > div,
+.stock-detail__date {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.stock-detail dt {
+  color: var(--sr-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.stock-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.stock-detail__identifier {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.stock-detail__restrictions ul {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.stock-detail__restrictions li {
+  display: flex;
+  min-height: var(--sr-touch-target-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--sr-color-surface-subtle);
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-control);
+}
+
 .vehicle-lookup__result {
   border-top: 1px solid var(--sr-color-border, #d8e0ea);
   margin-top: 1rem;
@@ -1969,6 +2133,24 @@ footer {
   .stock-inventory__heading .sr-button,
   .stock-inventory__feedback .sr-button {
     width: 100%;
+  }
+
+  .stock-detail__hero,
+  .stock-detail__feedback,
+  .stock-detail__restrictions li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stock-detail__hero .sr-button,
+  .stock-detail__feedback .sr-button {
+    width: 100%;
+  }
+
+  .stock-detail__grid,
+  .stock-detail__card dl,
+  .stock-detail__cancellation dl {
+    grid-template-columns: 1fr;
   }
 
   .establishment-creation form {

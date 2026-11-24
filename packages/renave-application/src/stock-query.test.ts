@@ -99,6 +99,53 @@ const inventoryResult = {
   verifiedIdentity: successfulResult.verifiedIdentity,
 };
 
+const detailResult = {
+  result: {
+    evidence: {
+      ...inventoryEvidence[0],
+      dataHoraMedicaoHodometro: "2026-11-24T14:20",
+      entradaEstoque: {
+        ...inventoryEvidence[0]!.entradaEstoque,
+        dataHora: "2026-11-20T10:00",
+      },
+      quilometragemHodometro: 38_412,
+      restricoesVeiculo: [
+        {
+          codigoTipoRestricao: "01",
+          tipoRestricao: "Administrativa",
+        },
+      ],
+      saidaEstoque: {
+        cpfOperadorResponsavel: "12345678901",
+        dataHora: "2026-11-24T14:00",
+        dataHoraRegistro: "2026-11-24T14:30",
+        motivo: "VENDA",
+      },
+    },
+    publicResult: {
+      chassi: "9BWZZZ377VT004251",
+      dataHoraMedicaoHodometro: "2026-11-24T14:20",
+      entrada: {
+        dataHora: "2026-11-20T10:00",
+        dataHoraRegistro: "2026-11-24T14:30",
+      },
+      estado: "CONFIRMADO" as const,
+      id: 7,
+      placa: "ABC1D23",
+      quilometragemHodometro: 38_412,
+      renavam: "00607701676",
+      restricoes: [{ codigoTipo: "01", tipo: "Administrativa" }],
+      saida: {
+        dataHora: "2026-11-24T14:00",
+        dataHoraRegistro: "2026-11-24T14:30",
+        motivo: "VENDA",
+      },
+      tipoCrv: "DIGITAL" as const,
+    },
+  },
+  verifiedIdentity: successfulResult.verifiedIdentity,
+};
+
 function createHarness(options?: {
   authorizationContext?: AuthorizationContext | null;
   connectorError?: Error;
@@ -138,6 +185,8 @@ function createHarness(options?: {
       ),
     },
     connector: {
+      getStockById:
+        connector as unknown as StockQueryPorts["connector"]["getStockById"],
       getRecentStocks: connector,
       getStocksByPlate: connector,
     },
@@ -169,6 +218,80 @@ const input = {
 };
 
 describe("StockQueryService", () => {
+  it("consulta detalhe por id e reconstrói a projeção sem campos protegidos", async () => {
+    const harness = createHarness({ connectorResult: detailResult });
+
+    await expect(
+      harness.service.executeById({
+        actorIp: input.actorIp,
+        establishmentId: input.establishmentId,
+        stockId: 7,
+        subject: input.subject,
+        tenantId: input.tenantId,
+        traceId: "trace-detail-1",
+      }),
+    ).resolves.toEqual(detailResult.result.publicResult);
+    expect(JSON.stringify(detailResult.result.publicResult)).not.toMatch(
+      /cpf|numeroCrv|codigoSegurancaCrv|chaveNotaFiscal/i,
+    );
+    expect(harness.connector).toHaveBeenCalledWith(
+      {
+        environment: "homologation",
+        establishmentCnpj: ESTABLISHMENT_CNPJ,
+        establishmentId: ESTABLISHMENT_ID,
+        integratorCnpj: INTEGRATOR_CNPJ,
+        tenantId: TENANT_ID,
+      },
+      7,
+    );
+    expect(harness.begin).toHaveBeenCalledWith(
+      expect.objectContaining({ request: { stockId: 7 } }),
+    );
+    expect(harness.succeed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidenceResponse: detailResult.result.evidence,
+      }),
+    );
+  });
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, Number.NaN])(
+    "recusa id de estoque inválido %s antes de qualquer porta",
+    async (stockId) => {
+      const harness = createHarness();
+      await expect(
+        harness.service.executeById({
+          actorIp: input.actorIp,
+          establishmentId: input.establishmentId,
+          stockId,
+          subject: input.subject,
+          tenantId: input.tenantId,
+        }),
+      ).rejects.toMatchObject({
+        code: "INVALID_STOCK_QUERY_APPLICATION_INPUT",
+        field: "stockId",
+      });
+      expect(harness.ports.authorizationContexts.load).not.toHaveBeenCalled();
+      expect(harness.begin).not.toHaveBeenCalled();
+      expect(harness.connector).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejeita projeção de detalhe divergente da evidência", async () => {
+    const connectorResult = structuredClone(detailResult);
+    connectorResult.result.publicResult.quilometragemHodometro = 1;
+    const harness = createHarness({ connectorResult });
+
+    await expect(
+      harness.service.executeById({
+        actorIp: input.actorIp,
+        establishmentId: input.establishmentId,
+        stockId: 7,
+        subject: input.subject,
+        tenantId: input.tenantId,
+      }),
+    ).rejects.toBeInstanceOf(StockQueryResultInvalidError);
+  });
+
   it("lista inventário recente sem expor os campos protegidos", async () => {
     const harness = createHarness({ connectorResult: inventoryResult });
 

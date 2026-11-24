@@ -8,17 +8,36 @@ const CRV_TYPES = new Set<CrvType>(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
 export interface RenaveStockRecord {
   chassi?: string;
   entradaEstoque?: {
+    [key: string]: unknown;
     cpfOperadorResponsavel?: string;
     dataHora?: string;
     dataHoraRegistro?: string;
   };
-  cancelamentoEstoque?: unknown;
+  cancelamentoEstoque?: {
+    [key: string]: unknown;
+    dataHoraCancelamentoEstoque?: string;
+    motivoCancelamentoEstoque?: string;
+  };
   codigoSegurancaCrv?: string;
+  dataHoraMedicaoHodometro?: string;
   estado?: RenaveStockState;
   id?: number;
   numeroCrv?: string;
   placa?: string;
+  quilometragemHodometro?: number;
   renavam?: string;
+  restricoesVeiculo?: readonly {
+    [key: string]: unknown;
+    codigoTipoRestricao?: string;
+    tipoRestricao?: string;
+  }[];
+  saidaEstoque?: {
+    [key: string]: unknown;
+    cpfOperadorResponsavel?: string;
+    dataHora?: string;
+    dataHoraRegistro?: string;
+    motivo?: string;
+  };
   tipoCrv?: CrvType;
 }
 

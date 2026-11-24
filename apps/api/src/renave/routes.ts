@@ -2,6 +2,7 @@ import type { IdentityService } from "@seu-renave/identity";
 import type {
   CrvType,
   RenaveVehicle,
+  StockDetail,
   StockInventorySummary,
   StockSummary,
 } from "@seu-renave/renave-connector";
@@ -62,6 +63,14 @@ export interface StockQueryUseCase {
     tenantId: string;
     traceId?: string;
   }): Promise<readonly StockInventorySummary[]>;
+  executeById(input: {
+    actorIp: string;
+    establishmentId: string;
+    stockId: number;
+    subject: string;
+    tenantId: string;
+    traceId?: string;
+  }): Promise<StockDetail>;
 }
 
 export interface VehicleLookupUseCase {
@@ -238,6 +247,30 @@ function safeStockInventoryParams(
   return params;
 }
 
+function safeStockDetailParams(
+  request: FastifyRequest,
+): (RouteParams & { stockId: number }) | undefined {
+  const params = safeParams(request);
+  if (
+    !params ||
+    typeof request.params !== "object" ||
+    request.params === null ||
+    typeof request.query !== "object" ||
+    request.query === null ||
+    Array.isArray(request.query) ||
+    Object.keys(request.query).length !== 0
+  ) {
+    return undefined;
+  }
+  const rawStockId = (request.params as Record<string, unknown>).stockId;
+  if (typeof rawStockId !== "string" || !/^[1-9]\d{0,15}$/u.test(rawStockId)) {
+    return undefined;
+  }
+  const stockId = Number(rawStockId);
+  if (!Number.isSafeInteger(stockId)) return undefined;
+  return { ...params, stockId };
+}
+
 function mappedStatus(code: string | undefined): number {
   if (
     code === "INVALID_ELIGIBILITY_APPLICATION_INPUT" ||
@@ -409,6 +442,98 @@ export function registerRenaveRoutes(
           const status = mappedStatus(code);
           request.log.error({
             event: "renave.stock_inventory.failed",
+            errorCode: code ?? "UNEXPECTED_ERROR",
+            traceId: request.id,
+          });
+          return reply.code(status).send({
+            code:
+              status === 500 ? "INTERNAL_ERROR" : (code ?? "UPSTREAM_ERROR"),
+            traceId: request.id,
+          });
+        }
+      } finally {
+        try {
+          await permitDecision.permit.release();
+        } catch {
+          request.log.error({
+            event: "renave.query_permit_release_failed",
+            traceId: request.id,
+          });
+        }
+      }
+    },
+  );
+
+  app.get(
+    "/api/tenants/:tenantId/establishments/:establishmentId/stocks/:stockId",
+    async (request, reply) => {
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
+      if (!sessionResult.ok) return;
+      if (!options.stockQuery) {
+        return reply.code(503).send({ code: "RENAVE_NOT_CONFIGURED" });
+      }
+      const params = safeStockDetailParams(request);
+      if (!params) return reply.code(400).send({ code: "INVALID_REQUEST" });
+      if (!options.queryLimiter) {
+        return reply
+          .code(503)
+          .send({ code: "RENAVE_QUERY_LIMIT_NOT_CONFIGURED" });
+      }
+      const executionInput = {
+        actorIp: request.ip,
+        establishmentId: params.establishmentId,
+        stockId: params.stockId,
+        subject: sessionResult.session.subject,
+        tenantId: params.tenantId,
+        traceId: request.id,
+      };
+      try {
+        await options.stockQuery.authorize(executionInput);
+      } catch (error) {
+        const code = errorCode(error);
+        const status = mappedStatus(code);
+        return reply.code(status).send({
+          code: status === 500 ? "INTERNAL_ERROR" : (code ?? "INTERNAL_ERROR"),
+        });
+      }
+
+      let permitDecision;
+      try {
+        permitDecision = await options.queryLimiter.acquire({
+          establishmentId: params.establishmentId,
+          subject: sessionResult.session.subject,
+          tenantId: params.tenantId,
+        });
+      } catch {
+        request.log.error({
+          event: "renave.query_limit_unavailable",
+          traceId: request.id,
+        });
+        return reply.code(503).send({ code: "RENAVE_QUERY_LIMIT_UNAVAILABLE" });
+      }
+      if (!permitDecision.allowed) {
+        request.log.warn({
+          event: "renave.query_limited",
+          scope: permitDecision.scope,
+          traceId: request.id,
+        });
+        reply.header("retry-after", String(permitDecision.retryAfterSeconds));
+        return reply.code(429).send({ code: "RENAVE_QUERY_LIMITED" });
+      }
+
+      try {
+        try {
+          const result = await options.stockQuery.executeById(executionInput);
+          reply.header("cache-control", "no-store");
+          return result;
+        } catch (error) {
+          const code = errorCode(error);
+          const status = mappedStatus(code);
+          request.log.error({
+            event: "renave.stock_detail.failed",
             errorCode: code ?? "UNEXPECTED_ERROR",
             traceId: request.id,
           });
