@@ -843,4 +843,80 @@ describe("guard do banco de runtime", () => {
     }
     await expectAppContractReady();
   });
+
+  it("recusa checksum divergente da migration de lease RECONCILE", async () => {
+    const original = await adminPool.query<{ checksum: string }>(
+      `select checksum from renave.schema_migrations
+        where version='0035_operation_reconciliation_lease'`,
+    );
+    await adminPool.query(
+      `update renave.schema_migrations set checksum=$1
+        where version='0035_operation_reconciliation_lease'`,
+      ["0".repeat(64)],
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `update renave.schema_migrations set checksum=$1
+          where version='0035_operation_reconciliation_lease'`,
+        [original.rows[0]!.checksum],
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa beginReconciliation adulterado ou sem SECURITY DEFINER", async () => {
+    const signature =
+      "renave.begin_operation_reconciliation(uuid,uuid,uuid,bigint)";
+    const original = await adminPool.query<{ definition: string }>(
+      "select pg_get_functiondef($1::regprocedure) as definition",
+      [signature],
+    );
+    await adminPool.query(
+      `create or replace function renave.begin_operation_reconciliation(
+         p_outbox_id uuid,p_lease_owner uuid,p_lease_token uuid,
+         p_expected_operation_version bigint
+       ) returns table (
+         outbox_id uuid,operation_id uuid,establishment_id uuid,
+         correlation_id uuid,kind text,mutation_family text,
+         operation_version bigint,sent_at timestamptz,attempt_count integer,
+         lease_expires_at timestamptz
+       ) language plpgsql security definer set search_path=pg_catalog as $$
+       begin return; end $$`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+    await adminPool.query(`alter function ${signature} security invoker`);
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(`alter function ${signature} security definer`);
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa grant inesperado em funções RECONCILE", async () => {
+    await adminPool.query("create role reconciliation_lease_acl_probe nologin");
+    await adminPool.query(
+      `grant execute on function
+         renave.claim_operation_reconciliation_leases(uuid,integer)
+       to reconciliation_lease_acl_probe`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `revoke execute on function
+           renave.claim_operation_reconciliation_leases(uuid,integer)
+         from reconciliation_lease_acl_probe`,
+      );
+      await adminPool.query("drop role reconciliation_lease_acl_probe");
+    }
+    await expectAppContractReady();
+  });
 });
