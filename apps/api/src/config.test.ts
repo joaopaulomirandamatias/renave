@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { loadConfig } from "./config.js";
+import {
+  decodeEvidenceKeyBase64,
+  EvidenceCipher,
+} from "@seu-renave/protected-evidence";
+
+import { loadAppConfig, loadConfig } from "./config.js";
+import type { ApiSecretFiles } from "./secret-files.js";
 
 const oidc = {
   AUTH_MODE: "oidc",
@@ -125,7 +131,7 @@ describe("configuração da API", () => {
       IDENTITY_DATABASE_URL:
         "postgres://renave_identity_app@127.0.0.1:54317/renave",
       LOGIN_RATE_LIMIT_HMAC_KEY_BASE64: Buffer.alloc(32).toString("base64"),
-      RENAVE_EVIDENCE_KEY_BASE64: "placeholder-validado-no-runtime",
+      RENAVE_EVIDENCE_KEY_BASE64: Buffer.alloc(32, 9).toString("base64"),
       RENAVE_EVIDENCE_KEY_ID: "key-2026-11",
       RENAVE_INTEGRATION_ENABLED: "true",
       RENAVE_INTEGRATOR_CNPJ: "11222333000181",
@@ -138,9 +144,12 @@ describe("configuração da API", () => {
     });
 
     expect(config.renave).toMatchObject({
-      certificateFile: "/run/secrets/cert.pem",
-      evidenceKeyId: "key-2026-11",
+      evidenceKeyring: { activeKeyId: "key-2026-11" },
       integratorCnpj: "11222333000181",
+      mtls: {
+        certificateFile: "/run/secrets/cert.pem",
+        kind: "files",
+      },
     });
     expect(config.serproQueryLimitHmacKeyBase64).toBe(
       Buffer.alloc(32).toString("base64"),
@@ -281,4 +290,204 @@ describe("configuração da API", () => {
       mode: "trusted-proxy",
     });
   });
+});
+
+const secureOidc = {
+  ...oidc,
+  APP_ENVIRONMENT: "homologation",
+  OIDC_CLIENT_ID: "confidential-client",
+  RENAVE_INTEGRATION_ENABLED: "true",
+  RENAVE_INTEGRATOR_CNPJ: "11222333000181",
+  SESSION_STORE: "postgres",
+};
+
+function secureSecrets(
+  evidenceKeyring: unknown = {
+    activeKeyId: "evidence-v2",
+    keys: [
+      {
+        keyBase64: Buffer.alloc(32, 2).toString("base64"),
+        keyId: "evidence-v2",
+      },
+      {
+        keyBase64: Buffer.alloc(32, 1).toString("base64"),
+        keyId: "evidence-v1",
+      },
+    ],
+    version: 1,
+  },
+): ApiSecretFiles {
+  return {
+    databaseCa: undefined,
+    databaseUrl: "postgres://app@127.0.0.1:54317/renave",
+    evidenceKeyringJson: JSON.stringify(evidenceKeyring),
+    identityDatabaseCa: undefined,
+    identityDatabaseUrl: "postgres://identity@127.0.0.1:54317/renave_identity",
+    loginRateLimitHmacKeyBase64: Buffer.alloc(32, 3).toString("base64"),
+    mtlsCa: "CA",
+    mtlsCertificate: "CERT",
+    mtlsKey: "KEY",
+    mtlsKeyPassphrase: "passphrase",
+    oidcClientSecret: "oidc-secret",
+    serproQueryLimitHmacKeyBase64: Buffer.alloc(32, 4).toString("base64"),
+    tenantAdminHmacKeyBase64: Buffer.alloc(32, 5).toString("base64"),
+  };
+}
+
+function cipher(config: Awaited<ReturnType<typeof loadAppConfig>>) {
+  const keyring = config.renave!.evidenceKeyring;
+  const keys = new Map(
+    keyring.keys.map(({ keyBase64, keyId }) => [
+      keyId,
+      decodeEvidenceKeyBase64(keyBase64),
+    ]),
+  );
+  try {
+    return new EvidenceCipher({ activeKeyId: keyring.activeKeyId, keys });
+  } finally {
+    for (const key of keys.values()) key.fill(0);
+  }
+}
+
+describe("configuração operacional da API por arquivos", () => {
+  it("rejeita segredo concorrente no ambiente antes de ler o mount", async () => {
+    let reads = 0;
+    await expect(
+      loadAppConfig(
+        { ...secureOidc, DATABASE_URL: "postgres://must-not-be-used/db" },
+        async () => {
+          reads += 1;
+          return secureSecrets();
+        },
+      ),
+    ).rejects.toThrow("Configuração secreta da API inválida");
+    expect(reads).toBe(0);
+
+    await expect(
+      loadAppConfig({ APP_ENVIRONMENT: "homologation", DATABASE_URL: "x" }),
+    ).rejects.toThrow("Configuração secreta da API inválida");
+  });
+
+  it("carrega DSNs, HMACs, OIDC, mTLS e keyring somente do bundle", async () => {
+    const config = await loadAppConfig(secureOidc, async () => secureSecrets());
+    expect(config.databaseUrl).toContain("127.0.0.1");
+    expect(config.oidc?.clientSecret).toBe("oidc-secret");
+    expect(config.renave).toMatchObject({
+      evidenceKeyring: { activeKeyId: "evidence-v2" },
+      keyPassphrase: "passphrase",
+      mtls: { kind: "material" },
+    });
+    expect(
+      config.renave?.evidenceKeyring.keys.map(({ keyId }) => keyId),
+    ).toEqual(["evidence-v2", "evidence-v1"]);
+  });
+
+  it("preserva leitura histórica após rotação e rollback da chave ativa", async () => {
+    const oldConfig = await loadAppConfig(secureOidc, async () =>
+      secureSecrets({
+        activeKeyId: "evidence-v1",
+        keys: [
+          {
+            keyBase64: Buffer.alloc(32, 1).toString("base64"),
+            keyId: "evidence-v1",
+          },
+        ],
+        version: 1,
+      }),
+    );
+    const rotatedConfig = await loadAppConfig(secureOidc, async () =>
+      secureSecrets(),
+    );
+    const rollbackConfig = await loadAppConfig(secureOidc, async () =>
+      secureSecrets({
+        activeKeyId: "evidence-v1",
+        keys: [
+          {
+            keyBase64: Buffer.alloc(32, 1).toString("base64"),
+            keyId: "evidence-v1",
+          },
+          {
+            keyBase64: Buffer.alloc(32, 2).toString("base64"),
+            keyId: "evidence-v2",
+          },
+        ],
+        version: 1,
+      }),
+    );
+    const binding = {
+      action: "renave.vehicle.read",
+      establishmentId: "22222222-2222-4222-8222-222222222222",
+      evidenceId: "evidence-1",
+      tenantId: "11111111-1111-4111-8111-111111111111",
+    };
+    const encrypted = cipher(oldConfig).encrypt(
+      { plate: "ABC1D23" },
+      binding,
+      "request",
+    );
+    expect(
+      cipher(rotatedConfig).decrypt(encrypted, binding, "request"),
+    ).toEqual({ plate: "ABC1D23" });
+    const encryptedAfterRotation = cipher(rotatedConfig).encrypt(
+      { plate: "DEF4G56" },
+      binding,
+      "response",
+    );
+    expect(
+      cipher(rollbackConfig).decrypt(
+        encryptedAfterRotation,
+        binding,
+        "response",
+      ),
+    ).toEqual({ plate: "DEF4G56" });
+  });
+
+  it.each([
+    {
+      activeKeyId: "missing",
+      keys: [
+        {
+          keyBase64: Buffer.alloc(32, 1).toString("base64"),
+          keyId: "one",
+        },
+      ],
+      version: 1,
+    },
+    {
+      activeKeyId: "one",
+      keys: [
+        {
+          keyBase64: Buffer.alloc(32, 1).toString("base64"),
+          keyId: "one",
+        },
+        {
+          keyBase64: Buffer.alloc(32, 2).toString("base64"),
+          keyId: "one",
+        },
+      ],
+      version: 1,
+    },
+    {
+      activeKeyId: "one",
+      keys: [
+        {
+          keyBase64: Buffer.alloc(32, 1).toString("base64"),
+          keyId: "one",
+        },
+        {
+          keyBase64: Buffer.alloc(32, 1).toString("base64"),
+          keyId: "two",
+        },
+      ],
+      version: 1,
+    },
+    { activeKeyId: "one", keys: [], version: 2 },
+  ])(
+    "recusa keyring sem active, com reuso ou schema divergente",
+    async (value) => {
+      await expect(
+        loadAppConfig(secureOidc, async () => secureSecrets(value)),
+      ).rejects.toThrow("Configuração secreta da API inválida");
+    },
+  );
 });

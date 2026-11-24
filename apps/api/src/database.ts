@@ -5,6 +5,7 @@ import type { Pool } from "pg";
 
 export interface RuntimePoolOptions {
   applicationName: "seu-renave-api-business" | "seu-renave-api-identity";
+  ca?: string;
   caFile: string | undefined;
   connectionString: string;
   max: number;
@@ -17,9 +18,14 @@ export interface RuntimePoolOptions {
 export async function createRuntimePool(
   options: RuntimePoolOptions,
 ): Promise<Pool> {
-  const ca = options.caFile
-    ? await readFile(options.caFile, { encoding: "utf8" })
-    : undefined;
+  if (options.ca !== undefined && options.caFile !== undefined) {
+    throw new Error("A CA do banco possui fontes concorrentes");
+  }
+  const ca =
+    options.ca ??
+    (options.caFile
+      ? await readFile(options.caFile, { encoding: "utf8" })
+      : undefined);
   return createPool(options.connectionString, {
     application_name: options.applicationName,
     connectionTimeoutMillis: 5_000,

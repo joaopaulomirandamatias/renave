@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -38,6 +38,7 @@ describe("readRenaveMtlsMaterial", () => {
       writeFile(paths.certificateFile, "CERT"),
       writeFile(paths.keyFile, "KEY"),
     ]);
+    await Promise.all(Object.values(paths).map((path) => chmod(path, 0o400)));
 
     await expect(readRenaveMtlsMaterial(paths)).resolves.toEqual({
       ca: "CA",
@@ -66,5 +67,43 @@ describe("readRenaveMtlsMaterial", () => {
       code: "RENAVE_MTLS_MATERIAL_UNAVAILABLE",
     });
     expect(String(error)).not.toContain(secretPath);
+  });
+
+  it("recusa symlink, permissão ampla e conteúdo acima do limite", async () => {
+    const directory = await materialDirectory();
+    const target = join(directory, "target.pem");
+    await writeFile(target, "SECRET");
+    await chmod(target, 0o400);
+    const link = join(directory, "link.pem");
+    await symlink("target.pem", link);
+    await expect(
+      readRenaveMtlsMaterial({
+        caFile: link,
+        certificateFile: link,
+        keyFile: link,
+      }),
+    ).rejects.toBeInstanceOf(RenaveMtlsMaterialReadError);
+
+    const broad = join(directory, "broad.pem");
+    await writeFile(broad, "SECRET");
+    await chmod(broad, 0o444);
+    await expect(
+      readRenaveMtlsMaterial({
+        caFile: broad,
+        certificateFile: broad,
+        keyFile: broad,
+      }),
+    ).rejects.toBeInstanceOf(RenaveMtlsMaterialReadError);
+
+    const huge = join(directory, "huge.pem");
+    await writeFile(huge, "x".repeat(64 * 1_024 + 1));
+    await chmod(huge, 0o400);
+    await expect(
+      readRenaveMtlsMaterial({
+        caFile: huge,
+        certificateFile: huge,
+        keyFile: huge,
+      }),
+    ).rejects.toBeInstanceOf(RenaveMtlsMaterialReadError);
   });
 });

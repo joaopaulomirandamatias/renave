@@ -1,5 +1,5 @@
 import { buildApp } from "./app.js";
-import { loadConfig } from "./config.js";
+import { loadAppConfig } from "./config.js";
 import {
   createCertificateExpiryMonitor,
   type CertificateExpiryEvent,
@@ -7,7 +7,7 @@ import {
 import { createRuntime } from "./runtime.js";
 import { installApiGracefulShutdown } from "./shutdown.js";
 
-const config = loadConfig();
+const config = await loadAppConfig();
 const runtime = await createRuntime(config);
 const app = buildApp({
   config,

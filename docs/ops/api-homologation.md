@@ -23,6 +23,39 @@ O cofre entrega arquivos separados para CA, certificado e chave privada. A
 chave de evidência e as chaves HMAC também vêm do cofre, nunca do repositório,
 imagem, ConfigMap, argumento de processo ou log.
 
+O processo lê esses valores exclusivamente do mount fixo
+`/run/secrets/seu-renave/api/`. Fora de desenvolvimento, qualquer variável de
+ambiente equivalente é recusada antes da leitura do mount. Os arquivos devem
+ser regulares, `0400` ou `0440`; projeções atômicas são aceitas somente por um
+único symlink `..data`, resolvido uma vez por carga para impedir mistura entre
+versões.
+
+| Arquivo | Conteúdo |
+|---|---|
+| `database-url` / `database-ca.pem` | DSN e CA do banco SaaS |
+| `identity-database-url` / `identity-database-ca.pem` | DSN e CA do banco de identidade |
+| `login-rate-limit-hmac-key` | HMAC do limite de login |
+| `tenant-admin-hmac-key` | HMAC administrativo |
+| `serpro-query-limit-hmac-key` | HMAC do limite de consultas SERPRO |
+| `oidc-client-secret` | segredo do cliente confidencial, se houver |
+| `mtls-ca.pem`, `mtls-cert.pem`, `mtls-key.pem`, `mtls-passphrase` | material mTLS; passphrase opcional |
+| `evidence-keyring.json` | chave ativa e chaves históricas de evidência |
+
+O keyring tem schema fechado e versionado. Cada ID e cada material aparecem uma
+única vez; a chave ativa precisa existir na lista. Durante rotação, mantenha as
+chaves históricas necessárias para autenticar evidências ainda retidas:
+
+```json
+{
+  "version": 1,
+  "activeKeyId": "evidence-2026-12",
+  "keys": [
+    { "keyId": "evidence-2026-12", "keyBase64": "BASE64_32_BYTES" },
+    { "keyId": "evidence-2026-11", "keyBase64": "BASE64_32_BYTES" }
+  ]
+}
+```
+
 Antes de iniciar a API, verifique por controles da plataforma:
 
 - arquivos regulares, somente leitura e acessíveis apenas pelo UID do processo;

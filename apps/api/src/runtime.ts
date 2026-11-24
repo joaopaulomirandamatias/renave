@@ -127,6 +127,9 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         identityPool = registerPool(
           await createRuntimePool({
             applicationName: "seu-renave-api-identity",
+            ...(config.identityDatabaseTlsCa
+              ? { ca: config.identityDatabaseTlsCa }
+              : {}),
             caFile: config.identityDatabaseTlsCaFile,
             connectionString: config.identityDatabaseUrl!,
             max: 8,
@@ -148,13 +151,17 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         identity = composeIdentity(config);
       }
     }
-    const loginRateLimiter =
-      identityPool && config.loginRateLimitHmacKeyBase64
-        ? new PostgresLoginRateLimiter(
-            identityPool,
-            decodeLoginRateHmacKeyBase64(config.loginRateLimitHmacKeyBase64),
-          )
-        : undefined;
+    let loginRateLimiter: PostgresLoginRateLimiter | undefined;
+    if (identityPool && config.loginRateLimitHmacKeyBase64) {
+      const key = decodeLoginRateHmacKeyBase64(
+        config.loginRateLimitHmacKeyBase64,
+      );
+      try {
+        loginRateLimiter = new PostgresLoginRateLimiter(identityPool, key);
+      } finally {
+        key.fill(0);
+      }
+    }
     const sessionLookupGate = identity
       ? new LocalSessionLookupGate(config.sessionLookupMaxConcurrency)
       : undefined;
@@ -163,6 +170,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       ? registerPool(
           await createRuntimePool({
             applicationName: "seu-renave-api-business",
+            ...(config.databaseTlsCa ? { ca: config.databaseTlsCa } : {}),
             caFile: config.databaseTlsCaFile,
             connectionString: config.databaseUrl,
             max: 16,
@@ -173,15 +181,17 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       await assertRuntimeDatabase(businessPool, { expectedRole: APP_ROLE });
       runtimeDatabases.push({ expectedRole: APP_ROLE, pool: businessPool });
     }
-    const serproQueryLimiter =
-      businessPool && config.serproQueryLimitHmacKeyBase64
-        ? new PostgresSerproQueryLimiter(
-            businessPool,
-            decodeSerproQueryHmacKeyBase64(
-              config.serproQueryLimitHmacKeyBase64,
-            ),
-          )
-        : undefined;
+    let serproQueryLimiter: PostgresSerproQueryLimiter | undefined;
+    if (businessPool && config.serproQueryLimitHmacKeyBase64) {
+      const key = decodeSerproQueryHmacKeyBase64(
+        config.serproQueryLimitHmacKeyBase64,
+      );
+      try {
+        serproQueryLimiter = new PostgresSerproQueryLimiter(businessPool, key);
+      } finally {
+        key.fill(0);
+      }
+    }
     const tenantDirectory: TenantDirectory | undefined = businessPool
       ? createPostgresTenantDirectory(businessPool)
       : undefined;
@@ -237,11 +247,18 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     let stockQuery: PostgresStockQueryUseCase | undefined;
     let vehicleLookup: PostgresVehicleLookupUseCase | undefined;
     if (config.renave) {
-      const { ca, cert, key } = await readRenaveMtlsMaterial({
-        caFile: config.renave.caFile,
-        certificateFile: config.renave.certificateFile,
-        keyFile: config.renave.keyFile,
-      });
+      const { ca, cert, key } =
+        config.renave.mtls.kind === "material"
+          ? {
+              ca: config.renave.mtls.ca,
+              cert: config.renave.mtls.certificate,
+              key: config.renave.mtls.key,
+            }
+          : await readRenaveMtlsMaterial({
+              caFile: config.renave.mtls.caFile,
+              certificateFile: config.renave.mtls.certificateFile,
+              keyFile: config.renave.mtls.keyFile,
+            });
       const certificateThumbprintSha256 = new X509Certificate(
         cert,
       ).fingerprint256
@@ -258,15 +275,22 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
           ? {}
           : { passphrase: config.renave.keyPassphrase }),
       });
-      const cipher = new EvidenceCipher({
-        activeKeyId: config.renave.evidenceKeyId,
-        keys: new Map([
-          [
-            config.renave.evidenceKeyId,
-            decodeEvidenceKeyBase64(config.renave.evidenceKeyBase64),
-          ],
-        ]),
-      });
+      const evidenceKeys = new Map<string, Buffer>();
+      let cipher: EvidenceCipher;
+      try {
+        for (const entry of config.renave.evidenceKeyring.keys) {
+          evidenceKeys.set(
+            entry.keyId,
+            decodeEvidenceKeyBase64(entry.keyBase64),
+          );
+        }
+        cipher = new EvidenceCipher({
+          activeKeyId: config.renave.evidenceKeyring.activeKeyId,
+          keys: evidenceKeys,
+        });
+      } finally {
+        for (const value of evidenceKeys.values()) value.fill(0);
+      }
       const transport = new HttpRenaveReadOnlyTransport({
         environment: "homologation",
         request: createHomologationRenaveReadOnlyRequest(
