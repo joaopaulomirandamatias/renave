@@ -37,3 +37,20 @@ export {
   type OperationReconciliationProjectionBinding,
   type StockEntryReconciliationProjectionV1,
 } from "./operation-reconciliation-projection.js";
+export {
+  RenavePrincipalConfigurationError,
+  RenavePrincipalCrypto,
+  RenavePrincipalDecryptionError,
+  RenavePrincipalInputError,
+  DecryptedRenavePrincipal,
+  type EncryptedRenavePrincipal,
+  type EstablishmentEmailBinding,
+  type OperatorCpfBinding,
+  type ProtectedRenavePrincipal,
+  type RenavePrincipalBinding,
+  type RenavePrincipalCryptoConfig,
+  type RenavePrincipalHmac,
+  type RenavePrincipalKeyringConfig,
+  type RenavePrincipalPurpose,
+  type RenavePrincipalPurposeConfig,
+} from "./renave-principal-crypto.js";
