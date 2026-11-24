@@ -8,6 +8,7 @@ export {
   type HttpRenaveReadOnlyTransportOptions,
   type HttpRenaveTransportOptions,
   type RenaveHttpRequest,
+  type RenaveInternalErrorMetadata,
 } from "./http-transport.js";
 export {
   createHomologationRenaveReadOnlyRequest,

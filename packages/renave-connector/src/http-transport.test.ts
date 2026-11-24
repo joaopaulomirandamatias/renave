@@ -222,6 +222,57 @@ describe("HttpRenaveTransport", () => {
     expect(request).toHaveBeenCalledOnce();
   });
 
+  it("recusa corpo 5xx acima de 16 KiB sem materializar metadados", async () => {
+    const body = JSON.stringify({
+      dataHora: "2026-11-24T10:15:30-03:00",
+      detalhe: `CPF 12345678901 ${"x".repeat(16 * 1_024)}`,
+      logIdRastreabilidade: "09bafee3fef94776a4882a309f18f252",
+    });
+    const request = vi.fn(async () => new Response(body, { status: 500 }));
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+    const prepared = await prepareRenaveMutation("request-stock-entry", {});
+
+    let captured: unknown;
+    try {
+      await transport.mutate(headers, prepared);
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toMatchObject({
+      code: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
+      requestSha256: prepared.requestSha256,
+      status: 500,
+    });
+    expect(captured).not.toHaveProperty("dataHora");
+    expect(captured).not.toHaveProperty("logIdRastreabilidade");
+    expect(JSON.stringify(captured)).not.toMatch(
+      /09bafee3fef94776a4882a309f18f252|12345678901/u,
+    );
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("revalida metadados no construtor exportado do erro", () => {
+    const error = new RenaveMutationOutcomeUnknownError(
+      "request-stock-entry",
+      "a".repeat(64),
+      500,
+      {
+        dataHora: "CPF 12345678901",
+        logIdRastreabilidade: "pessoa@example.com",
+      },
+    );
+
+    expect(error).not.toHaveProperty("dataHora");
+    expect(error).not.toHaveProperty("logIdRastreabilidade");
+    expect(JSON.stringify(error)).not.toMatch(
+      /12345678901|pessoa@example\.com/u,
+    );
+  });
+
   it("aceita aptidão com veículo e débitos mesmo sem diagnóstico", async () => {
     const payload = {
       informacoesDebitos: {
@@ -361,6 +412,92 @@ describe("HttpRenaveTransport", () => {
       expect(request).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("preserva somente metadados válidos e sanitizados de erro interno", async () => {
+    const request = vi.fn(async () =>
+      Response.json(
+        {
+          dataHora: "2026-11-24T10:15:30.123456-03:00",
+          detalhe: "CPF 12345678901 e pessoa@example.com",
+          logIdRastreabilidade: "09bafee3fef94776a4882a309f18f252",
+          mensagemParaUsuarioFinal: "Falha para a placa QTP4H82",
+          titulo: "Erro Interno",
+        },
+        { status: 500 },
+      ),
+    );
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+    const prepared = await prepareRenaveMutation("request-stock-entry", {
+      placa: "QTP4H82",
+    });
+
+    let captured: unknown;
+    try {
+      await transport.mutate(headers, prepared);
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toMatchObject({
+      code: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
+      dataHora: "2026-11-24T13:15:30.123Z",
+      logIdRastreabilidade: "09bafee3fef94776a4882a309f18f252",
+      requestSha256: prepared.requestSha256,
+      status: 500,
+    });
+    const serialized = JSON.stringify(captured);
+    expect(serialized).not.toMatch(
+      /12345678901|pessoa@example\.com|QTP4H82|detalhe|mensagemParaUsuarioFinal/u,
+    );
+    expect(String(captured)).not.toMatch(
+      /09bafee3fef94776a4882a309f18f252|12345678901|QTP4H82/u,
+    );
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["JSON inválido", "{"],
+    [
+      "campos fora do formato fechado",
+      JSON.stringify({
+        dataHora: "2026-11-24T10:15:30.123456",
+        logIdRastreabilidade: "09BAFEE3-FEF9-4776-A488-2A309F18F252",
+      }),
+    ],
+    [
+      "data impossível e rastreabilidade longa",
+      JSON.stringify({
+        dataHora: "2026-02-30T10:15:30Z",
+        logIdRastreabilidade: "a".repeat(33),
+      }),
+    ],
+  ])("descarta metadados de erro interno com %s", async (_label, body) => {
+    const request = vi.fn(async () => new Response(body, { status: 503 }));
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+    const prepared = await prepareRenaveMutation("request-stock-entry", {});
+
+    let captured: unknown;
+    try {
+      await transport.mutate(headers, prepared);
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(captured).toMatchObject({
+      code: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
+      requestSha256: prepared.requestSha256,
+      status: 503,
+    });
+    expect(captured).not.toHaveProperty("dataHora");
+    expect(captured).not.toHaveProperty("logIdRastreabilidade");
+    expect(request).toHaveBeenCalledOnce();
+  });
 
   it.each([
     ["vazio", ""],

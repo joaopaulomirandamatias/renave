@@ -85,6 +85,15 @@ const STOCK_STATES = new Set([
   "FINALIZADO",
 ]);
 const CRV_TYPES = new Set(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
+const TRACE_ID_PATTERN = /^[0-9a-f]{32}$/u;
+const MAX_INTERNAL_ERROR_BODY_BYTES = 16 * 1_024;
+const ABSOLUTE_DATE_TIME_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/u;
+
+export interface RenaveInternalErrorMetadata {
+  dataHora?: string;
+  logIdRastreabilidade?: string;
+}
 
 export class RenaveHttpError extends Error {
   readonly code = "RENAVE_HTTP_ERROR";
@@ -100,16 +109,27 @@ export class RenaveHttpError extends Error {
 
 export class RenaveMutationOutcomeUnknownError extends Error {
   readonly code = "RENAVE_MUTATION_OUTCOME_UNKNOWN";
+  declare readonly dataHora?: string;
+  declare readonly logIdRastreabilidade?: string;
 
   constructor(
     readonly operation: RenaveMutationOperation,
     readonly requestSha256: string,
     readonly status?: number,
+    metadata: RenaveInternalErrorMetadata = {},
   ) {
     super(
       "O resultado da mutação RENAVE é incerto e deve ser reconciliado antes de qualquer reenvio",
     );
     this.name = "RenaveMutationOutcomeUnknownError";
+    const dataHora = canonicalAbsoluteTimestamp(metadata.dataHora);
+    if (dataHora !== undefined) this.dataHora = dataHora;
+    if (
+      typeof metadata.logIdRastreabilidade === "string" &&
+      TRACE_ID_PATTERN.test(metadata.logIdRastreabilidade)
+    ) {
+      this.logIdRastreabilidade = metadata.logIdRastreabilidade;
+    }
   }
 }
 
@@ -132,6 +152,161 @@ async function parseJson(
     return JSON.parse(body) as unknown;
   } catch {
     throw new RenaveProtocolError(operation);
+  }
+}
+
+function canonicalAbsoluteTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const match = ABSOLUTE_DATE_TIME_PATTERN.exec(value);
+  if (!match) return undefined;
+  const [
+    ,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    fraction = "",
+    zone,
+    sign,
+    offsetHour,
+    offsetMinute,
+  ] = match;
+  const parts = [year, month, day, hour, minute, second].map(Number);
+  const [
+    yearNumber,
+    monthNumber,
+    dayNumber,
+    hourNumber,
+    minuteNumber,
+    secondNumber,
+  ] = parts;
+  if (
+    parts.some((part) => !Number.isInteger(part)) ||
+    !yearNumber ||
+    !monthNumber ||
+    !dayNumber ||
+    hourNumber === undefined ||
+    minuteNumber === undefined ||
+    secondNumber === undefined ||
+    monthNumber > 12 ||
+    hourNumber > 23 ||
+    minuteNumber > 59 ||
+    secondNumber > 59
+  ) {
+    return undefined;
+  }
+  const offsetHours = zone === "Z" ? 0 : Number(offsetHour);
+  const offsetMinutes = zone === "Z" ? 0 : Number(offsetMinute);
+  if (
+    offsetHours > 14 ||
+    offsetMinutes > 59 ||
+    (offsetHours === 14 && offsetMinutes !== 0)
+  ) {
+    return undefined;
+  }
+  const localMilliseconds = Date.UTC(
+    yearNumber,
+    monthNumber - 1,
+    dayNumber,
+    hourNumber,
+    minuteNumber,
+    secondNumber,
+    Number(fraction.padEnd(3, "0").slice(0, 3)),
+  );
+  const local = new Date(localMilliseconds);
+  if (
+    local.getUTCFullYear() !== yearNumber ||
+    local.getUTCMonth() !== monthNumber - 1 ||
+    local.getUTCDate() !== dayNumber ||
+    local.getUTCHours() !== hourNumber ||
+    local.getUTCMinutes() !== minuteNumber ||
+    local.getUTCSeconds() !== secondNumber
+  ) {
+    return undefined;
+  }
+  const offset = (offsetHours * 60 + offsetMinutes) * 60_000;
+  const milliseconds = localMilliseconds - (sign === "-" ? -offset : offset);
+  return Number.isFinite(milliseconds)
+    ? new Date(milliseconds).toISOString()
+    : undefined;
+}
+
+async function internalErrorMetadata(
+  response: Response,
+): Promise<RenaveInternalErrorMetadata> {
+  let parsed: unknown;
+  try {
+    const body = await readBoundedInternalErrorBody(response);
+    if (body === undefined) return {};
+    if (body.length === 0) return {};
+    parsed = JSON.parse(body) as unknown;
+  } catch {
+    return {};
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {};
+  }
+  const candidate = parsed as Record<string, unknown>;
+  const dataHora = canonicalAbsoluteTimestamp(candidate.dataHora);
+  const logIdRastreabilidade =
+    typeof candidate.logIdRastreabilidade === "string" &&
+    TRACE_ID_PATTERN.test(candidate.logIdRastreabilidade)
+      ? candidate.logIdRastreabilidade
+      : undefined;
+  return {
+    ...(dataHora === undefined ? {} : { dataHora }),
+    ...(logIdRastreabilidade === undefined ? {} : { logIdRastreabilidade }),
+  };
+}
+
+async function readBoundedInternalErrorBody(
+  response: Response,
+): Promise<string | undefined> {
+  const contentLength = response.headers.get("content-length");
+  if (
+    contentLength !== null &&
+    /^\d+$/u.test(contentLength) &&
+    Number(contentLength) > MAX_INTERNAL_ERROR_BODY_BYTES
+  ) {
+    try {
+      await response.body?.cancel();
+    } catch {
+      // A recusa do corpo continua fail-closed mesmo se o stream não cancelar.
+    }
+    return undefined;
+  }
+  if (response.body === null) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytesRead = 0;
+  let body = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return body + decoder.decode();
+      bytesRead += value.byteLength;
+      if (bytesRead > MAX_INTERNAL_ERROR_BODY_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // O limite já foi excedido; nenhum conteúdo será processado.
+        }
+        return undefined;
+      }
+      body += decoder.decode(value, { stream: true });
+    }
+  } catch {
+    try {
+      await reader.cancel();
+    } catch {
+      // Falha de leitura/cancelamento resulta em ausência de metadados.
+    }
+    return undefined;
+  } finally {
+    reader.releaseLock();
   }
 }
 
@@ -614,10 +789,12 @@ export class HttpRenaveTransport implements RenaveTransport {
     }
 
     if (response.status >= 500) {
+      const metadata = await internalErrorMetadata(response);
       throw new RenaveMutationOutcomeUnknownError(
         operation,
         requestSha256,
         response.status,
+        metadata,
       );
     }
     if (!response.ok) {
