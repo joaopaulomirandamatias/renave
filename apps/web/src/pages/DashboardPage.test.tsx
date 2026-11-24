@@ -163,6 +163,73 @@ describe("DashboardPage", () => {
     expect(within(navigation).getAllByRole("link")).toHaveLength(3);
   });
 
+  it.each([
+    ["dashboard", "Resumo do estabelecimento"],
+    ["stock", "Consultar aptidão do veículo"],
+    ["stock-entry", "Registrar compra do veículo"],
+    ["compliance", "Vínculo do estabelecimento"],
+    ["establishments", "Cadastrar estabelecimento"],
+  ] as const)(
+    "monta somente o conteúdo da rota %s",
+    (route, expectedHeading) => {
+      const routeHeadings = [
+        "Resumo do estabelecimento",
+        "Consultar aptidão do veículo",
+        "Registrar compra do veículo",
+        "Vínculo do estabelecimento",
+        "Cadastrar estabelecimento",
+      ] as const;
+
+      render(
+        <DashboardPage
+          environment="homologation"
+          establishmentManagement="available"
+          establishments={establishments}
+          linkStatus="enabled"
+          onCheckEligibility={vi.fn(async () => ({
+            detranUnavailable: false,
+            impediments: [],
+            status: "eligible" as const,
+          }))}
+          onCreateEstablishment={vi.fn(async () => ({
+            establishment: { id: "store-created", tradeName: "Loja Centro" },
+            renaveLink: { status: "not_started" as const },
+          }))}
+          onCreateStockEntry={vi.fn(async () => ({
+            createdAt: "2026-11-24T15:00:00.000Z",
+            operationId: "11111111-1111-4111-8111-111111111111",
+            replayed: false,
+            status: "HELD_LOCAL" as const,
+          }))}
+          onLogout={vi.fn()}
+          onSearchStocks={vi.fn(async () => [])}
+          readiness={{
+            certificate: "ready",
+            environment: "homologation",
+            establishmentContact: "verified",
+            integration: "configured",
+            link: "enabled",
+            mutations: "blocked",
+            operatorIdentity: "verified",
+            queries: "ready",
+          }}
+          route={route}
+          selectedEstablishmentId="store-belem"
+          selectedTenantId="tenant-a"
+          stockEntryOperationsEnabled
+          tenants={[{ id: "tenant-a", label: "Organização A" }]}
+          userDisplayName="Operador"
+        />,
+      );
+
+      for (const heading of routeHeadings) {
+        const query = screen.queryByRole("heading", { name: heading });
+        if (heading === expectedHeading) expect(query).toBeVisible();
+        else expect(query).toBeNull();
+      }
+    },
+  );
+
   it("cai para o primeiro estabelecimento quando o selecionado não existe", () => {
     render(
       <DashboardPage
