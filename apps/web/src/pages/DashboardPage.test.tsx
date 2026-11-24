@@ -185,11 +185,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "blocked",
           environment: "homologation",
-          establishmentContact: "blocked",
+          establishmentContact: "pending",
           integration: "configured",
           link: "confirmed",
           mutations: "blocked",
-          operatorIdentity: "blocked",
+          operatorIdentity: "pending",
           queries: "blocked",
         }}
         selectedEstablishmentId="store-belem"
@@ -215,11 +215,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "ready",
           environment: "homologation",
-          establishmentContact: "ready",
+          establishmentContact: "verified",
           integration: "configured",
           link: "confirmed",
           mutations: "blocked",
-          operatorIdentity: "ready",
+          operatorIdentity: "verified",
           queries: "ready",
         }}
         selectedEstablishmentId="store-belem"
@@ -307,11 +307,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "warning",
           environment: "homologation",
-          establishmentContact: "blocked",
+          establishmentContact: "pending",
           integration: "configured",
           link: "confirmed",
           mutations: "blocked",
-          operatorIdentity: "ready",
+          operatorIdentity: "verified",
           queries: "ready",
         }}
         selectedEstablishmentId="store-belem"
@@ -327,8 +327,8 @@ describe("DashboardPage", () => {
     expect(readiness).toHaveTextContent("Atenção");
     expect(readiness).toHaveTextContent("Identidade do operador");
     expect(readiness).toHaveTextContent("Contato RENAVE do estabelecimento");
-    expect(readiness).toHaveTextContent("Verificada");
-    expect(readiness).toHaveTextContent("Verificação pendente");
+    expect(readiness).toHaveTextContent("Verificação concluída");
+    expect(readiness).toHaveTextContent("Aguardando verificação");
     expect(readiness).toHaveTextContent("Liberadas");
     expect(readiness).toHaveTextContent("Mutações RENAVE");
     expect(readiness).toHaveTextContent("Protegidas");
@@ -351,7 +351,7 @@ describe("DashboardPage", () => {
           integration: "configured",
           link: "pending",
           mutations: "blocked",
-          operatorIdentity: "blocked",
+          operatorIdentity: "pending",
           queries: "blocked",
         }}
         selectedEstablishmentId="store-belem"
@@ -374,11 +374,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "warning",
           environment: "homologation",
-          establishmentContact: "blocked",
+          establishmentContact: "pending",
           integration: "configured",
           link: "pending",
           mutations: "blocked",
-          operatorIdentity: "ready",
+          operatorIdentity: "verified",
           queries: "blocked",
         }}
         selectedEstablishmentId="store-belem"
@@ -466,11 +466,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "ready",
           environment: "homologation",
-          establishmentContact: "ready",
+          establishmentContact: "verified",
           integration: "configured",
           link: "enabled",
           mutations: "blocked",
-          operatorIdentity: "ready",
+          operatorIdentity: "verified",
           queries: "ready",
         }}
         selectedEstablishmentId="store-belem"
@@ -505,11 +505,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "warning",
           environment: "homologation",
-          establishmentContact: "ready",
+          establishmentContact: "verified",
           integration: "configured",
           link: "enabled",
           mutations: "blocked",
-          operatorIdentity: "ready",
+          operatorIdentity: "verified",
           queries: "ready",
         }}
         selectedEstablishmentId="store-belem"
@@ -528,6 +528,50 @@ describe("DashboardPage", () => {
     );
   });
 
+  it.each(["missing", "pending", "suspended", "unavailable"] as const)(
+    "mantém entrada bloqueada com perfil %s sem ocultar consultas read-only",
+    (profileStatus) => {
+      render(
+        <DashboardPage
+          environment="homologation"
+          establishments={establishments}
+          linkStatus="enabled"
+          onCheckEligibility={vi.fn()}
+          onCreateStockEntry={vi.fn()}
+          onLogout={vi.fn()}
+          onSearchStocks={vi.fn()}
+          readiness={{
+            certificate: "ready",
+            environment: "homologation",
+            establishmentContact: "verified",
+            integration: "configured",
+            link: "enabled",
+            mutations: "blocked",
+            operatorIdentity: profileStatus,
+            queries: "ready",
+          }}
+          selectedEstablishmentId="store-belem"
+          selectedTenantId="tenant-a"
+          stockEntryOperationsEnabled
+          tenants={[{ id: "tenant-a", label: "Organização A" }]}
+          userDisplayName="Operador"
+        />,
+      );
+
+      expect(
+        screen.queryByRole("button", { name: "Registrar solicitação local" }),
+      ).toBeNull();
+      expect(
+        screen.getByRole("heading", { name: "Localizar estoque por placa" }),
+      ).toBeVisible();
+      expect(
+        screen.getByRole("heading", {
+          name: "Consultar aptidão do veículo",
+        }),
+      ).toBeVisible();
+    },
+  );
+
   it("não confia em um vínculo externo habilitado quando a prontidão diverge", () => {
     render(
       <DashboardPage
@@ -539,11 +583,11 @@ describe("DashboardPage", () => {
         readiness={{
           certificate: "ready",
           environment: "homologation",
-          establishmentContact: "ready",
+          establishmentContact: "verified",
           integration: "configured",
           link: "pending",
           mutations: "blocked",
-          operatorIdentity: "ready",
+          operatorIdentity: "verified",
           queries: "blocked",
         }}
         selectedEstablishmentId="store-belem"

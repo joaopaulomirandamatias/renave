@@ -143,8 +143,8 @@ export function DashboardPage({
     readiness?.integration === "configured" &&
     (readiness.certificate === "ready" ||
       readiness.certificate === "warning") &&
-    readiness.operatorIdentity === "ready" &&
-    readiness.establishmentContact === "ready" &&
+    readiness.operatorIdentity === "verified" &&
+    readiness.establishmentContact === "verified" &&
     readiness.link === "enabled" &&
     linkStatus === "enabled";
   return (

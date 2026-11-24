@@ -72,11 +72,11 @@ function setup(
     async () => ({
       certificate: "warning",
       environment: "homologation",
-      establishmentContact: "blocked",
+      establishmentContact: "pending",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
-      operatorIdentity: "ready",
+      operatorIdentity: "verified",
       queries: "ready",
     }),
   );
@@ -161,18 +161,19 @@ describe("rota autenticada de aptidão", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.json()).toEqual({
       certificate: "warning",
       environment: "homologation",
-      establishmentContact: "blocked",
+      establishmentContact: "pending",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
-      operatorIdentity: "ready",
+      operatorIdentity: "verified",
       queries: "ready",
     });
     expect(response.body).not.toMatch(
-      /cnpj|cpf|email|thumbprint|fingerprint|serial|expires|notAfter|verifiedAt|version|source|keyId|hmac|cipher|\.pem|\/run\/secrets/iu,
+      /cnpj|cpf|email|profileId|verifier|thumbprint|fingerprint|serial|expires|notAfter|verifiedAt|version|source|keyId|hmac|cipher|\.pem|\/run\/secrets/iu,
     );
     expect(readinessExecute).toHaveBeenCalledWith({
       establishmentId: ESTABLISHMENT_ID,

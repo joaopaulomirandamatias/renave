@@ -96,13 +96,16 @@ export interface BrowserRenaveLink {
 export interface BrowserRenaveReadiness {
   certificate: "ready" | "warning" | "blocked" | "unavailable";
   environment: "homologation";
-  establishmentContact: "ready" | "blocked" | "unavailable";
+  establishmentContact: BrowserRenaveProfileReadiness;
   integration: "configured" | "disabled";
   link: BrowserRenaveLinkStatus;
   mutations: "blocked";
-  operatorIdentity: "ready" | "blocked" | "unavailable";
+  operatorIdentity: BrowserRenaveProfileReadiness;
   queries: "ready" | "blocked";
 }
+
+export type BrowserRenaveProfileReadiness =
+  "missing" | "pending" | "verified" | "suspended" | "unavailable";
 
 export type BrowserStockState =
   "SOLICITADO" | "TRANSFERIDO" | "CONFIRMADO" | "FINALIZADO";
@@ -391,7 +394,7 @@ const renaveQueryReadiness = new Set<BrowserRenaveReadiness["queries"]>([
 ]);
 const renavePrincipalReadiness = new Set<
   BrowserRenaveReadiness["operatorIdentity"]
->(["ready", "blocked", "unavailable"]);
+>(["missing", "pending", "verified", "suspended", "unavailable"]);
 
 function parseRenaveReadiness(value: unknown): BrowserRenaveReadiness {
   const expectedKeys = new Set([

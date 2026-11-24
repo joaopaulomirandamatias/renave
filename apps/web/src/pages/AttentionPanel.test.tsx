@@ -13,11 +13,11 @@ afterEach(cleanup);
 const ready: BrowserRenaveReadiness = {
   certificate: "ready",
   environment: "homologation",
-  establishmentContact: "ready",
+  establishmentContact: "verified",
   integration: "configured",
   link: "enabled",
   mutations: "blocked",
-  operatorIdentity: "ready",
+  operatorIdentity: "verified",
   queries: "ready",
 };
 
@@ -172,7 +172,7 @@ describe("deriveAttentionItems", () => {
     [
       {
         ...ready,
-        operatorIdentity: "blocked" as const,
+        operatorIdentity: "pending" as const,
         queries: "blocked" as const,
       },
       "operator-identity",
@@ -193,6 +193,38 @@ describe("deriveAttentionItems", () => {
       );
     },
   );
+
+  it.each([
+    ["missing", "blocked", /sem cadastro verificado/i],
+    ["pending", "waiting", /aguardando verificação/i],
+    ["suspended", "blocked", /verificação suspensa/i],
+    ["unavailable", "attention", /indisponível/i],
+  ] as const)(
+    "distingue perfil %s sem criar ação inexistente",
+    (profileStatus, tone, cause) => {
+      const items = deriveAttentionItems(
+        state({
+          readiness: {
+            ...ready,
+            operatorIdentity: profileStatus,
+          },
+        }),
+      );
+      const item = items.find(({ id }) => id === "operator-identity");
+      expect(item).toEqual(expect.objectContaining({ tone }));
+      expect(item?.cause).toMatch(cause);
+      expect(item).not.toHaveProperty("action");
+      expect(items).not.toContainEqual(
+        expect.objectContaining({ id: "queries-ready" }),
+      );
+    },
+  );
+
+  it("não cria pendência para perfil verificado", () => {
+    expect(deriveAttentionItems(state())).not.toContainEqual(
+      expect.objectContaining({ id: "operator-identity" }),
+    );
+  });
 
   it.each([
     ["not_started", "link-not-started"],

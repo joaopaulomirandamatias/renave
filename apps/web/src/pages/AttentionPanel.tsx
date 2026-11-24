@@ -47,25 +47,47 @@ export interface AttentionPanelProps extends AttentionState {
   onReloadLinkStatus?: () => void;
 }
 
-function blockedPrincipal(
+function principalAttention(
   id: string,
-  cause: string,
+  label: string,
   status: BrowserRenaveReadiness["operatorIdentity"],
 ): AttentionItem | undefined {
-  if (status === "ready") return undefined;
-  return {
-    cause,
-    id,
-    impact:
-      status === "unavailable"
-        ? "O estado da fonte protegida não pôde ser confirmado; nenhuma operação será liberada por suposição."
-        : "Operações RENAVE que exigem essa identidade permanecem bloqueadas.",
-    nextStep:
-      status === "unavailable"
-        ? "Tente novamente quando o serviço de perfis estiver disponível."
-        : "Conclua a verificação com a equipe responsável pelo cadastro.",
-    tone: status === "unavailable" ? "attention" : "blocked",
+  if (status === "verified") return undefined;
+  const states: Record<
+    Exclude<typeof status, "verified">,
+    Omit<AttentionItem, "id">
+  > = {
+    missing: {
+      cause: `${label} sem cadastro verificado`,
+      impact:
+        "Operações RENAVE que exigem essa informação permanecem bloqueadas.",
+      nextStep: "Solicite o cadastro à equipe responsável.",
+      tone: "blocked",
+    },
+    pending: {
+      cause: `${label} aguardando verificação`,
+      impact:
+        "Operações RENAVE que exigem essa informação permanecem bloqueadas até a conclusão.",
+      nextStep: "Aguarde a verificação; não repita o cadastro.",
+      tone: "waiting",
+    },
+    suspended: {
+      cause: `${label} com verificação suspensa`,
+      impact:
+        "A informação protegida não pode ser usada em uma operação RENAVE.",
+      nextStep: "Solicite revisão ou reativação à equipe responsável.",
+      tone: "blocked",
+    },
+    unavailable: {
+      cause: `${label} indisponível`,
+      impact:
+        "O estado da fonte protegida não pôde ser confirmado; nenhuma operação será liberada por suposição.",
+      nextStep:
+        "Tente novamente quando o serviço de perfis estiver disponível.",
+      tone: "attention",
+    },
   };
+  return { id, ...states[status] };
 }
 
 export function deriveAttentionItems(
@@ -213,15 +235,15 @@ export function deriveAttentionItems(
       });
     }
 
-    const operator = blockedPrincipal(
+    const operator = principalAttention(
       "operator-identity",
-      "Identidade do operador pendente",
+      "Identidade do operador",
       state.readiness.operatorIdentity,
     );
     if (operator) items.push(operator);
-    const contact = blockedPrincipal(
+    const contact = principalAttention(
       "establishment-contact",
-      "Contato RENAVE do estabelecimento pendente",
+      "Contato RENAVE do estabelecimento",
       state.readiness.establishmentContact,
     );
     if (contact) items.push(contact);

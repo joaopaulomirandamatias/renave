@@ -62,20 +62,20 @@ describe("prontidão RENAVE sanitizada", () => {
     expect(publicCertificateReadiness(false)).toBe("unavailable");
     expect(
       summarizeRenaveReadiness({
-        establishmentContact: "blocked",
+        establishmentContact: "pending",
         integrationConfigured: false,
         link: "not_started",
-        operatorIdentity: "blocked",
+        operatorIdentity: "pending",
         queryLimiterConfigured: false,
       }),
     ).toEqual({
       certificate: "unavailable",
       environment: "homologation",
-      establishmentContact: "blocked",
+      establishmentContact: "pending",
       integration: "disabled",
       link: "not_started",
       mutations: "blocked",
-      operatorIdentity: "blocked",
+      operatorIdentity: "pending",
       queries: "blocked",
     });
   });
@@ -86,20 +86,20 @@ describe("prontidão RENAVE sanitizada", () => {
       expect(
         summarizeRenaveReadiness({
           certificateStatus: "expiring_30d",
-          establishmentContact: "ready",
+          establishmentContact: "verified",
           integrationConfigured: true,
           link,
-          operatorIdentity: "ready",
+          operatorIdentity: "verified",
           queryLimiterConfigured: true,
         }),
       ).toEqual({
         certificate: "warning",
         environment: "homologation",
-        establishmentContact: "ready",
+        establishmentContact: "verified",
         integration: "configured",
         link,
         mutations: "blocked",
-        operatorIdentity: "ready",
+        operatorIdentity: "verified",
         queries: "ready",
       });
     },
@@ -115,10 +115,10 @@ describe("prontidão RENAVE sanitizada", () => {
       expect(
         summarizeRenaveReadiness({
           certificateStatus,
-          establishmentContact: "blocked",
+          establishmentContact: "pending",
           integrationConfigured: true,
           link,
-          operatorIdentity: "blocked",
+          operatorIdentity: "pending",
           queryLimiterConfigured,
         }).queries,
       ).toBe("blocked");
@@ -163,7 +163,7 @@ describe("prontidão RENAVE sanitizada", () => {
   });
 
   it.each(["pending", "suspended"] as const)(
-    "projeta perfil interno %s somente como bloqueado",
+    "preserva o estado sanitizado %s do perfil",
     async (status) => {
       db.getOperatorIdentityProfileStatus.mockResolvedValueOnce(status);
       const useCase = new PostgresRenaveReadinessUseCase({
@@ -178,11 +178,33 @@ describe("prontidão RENAVE sanitizada", () => {
           subject: SUBJECT,
           tenantId: TENANT_ID,
         }),
-      ).resolves.toMatchObject({ operatorIdentity: "blocked" });
+      ).resolves.toMatchObject({ operatorIdentity: status });
     },
   );
 
-  it("projeta perfis ausentes como bloqueados sem inventar metadados", async () => {
+  it("falha fechado quando o reader retorna um estado fora do contrato", async () => {
+    db.getOperatorIdentityProfileStatus.mockResolvedValueOnce(
+      "unexpected-status" as never,
+    );
+    const useCase = new PostgresRenaveReadinessUseCase({
+      integrationConfigured: true,
+      pool: {} as never,
+      queryLimiterConfigured: true,
+    });
+
+    await expect(
+      useCase.execute({
+        establishmentId: ESTABLISHMENT_ID,
+        subject: SUBJECT,
+        tenantId: TENANT_ID,
+      }),
+    ).resolves.toMatchObject({
+      establishmentContact: "verified",
+      operatorIdentity: "unavailable",
+    });
+  });
+
+  it("projeta perfis ausentes como missing sem inventar metadados", async () => {
     db.getOperatorIdentityProfileStatus.mockResolvedValueOnce(null);
     db.getEstablishmentRenaveProfileStatus.mockResolvedValueOnce(null);
     const useCase = new PostgresRenaveReadinessUseCase({
@@ -197,8 +219,8 @@ describe("prontidão RENAVE sanitizada", () => {
       tenantId: TENANT_ID,
     });
     expect(result).toMatchObject({
-      establishmentContact: "blocked",
-      operatorIdentity: "blocked",
+      establishmentContact: "missing",
+      operatorIdentity: "missing",
     });
     expect(JSON.stringify(result)).not.toMatch(
       /verifiedAt|updatedAt|version|source|keyId|hmac|cipher/iu,
@@ -221,11 +243,35 @@ describe("prontidão RENAVE sanitizada", () => {
       tenantId: TENANT_ID,
     });
     expect(result).toMatchObject({
-      establishmentContact: "ready",
+      establishmentContact: "verified",
       operatorIdentity: "unavailable",
       mutations: "blocked",
     });
     expect(JSON.stringify(result)).not.toMatch(/envelope|secret|profile-key/iu);
+  });
+
+  it("preserva o operador quando somente o contato fica indisponível", async () => {
+    db.getEstablishmentRenaveProfileStatus.mockRejectedValueOnce(
+      new Error("profile_id verifier source_evidence_digest"),
+    );
+    const useCase = new PostgresRenaveReadinessUseCase({
+      integrationConfigured: true,
+      pool: {} as never,
+      queryLimiterConfigured: true,
+    });
+
+    const result = await useCase.execute({
+      establishmentId: ESTABLISHMENT_ID,
+      subject: SUBJECT,
+      tenantId: TENANT_ID,
+    });
+    expect(result).toMatchObject({
+      establishmentContact: "unavailable",
+      operatorIdentity: "verified",
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /profile_id|verifier|source_evidence_digest/iu,
+    );
   });
 
   it("nega contexto de outro tenant antes de consultar a loja ou certificado", async () => {
@@ -310,11 +356,11 @@ describe("prontidão RENAVE sanitizada", () => {
     ).resolves.toEqual({
       certificate: "blocked",
       environment: "homologation",
-      establishmentContact: "ready",
+      establishmentContact: "verified",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
-      operatorIdentity: "ready",
+      operatorIdentity: "verified",
       queries: "blocked",
     });
   });

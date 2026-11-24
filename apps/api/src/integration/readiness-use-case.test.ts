@@ -229,11 +229,11 @@ describe("prontidão RENAVE com PostgreSQL", () => {
     ).resolves.toEqual({
       certificate: "ready",
       environment: "homologation",
-      establishmentContact: "ready",
+      establishmentContact: "verified",
       integration: "configured",
       link: "confirmed",
       mutations: "blocked",
-      operatorIdentity: "ready",
+      operatorIdentity: "verified",
       queries: "ready",
     });
   });
@@ -247,21 +247,21 @@ describe("prontidão RENAVE com PostgreSQL", () => {
       }),
     ).resolves.toMatchObject({
       certificate: "blocked",
-      establishmentContact: "ready",
+      establishmentContact: "verified",
       link: "confirmed",
       mutations: "blocked",
-      operatorIdentity: "ready",
+      operatorIdentity: "verified",
       queries: "blocked",
     });
   });
 
   it.each([
-    ["pendentes", PENDING_OPERATOR, () => pendingStoreA.id],
-    ["suspensos", SUSPENDED_OPERATOR, () => suspendedStoreA.id],
-    ["ausentes", MISSING_OPERATOR, () => missingStoreA.id],
+    ["pendentes", PENDING_OPERATOR, () => pendingStoreA.id, "pending"],
+    ["suspensos", SUSPENDED_OPERATOR, () => suspendedStoreA.id, "suspended"],
+    ["ausentes", MISSING_OPERATOR, () => missingStoreA.id, "missing"],
   ] as const)(
-    "projeta perfis %s somente como bloqueados",
-    async (_, subject, storeId) => {
+    "projeta perfis %s sem expor metadados",
+    async (_, subject, storeId, expectedStatus) => {
       await expect(
         useCase().execute({
           establishmentId: storeId(),
@@ -270,10 +270,10 @@ describe("prontidão RENAVE com PostgreSQL", () => {
         }),
       ).resolves.toMatchObject({
         certificate: "ready",
-        establishmentContact: "blocked",
+        establishmentContact: expectedStatus,
         link: "confirmed",
         mutations: "blocked",
-        operatorIdentity: "blocked",
+        operatorIdentity: expectedStatus,
         queries: "ready",
       });
     },

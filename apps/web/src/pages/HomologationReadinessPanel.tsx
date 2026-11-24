@@ -104,31 +104,42 @@ function principalItem(
   label: string,
   status: BrowserRenaveReadiness["operatorIdentity"],
 ): ReadinessItem {
-  if (status === "ready") {
-    return {
+  const states: Record<
+    BrowserRenaveReadiness["operatorIdentity"],
+    Omit<ReadinessItem, "label">
+  > = {
+    missing: {
+      description:
+        "Nenhum cadastro verificado foi localizado para esta finalidade.",
+      state: "blocked",
+      stateLabel: "Cadastro ausente",
+    },
+    pending: {
+      description:
+        "O cadastro existe, mas a verificação ainda não foi concluída.",
+      state: "current",
+      stateLabel: "Aguardando verificação",
+    },
+    verified: {
       description:
         "A fonte verificada necessária está disponível, sem expor o dado protegido.",
-      label,
       state: "complete",
-      stateLabel: "Verificada",
-    };
-  }
-  if (status === "unavailable") {
-    return {
+      stateLabel: "Verificação concluída",
+    },
+    suspended: {
+      description:
+        "A verificação foi suspensa e não pode ser usada em uma operação RENAVE.",
+      state: "blocked",
+      stateLabel: "Acesso suspenso",
+    },
+    unavailable: {
       description:
         "O estado não pôde ser confirmado com segurança nesta verificação.",
-      label,
       state: "attention",
       stateLabel: "Indisponível",
-    };
-  }
-  return {
-    description:
-      "A fonte verificada ainda não está pronta para uma operação RENAVE.",
-    label,
-    state: "blocked",
-    stateLabel: "Verificação pendente",
+    },
   };
+  return { label, ...states[status] };
 }
 
 function readinessItems(

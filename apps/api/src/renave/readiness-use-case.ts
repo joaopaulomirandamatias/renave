@@ -26,7 +26,8 @@ const READY_LINK_STATUSES = new Set<CredentialLinkStatus>([
 
 export type PublicCertificateReadiness =
   "ready" | "warning" | "blocked" | "unavailable";
-export type PublicPrincipalReadiness = "ready" | "blocked" | "unavailable";
+export type PublicPrincipalReadiness =
+  "missing" | "pending" | "verified" | "suspended" | "unavailable";
 
 export interface RenaveHomologationReadiness {
   certificate: PublicCertificateReadiness;
@@ -90,7 +91,11 @@ export function summarizeRenaveReadiness(input: {
 function publicPrincipalReadiness(
   status: RenaveProfileStatusValue | null,
 ): PublicPrincipalReadiness {
-  return status === "verified" ? "ready" : "blocked";
+  if (status === null) return "missing";
+  if (status === "pending" || status === "verified" || status === "suspended") {
+    return status;
+  }
+  throw new Error("Estado de perfil RENAVE inválido.");
 }
 
 async function readProfileWithinSavepoint(
