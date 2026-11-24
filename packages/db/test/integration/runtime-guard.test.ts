@@ -1564,4 +1564,82 @@ describe("guard do banco de runtime", () => {
     }
     await expectAppContractReady();
   });
+
+  it("recusa drift na allowlist de evidência da consulta veicular", async () => {
+    const client = await adminPool.connect();
+    try {
+      await client.query("begin");
+      await client.query(`
+        alter table renave.protected_evidence
+          drop constraint protected_evidence_action_valid,
+          add constraint protected_evidence_action_valid check (
+            action in (
+              'renave.identity.verify',
+              'renave.stock.read',
+              'renave.vehicle.eligibility.read',
+              'renave.vehicle.read',
+              'renave.vehicle.export'
+            )
+          )
+      `);
+      const result = await client.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      );
+      expect(result.rows[0]?.ready).toBe(false);
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa drift de RLS, policy ou ACL na evidência veicular", async () => {
+    const checks = [
+      async () =>
+        adminPool.query(
+          "alter table renave.protected_evidence disable row level security",
+        ),
+      async () =>
+        adminPool.query(
+          "grant select (request_ciphertext) on renave.protected_evidence to renave_app",
+        ),
+    ];
+    const restores = [
+      async () =>
+        adminPool.query(
+          "alter table renave.protected_evidence enable row level security",
+        ),
+      async () =>
+        adminPool.query(
+          "revoke select (request_ciphertext) on renave.protected_evidence from renave_app",
+        ),
+    ];
+
+    for (let index = 0; index < checks.length; index += 1) {
+      await checks[index]!();
+      try {
+        await expectAppContractRejected();
+      } finally {
+        await restores[index]!();
+      }
+      await expectAppContractReady();
+    }
+
+    await adminPool.query(`
+      drop policy protected_evidence_isolation on renave.protected_evidence;
+      create policy protected_evidence_isolation on renave.protected_evidence
+        using (true) with check (true)
+    `);
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(`
+        drop policy protected_evidence_isolation on renave.protected_evidence;
+        create policy protected_evidence_isolation on renave.protected_evidence
+          using (tenant_id = (select renave.current_tenant_id()))
+          with check (tenant_id = (select renave.current_tenant_id()))
+      `);
+    }
+    await expectAppContractReady();
+  });
 });

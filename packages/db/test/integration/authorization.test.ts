@@ -94,6 +94,20 @@ describe("autorização persistida", () => {
         tenantId: tenantA.id,
       }),
     ).toEqual({ allowed: false, reason: "ESTABLISHMENT_SCOPE_DENIED" });
+    expect(
+      authorize(context!, {
+        action: "renave.vehicle.read",
+        establishmentId: establishmentA.id,
+        tenantId: tenantA.id,
+      }),
+    ).toMatchObject({ allowed: true });
+    expect(
+      authorize(context!, {
+        action: "renave.vehicle.read",
+        establishmentId: establishmentB.id,
+        tenantId: tenantA.id,
+      }),
+    ).toEqual({ allowed: false, reason: "ESTABLISHMENT_SCOPE_DENIED" });
   });
 
   it("o mesmo subject recebe contexto diferente no outro tenant", async () => {

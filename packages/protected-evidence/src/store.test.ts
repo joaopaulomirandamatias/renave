@@ -14,6 +14,7 @@ const action = "renave.vehicle.eligibility.read" as const;
 type EvidenceAction =
   | "renave.identity.verify"
   | "renave.stock.read"
+  | "renave.vehicle.read"
   | "renave.vehicle.eligibility.read";
 
 function setup(
@@ -73,6 +74,27 @@ describe("PostgresProtectedEvidenceStore", () => {
     expect(insertParams[3]).toBe(stockAction);
     expect(persisted).not.toContain("ABC1D23");
     expect(persisted).not.toContain("stock-operator");
+  });
+
+  it("aceita consulta veicular e mantém request e ator somente cifrados", async () => {
+    const vehicleAction = "renave.vehicle.read" as const;
+    const { query, store } = setup([1], vehicleAction);
+
+    await store.begin({
+      action: vehicleAction,
+      actorSubject: "oidc|vehicle-operator",
+      establishmentId,
+      request: { chave: "9BWZZZ377VT004251", tipo: "chassi" },
+      tenantId,
+    });
+
+    const insertParams = query.mock.calls[0]?.[1] as unknown[];
+    const persisted = JSON.stringify(insertParams, (_key, value) =>
+      Buffer.isBuffer(value) ? value.toString("base64") : value,
+    );
+    expect(insertParams[3]).toBe(vehicleAction);
+    expect(persisted).not.toContain("9BWZZZ377VT004251");
+    expect(persisted).not.toContain("vehicle-operator");
   });
 
   it("recusa ação fora da allowlist antes de abrir conexão", () => {

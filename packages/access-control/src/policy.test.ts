@@ -42,6 +42,30 @@ describe("authorize", () => {
     ).toEqual({ allowed: false, reason: "TENANT_MISMATCH" });
   });
 
+  it("autoriza consulta veicular somente no tenant e estabelecimento atribuídos", () => {
+    expect(
+      authorize(operator, {
+        action: "renave.vehicle.read",
+        establishmentId: "establishment-a",
+        tenantId: "tenant-a",
+      }),
+    ).toMatchObject({ allowed: true, matchedRole: "renave_operator" });
+    expect(
+      authorize(operator, {
+        action: "renave.vehicle.read",
+        establishmentId: "establishment-b",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ESTABLISHMENT_SCOPE_DENIED" });
+    expect(
+      authorize(operator, {
+        action: "renave.vehicle.read",
+        establishmentId: "establishment-a",
+        tenantId: "tenant-b",
+      }),
+    ).toEqual({ allowed: false, reason: "TENANT_MISMATCH" });
+  });
+
   it("exige estabelecimento nas ações RENAVE", () => {
     expect(
       authorize(operator, {

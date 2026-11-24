@@ -3,6 +3,7 @@ export const DOMAIN_ACTIONS = [
   "tenant.user.manage",
   "renave.identity.verify",
   "renave.stock.read",
+  "renave.vehicle.read",
   "renave.vehicle.eligibility.read",
   "renave.stock-entry.request",
   "audit.read",
@@ -75,6 +76,11 @@ const POLICIES: Readonly<Record<DomainAction, ActionPolicy>> = Object.freeze({
     roles: ["tenant_admin", "renave_operator"],
   },
   "renave.stock.read": {
+    establishmentScoped: true,
+    justificationRequired: false,
+    roles: ["tenant_admin", "renave_operator"],
+  },
+  "renave.vehicle.read": {
     establishmentScoped: true,
     justificationRequired: false,
     roles: ["tenant_admin", "renave_operator"],

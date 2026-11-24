@@ -6,9 +6,10 @@ import { loadMigrations, MigrationError } from "../../src/migrate.js";
 
 describe("loadMigrations", () => {
   it("lê as migrations versionadas em ordem, com checksum estável", async () => {
-    const all = await loadMigrations();
+    const allWithVehicleLookup = await loadMigrations();
+    const all = allWithVehicleLookup.slice(0, -2);
     const first = all.slice(0, -16);
-    const second = (await loadMigrations()).slice(0, -16);
+    const second = (await loadMigrations()).slice(0, -18);
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
     expect(first.at(-21)?.version).toBe("0024_runtime_contract_stock_query");
@@ -268,6 +269,22 @@ describe("loadMigrations", () => {
     expect(all.at(-1)?.sql).toContain(all.at(-4)?.checksum);
     expect(all.at(-1)?.sql).toContain(
       "profile_reader_catalog_fingerprint_v0060",
+    );
+    expect(allWithVehicleLookup.at(-2)?.version).toBe(
+      "0061_vehicle_lookup_evidence",
+    );
+    expect(allWithVehicleLookup.at(-2)?.sql).toContain("'renave.vehicle.read'");
+    expect(allWithVehicleLookup.at(-2)?.sql).not.toMatch(
+      /create\s+role|alter\s+role|password\s+|provider\s*=|secret\s*=/iu,
+    );
+    expect(allWithVehicleLookup.at(-1)?.version).toBe(
+      "0062_runtime_contract_vehicle_lookup",
+    );
+    expect(allWithVehicleLookup.at(-1)?.sql).toContain(
+      allWithVehicleLookup.at(-2)?.checksum,
+    );
+    expect(allWithVehicleLookup.at(-1)?.sql).toContain(
+      "vehicle_lookup_catalog_fingerprint_v0062",
     );
   });
 

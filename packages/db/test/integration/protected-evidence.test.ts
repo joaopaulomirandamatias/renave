@@ -104,6 +104,55 @@ describe("protected_evidence", () => {
     ).rejects.toMatchObject({ code: "23514" });
   });
 
+  it("aceita consulta veicular, mantém a allowlist fechada e aplica RLS", async () => {
+    const vehicleEvidenceId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    await withTenant(appPool, tenantA.id, (client) =>
+      client.query(
+        `insert into renave.protected_evidence (
+           id, tenant_id, establishment_id, action,
+           request_key_id, request_nonce, request_auth_tag, request_ciphertext
+         ) values ($1, $2, $3, 'renave.vehicle.read', 'key-1', $4, $5, $6)`,
+        [
+          vehicleEvidenceId,
+          tenantA.id,
+          establishmentAId,
+          Buffer.alloc(12, 1),
+          Buffer.alloc(16, 2),
+          Buffer.from([3]),
+        ],
+      ),
+    );
+
+    await expect(
+      withTenant(appPool, tenantB.id, async (client) => {
+        const { rows } = await client.query(
+          "select id from renave.protected_evidence where id = $1",
+          [vehicleEvidenceId],
+        );
+        return rows;
+      }),
+    ).resolves.toEqual([]);
+
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        client.query(
+          `insert into renave.protected_evidence (
+             id, tenant_id, establishment_id, action,
+             request_key_id, request_nonce, request_auth_tag, request_ciphertext
+           ) values ($1, $2, $3, 'renave.vehicle.export', 'key-1', $4, $5, $6)`,
+          [
+            "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            tenantA.id,
+            establishmentAId,
+            Buffer.alloc(12, 1),
+            Buffer.alloc(16, 2),
+            Buffer.from([3]),
+          ],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
+  });
+
   it("isola por tenant e permite somente a transição pendente para concluída", async () => {
     await withTenant(appPool, tenantA.id, async (client) => {
       await client.query(

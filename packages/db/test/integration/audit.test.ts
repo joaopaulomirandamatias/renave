@@ -100,6 +100,21 @@ describe("trilha de auditoria", () => {
     ).resolves.toBe(true);
   });
 
+  it("aceita e encadeia a ação própria de consulta veicular", async () => {
+    const event = await appendFor(
+      tenantA,
+      establishmentA,
+      "renave.vehicle.read",
+    );
+
+    expect(event.action).toBe("renave.vehicle.read");
+    expect(event.tenantId).toBe(tenantA.id);
+    expect(event.establishmentId).toBe(establishmentA.id);
+    await expect(
+      withTenant(appPool, tenantA.id, verifyAuditChain),
+    ).resolves.toBe(true);
+  });
+
   it("isola leitura e cadeia entre tenants", async () => {
     const eventB = await appendFor(
       tenantB,
