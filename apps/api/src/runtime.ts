@@ -33,6 +33,7 @@ import { PostgresRenaveLinkStatusUseCase } from "./renave/link-status-use-case.j
 import { readRenaveMtlsMaterial } from "./renave/mtls-material.js";
 import { PostgresRenaveLinkPreflightUseCase } from "./renave/preflight-use-case.js";
 import type { SerproQueryLimiter } from "./renave/routes.js";
+import { PostgresStockQueryUseCase } from "./renave/stock-query-use-case.js";
 import { createPostgresTenantDirectory } from "./tenant/directory.js";
 import type { TenantDirectory } from "./tenant/routes.js";
 
@@ -46,6 +47,7 @@ export interface AppRuntime {
   loginRateLimiter?: LoginRateLimiter;
   sessionLookupGate?: SessionLookupGate;
   serproQueryLimiter?: SerproQueryLimiter;
+  stockQuery?: PostgresStockQueryUseCase;
   tenantDirectory?: TenantDirectory;
 }
 
@@ -150,6 +152,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
 
     let eligibility: PostgresVehicleEligibilityUseCase | undefined;
     let preflight: PostgresRenaveLinkPreflightUseCase | undefined;
+    let stockQuery: PostgresStockQueryUseCase | undefined;
     if (config.renave) {
       const { ca, cert, key } = await readRenaveMtlsMaterial({
         caFile: config.renave.caFile,
@@ -201,6 +204,13 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         integratorCnpj: config.renave.integratorCnpj,
         pool: businessPool,
       });
+      stockQuery = new PostgresStockQueryUseCase({
+        certificateThumbprintSha256,
+        cipher,
+        connector,
+        integratorCnpj: config.renave.integratorCnpj,
+        pool: businessPool,
+      });
     }
 
     return {
@@ -211,6 +221,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       ...(loginRateLimiter ? { loginRateLimiter } : {}),
       ...(sessionLookupGate ? { sessionLookupGate } : {}),
       ...(serproQueryLimiter ? { serproQueryLimiter } : {}),
+      ...(stockQuery ? { stockQuery } : {}),
       ...(tenantDirectory ? { tenantDirectory } : {}),
       async ready() {
         let databasesReady = true;

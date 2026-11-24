@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildApp } from "../app.js";
 import { loadConfig } from "../config.js";
-import type { SerproQueryLimiter } from "./routes.js";
+import type { SerproQueryLimiter, StockQueryUseCase } from "./routes.js";
 import type { EligibilityUseCase } from "./use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./preflight-use-case.js";
 import type { RenaveLinkStatusUseCase } from "./link-status-use-case.js";
@@ -50,6 +50,12 @@ function setup(
     authorize: authorizeEligibility,
     execute,
   } as EligibilityUseCase;
+  const authorizeStockQuery = vi.fn<StockQueryUseCase["authorize"]>(
+    async () => undefined,
+  );
+  const stockQueryExecute = vi.fn<StockQueryUseCase["execute"]>(async () => [
+    { estado: "CONFIRMADO", id: 7, placa: "ABC1D23" },
+  ]);
   const authorizePreflight = vi.fn<RenaveLinkPreflightUseCase["authorize"]>(
     async () => undefined,
   );
@@ -72,6 +78,10 @@ function setup(
     linkStatus: { execute: linkStatusExecute },
     preflight: { authorize: authorizePreflight, execute: preflightExecute },
     serproQueryLimiter: { acquire },
+    stockQuery: {
+      authorize: authorizeStockQuery,
+      execute: stockQueryExecute,
+    },
     ...(options.sessionLookupGate
       ? { sessionLookupGate: options.sessionLookupGate }
       : {}),
@@ -82,11 +92,13 @@ function setup(
     app,
     authorizeEligibility,
     authorizePreflight,
+    authorizeStockQuery,
     execute,
     getSession,
     linkStatusExecute,
     preflightExecute,
     release,
+    stockQueryExecute,
   };
 }
 
@@ -100,6 +112,22 @@ async function request(
     headers: {
       cookie: "renave_session=opaque-session",
       origin: ORIGIN,
+    },
+    payload: body,
+  });
+}
+
+async function stockRequest(
+  app: ReturnType<typeof buildApp>,
+  body: Record<string, unknown>,
+  origin = ORIGIN,
+) {
+  return await app.inject({
+    method: "POST",
+    url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/stocks/search`,
+    headers: {
+      cookie: "renave_session=opaque-session",
+      origin,
     },
     payload: body,
   });
@@ -311,5 +339,115 @@ describe("rota autenticada de aptidão", () => {
     expect(execute).toHaveBeenCalledOnce();
     expect(release).toHaveBeenCalledOnce();
     expect(response.body).not.toContain("secret");
+  });
+});
+
+describe("rota autenticada de consulta pontual de estoque", () => {
+  it("normaliza a placa e devolve somente a projeção pública", async () => {
+    const { acquire, app, authorizeStockQuery, release, stockQueryExecute } =
+      setup();
+
+    const response = await stockRequest(app, { plate: " abc1d23 " });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([
+      { estado: "CONFIRMADO", id: 7, placa: "ABC1D23" },
+    ]);
+    expect(response.body).not.toMatch(
+      /cpf|renavam|chassi|crv|nfe|cancelamento|codigoSeguranca/iu,
+    );
+    const executionInput = expect.objectContaining({
+      establishmentId: ESTABLISHMENT_ID,
+      plate: "ABC1D23",
+      subject: "oidc|operator-1",
+      tenantId: TENANT_ID,
+    });
+    expect(authorizeStockQuery).toHaveBeenCalledWith(executionInput);
+    expect(stockQueryExecute).toHaveBeenCalledWith(executionInput);
+    expect(acquire).toHaveBeenCalledWith({
+      establishmentId: ESTABLISHMENT_ID,
+      subject: "oidc|operator-1",
+      tenantId: TENANT_ID,
+    });
+    expect(release).toHaveBeenCalledOnce();
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("aplica Origin e recusa corpo extra antes de autorizar", async () => {
+    const { acquire, app, authorizeStockQuery, stockQueryExecute } = setup();
+
+    const csrf = await stockRequest(
+      app,
+      { plate: "ABC1D23" },
+      "https://evil.test",
+    );
+    const extra = await stockRequest(app, {
+      includeSensitive: true,
+      plate: "ABC1D23",
+    });
+    const invalid = await stockRequest(app, { plate: "ABC-1234" });
+
+    expect(csrf.statusCode).toBe(403);
+    expect(extra.statusCode).toBe(400);
+    expect(invalid.statusCode).toBe(400);
+    expect(authorizeStockQuery).not.toHaveBeenCalled();
+    expect(acquire).not.toHaveBeenCalled();
+    expect(stockQueryExecute).not.toHaveBeenCalled();
+  });
+
+  it("nega BOLA antes de adquirir lease ou consultar", async () => {
+    const { acquire, app, authorizeStockQuery, release, stockQueryExecute } =
+      setup();
+    authorizeStockQuery.mockRejectedValueOnce(
+      Object.assign(new Error("estabelecimento secreto"), {
+        code: "AUTHORIZATION_DENIED",
+      }),
+    );
+
+    const response = await stockRequest(app, { plate: "ABC1D23" });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "AUTHORIZATION_DENIED" });
+    expect(response.body).not.toContain("estabelecimento secreto");
+    expect(authorizeStockQuery).toHaveBeenCalledOnce();
+    expect(acquire).not.toHaveBeenCalled();
+    expect(stockQueryExecute).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("retorna 429 com Retry-After sem executar a consulta", async () => {
+    const { acquire, app, authorizeStockQuery, release, stockQueryExecute } =
+      setup();
+    acquire.mockResolvedValueOnce({
+      allowed: false,
+      retryAfterSeconds: 17,
+      scope: "establishment_rate",
+    });
+
+    const response = await stockRequest(app, { plate: "ABC1D23" });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBe("17");
+    expect(response.json()).toEqual({ code: "RENAVE_QUERY_LIMITED" });
+    expect(authorizeStockQuery).toHaveBeenCalledOnce();
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(stockQueryExecute).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("libera o lease quando a consulta falha e não expõe a mensagem", async () => {
+    const { app, release, stockQueryExecute } = setup();
+    stockQueryExecute.mockRejectedValueOnce(
+      Object.assign(new Error("placa e CPF não podem vazar"), {
+        code: "RENAVE_PROTOCOL_ERROR",
+      }),
+    );
+
+    const response = await stockRequest(app, { plate: "ABC1D23" });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toMatchObject({ code: "RENAVE_PROTOCOL_ERROR" });
+    expect(response.body).not.toMatch(/placa|cpf/iu);
+    expect(release).toHaveBeenCalledOnce();
   });
 });

@@ -1,0 +1,182 @@
+import {
+  authorize,
+  AuthorizationDeniedError,
+} from "@seu-renave/access-control";
+import {
+  appendAuditEvent,
+  getAuthorizationContext,
+  getCredentialLink,
+  getEstablishment,
+  withTenant,
+} from "@seu-renave/db";
+import {
+  EvidenceCipher,
+  PostgresProtectedEvidenceStore,
+} from "@seu-renave/protected-evidence";
+import {
+  StockQueryService,
+  type StockQueryAuditRecord,
+  type StockQueryInput,
+} from "@seu-renave/renave-application";
+import type {
+  RenaveConnector,
+  StockSummary,
+} from "@seu-renave/renave-connector";
+import type { Pool } from "pg";
+
+const ACTION = "renave.stock.read" as const;
+
+export class RenaveLinkNotReadyError extends Error {
+  readonly code = "RENAVE_LINK_NOT_READY";
+
+  constructor() {
+    super("O vínculo RENAVE não está confirmado para esta consulta");
+    this.name = "RenaveLinkNotReadyError";
+  }
+}
+
+export interface PostgresStockQueryUseCaseOptions {
+  certificateThumbprintSha256: string;
+  cipher: EvidenceCipher;
+  connector: RenaveConnector;
+  integratorCnpj: string;
+  pool: Pool;
+}
+
+function auditInput(record: StockQueryAuditRecord) {
+  return {
+    action: record.action,
+    actorIp: record.actorIp,
+    actorSubject: record.actorSubject,
+    certificateThumbprintSha256: record.certificateThumbprintSha256,
+    cnpjSent: record.cnpjSent,
+    establishmentId: record.establishmentId,
+    outcome: record.outcome,
+    payloadReference: record.payloadReference,
+    requestSha256: record.requestSha256,
+    ...(record.cnpjConfirmed === undefined
+      ? {}
+      : { cnpjConfirmed: record.cnpjConfirmed }),
+    ...(record.integratorCnpjConfirmed === undefined
+      ? {}
+      : { integratorCnpjConfirmed: record.integratorCnpjConfirmed }),
+    ...(record.responseSha256 === undefined
+      ? {}
+      : { responseSha256: record.responseSha256 }),
+    ...(record.traceId === undefined ? {} : { traceId: record.traceId }),
+  };
+}
+
+export class PostgresStockQueryUseCase {
+  constructor(private readonly options: PostgresStockQueryUseCaseOptions) {}
+
+  async authorize(
+    input: Pick<StockQueryInput, "establishmentId" | "subject" | "tenantId">,
+  ): Promise<void> {
+    await withTenant(this.options.pool, input.tenantId, async (client) => {
+      const context = await getAuthorizationContext(client, input.subject);
+      const decision = authorize(
+        context ?? {
+          grants: [],
+          subject: input.subject,
+          tenantId: input.tenantId,
+        },
+        {
+          action: ACTION,
+          establishmentId: input.establishmentId,
+          tenantId: input.tenantId,
+        },
+      );
+      if (!decision.allowed) {
+        throw new AuthorizationDeniedError(decision.reason);
+      }
+      const [establishment, link] = await Promise.all([
+        getEstablishment(client, input.establishmentId),
+        getCredentialLink(client, input.establishmentId),
+      ]);
+      if (!establishment || establishment.status !== "active") {
+        throw Object.assign(new Error("Estabelecimento indisponível"), {
+          code: "ESTABLISHMENT_UNAVAILABLE",
+        });
+      }
+      if (link?.status !== "confirmed" && link?.status !== "enabled") {
+        throw new RenaveLinkNotReadyError();
+      }
+    });
+  }
+
+  async execute(input: StockQueryInput): Promise<readonly StockSummary[]> {
+    await this.authorize(input);
+    const { pool } = this.options;
+    const evidence = new PostgresProtectedEvidenceStore(
+      pool,
+      this.options.cipher,
+      {
+        action: ACTION,
+        establishmentId: input.establishmentId,
+        tenantId: input.tenantId,
+      },
+    );
+    const service = new StockQueryService(
+      {
+        audit: {
+          append: async (record) => {
+            await withTenant(pool, record.tenantId, (client) =>
+              appendAuditEvent(client, auditInput(record)),
+            );
+          },
+        },
+        authorizationContexts: {
+          load: ({ subject, tenantId }) =>
+            withTenant(pool, tenantId, (client) =>
+              getAuthorizationContext(client, subject),
+            ),
+        },
+        connector: this.options.connector,
+        establishments: {
+          load: ({ establishmentId, tenantId }) =>
+            withTenant(pool, tenantId, async (client) => {
+              const establishment = await getEstablishment(
+                client,
+                establishmentId,
+              );
+              return establishment === null
+                ? null
+                : {
+                    cnpj: establishment.cnpj,
+                    id: establishment.id,
+                    status: establishment.status,
+                    tenantId: establishment.tenantId,
+                  };
+            }),
+        },
+        finalization: {
+          fail: async ({ audit, errorCode, payloadReference }) => {
+            await withTenant(pool, audit.tenantId, async (client) => {
+              await evidence.failWithClient(client, {
+                errorCode,
+                payloadReference,
+              });
+              await appendAuditEvent(client, auditInput(audit));
+            });
+          },
+          succeed: async ({ audit, evidenceResponse, payloadReference }) => {
+            await withTenant(pool, audit.tenantId, async (client) => {
+              await evidence.completeWithClient(client, {
+                payloadReference,
+                response: evidenceResponse,
+              });
+              await appendAuditEvent(client, auditInput(audit));
+            });
+          },
+        },
+        protectedEvidence: evidence,
+      },
+      {
+        certificateThumbprintSha256: this.options.certificateThumbprintSha256,
+        integratorCnpj: this.options.integratorCnpj,
+      },
+    );
+    return service.execute(input);
+  }
+}

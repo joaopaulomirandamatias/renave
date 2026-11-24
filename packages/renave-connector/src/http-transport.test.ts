@@ -189,15 +189,40 @@ describe("HttpRenaveTransport", () => {
     );
   });
 
+  it("normaliza a placa e nunca envia consulta de estoque sem filtro válido", async () => {
+    const request = vi.fn(async () => Response.json([]));
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await expect(
+      transport.findStocksByPlate(headers, " qtp4h82 "),
+    ).resolves.toEqual([]);
+    expect(request).toHaveBeenCalledWith(
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82",
+      expect.objectContaining({ method: "GET", redirect: "error" }),
+    );
+
+    for (const invalid of ["", "   ", "ABC123", "ABC-1234"]) {
+      await expect(
+        transport.findStocksByPlate(headers, invalid),
+      ).rejects.toMatchObject({ code: "INVALID_STOCK_PLATE_QUERY" });
+    }
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("preserva identidade, estado e cancelamento do estoque", async () => {
     const payload = {
       cancelamentoEstoque: { motivo: "cancelado" },
+      chassi: "9BWZZZ377VT004251",
       codigoSegurancaCrv: "12345678901",
       entradaEstoque: {
         cpfOperadorResponsavel: "12345678901",
         dataHoraRegistro: "2026-11-23T15:02:00.000Z",
       },
       estado: "FINALIZADO",
+      entregas: [{ dataHora: "2026-11-23T16:00:00.000Z" }],
       id: 7,
       numeroCrv: "123456789012",
       placa: "QTP4H82",
@@ -322,10 +347,12 @@ describe("HttpRenaveTransport", () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
-  it("recusa registro de estoque com tipos incompatíveis", async () => {
-    const request = vi.fn(async () =>
-      Response.json([{ id: "7", placa: "QTP4H82" }]),
-    );
+  it.each([
+    ["lista ausente", {}],
+    ["id incompatível", [{ id: "7", placa: "QTP4H82" }]],
+    ["estado desconhecido", [{ estado: "DESCONHECIDO", id: 7 }]],
+  ])("recusa resposta de estoque com %s", async (_label, payload) => {
+    const request = vi.fn(async () => Response.json(payload));
     const transport = new HttpRenaveTransport({
       environment: "homologation",
       request,
@@ -334,5 +361,25 @@ describe("HttpRenaveTransport", () => {
     await expect(
       transport.findStocksByPlate(headers, "QTP4H82"),
     ).rejects.toBeInstanceOf(RenaveProtocolError);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("não repete consulta de estoque após falha de transporte", async () => {
+    const request = vi.fn(async () => {
+      throw new Error("timeout");
+    });
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await expect(
+      transport.findStocksByPlate(headers, "QTP4H82"),
+    ).rejects.toMatchObject({
+      code: "RENAVE_HTTP_ERROR",
+      operation: "find-stocks-by-plate",
+      status: 0,
+    });
+    expect(request).toHaveBeenCalledOnce();
   });
 });

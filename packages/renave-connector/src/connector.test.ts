@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  InvalidStockPlateQueryError,
   RenaveConnector,
   RenaveIdentityMismatchError,
   type AuthenticatedClientIdentity,
@@ -226,6 +227,119 @@ describe("RenaveConnector", () => {
     );
     expect(fake.getAuthenticatedClient).toHaveBeenCalledTimes(1);
   });
+
+  it("consulta estoque por placa com identidade confirmada e devolve apenas o DTO mínimo", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    vi.mocked(fake.transport.findStocksByPlate).mockResolvedValue([
+      {
+        cancelamentoEstoque: { motivo: "não deve vazar" },
+        codigoSegurancaCrv: "12345678901",
+        entradaEstoque: { cpfOperadorResponsavel: "12345678901" },
+        estado: "CONFIRMADO",
+        id: 7,
+        numeroCrv: "123456789012",
+        placa: "QTP4H82",
+        renavam: "00607701676",
+        tipoCrv: "DIGITAL",
+      },
+    ]);
+
+    const response = await new RenaveConnector(fake.transport).getStocksByPlate(
+      context,
+      " qtp4h82 ",
+    );
+
+    expect(response.result.publicResult).toEqual([
+      { estado: "CONFIRMADO", id: 7, placa: "QTP4H82" },
+    ]);
+    expect(response.result.evidence).toHaveLength(1);
+    expect(response.result.evidence[0]).toMatchObject({
+      codigoSegurancaCrv: "12345678901",
+      renavam: "00607701676",
+    });
+    expect(JSON.stringify(response.result.publicResult)).not.toMatch(
+      /cpf|renavam|numeroCrv|codigoSegurancaCrv|cancelamento/,
+    );
+    expect(fake.transport.findStocksByPlate).toHaveBeenCalledWith(
+      { "CNPJ-Estabelecimento": "85106037000585" },
+      "QTP4H82",
+    );
+    expect(fake.getAuthenticatedClient).toHaveBeenCalledOnce();
+  });
+
+  it.each([undefined, null, "", "ABC123", "ABC-1234", "ABCDEFGH"])(
+    "recusa placa inválida %s antes de autenticar ou consultar estoque",
+    async (plate) => {
+      const fake = transportWithIdentity({
+        cnpj: "85106037000585",
+        cnpjIntegradora: "69418503000188",
+      });
+
+      await expect(
+        new RenaveConnector(fake.transport).getStocksByPlate(
+          context,
+          plate as never,
+        ),
+      ).rejects.toBeInstanceOf(InvalidStockPlateQueryError);
+      expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
+      expect(fake.transport.findStocksByPlate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("bloqueia consulta de estoque quando a identidade diverge", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "00000000000000",
+      cnpjIntegradora: "69418503000188",
+    });
+
+    await expect(
+      new RenaveConnector(fake.transport).getStocksByPlate(context, "QTP4H82"),
+    ).rejects.toBeInstanceOf(RenaveIdentityMismatchError);
+    expect(fake.transport.findStocksByPlate).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia consulta de estoque em produção antes de autenticar", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+
+    await expect(
+      new RenaveConnector(fake.transport).getStocksByPlate(
+        { ...context, environment: "production" },
+        "QTP4H82",
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_PRODUCTION_BLOCKED" });
+    expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(fake.transport.findStocksByPlate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { records: [{ estado: "CONFIRMADO", id: 7, placa: "OUT1A23" }] },
+    { records: [{ estado: "DESCONHECIDO", id: 7, placa: "QTP4H82" }] },
+    { records: [{ estado: "CONFIRMADO", placa: "QTP4H82" }] },
+  ])(
+    "falha fechado para estoque incompatível: $records",
+    async ({ records }) => {
+      const fake = transportWithIdentity({
+        cnpj: "85106037000585",
+        cnpjIntegradora: "69418503000188",
+      });
+      vi.mocked(fake.transport.findStocksByPlate).mockResolvedValue(
+        records as never,
+      );
+
+      await expect(
+        new RenaveConnector(fake.transport).getStocksByPlate(
+          context,
+          "QTP4H82",
+        ),
+      ).rejects.toMatchObject({ code: "RENAVE_STOCK_QUERY_RESULT_INVALID" });
+    },
+  );
 
   it.each([
     ["placa nula", { placa: null, tipoCrv: "DIGITAL" }],

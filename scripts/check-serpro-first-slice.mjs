@@ -105,6 +105,25 @@ requireProperties(
   "DiagnosticoAptidaoEstoque",
 );
 
+const stocks = operation(document, "/api/estoques", "get");
+const stockParameters = new Map(
+  stocks.parameters?.map((parameter) => [parameter.name, parameter]),
+);
+requireValue(stockParameters.has("placa"), "estoques não aceita placa");
+requireValue(
+  stocks.responses?.["200"]?.schema?.type === "array" &&
+    stocks.responses?.["200"]?.schema?.items?.$ref ===
+      "#/definitions/EstoqueJson",
+  "estoques não retorna array de EstoqueJson",
+);
+const stockDefinition = definition(document, "EstoqueJson");
+requireProperties(stockDefinition, ["estado", "id", "placa"], "EstoqueJson");
+requireValue(
+  JSON.stringify(stockDefinition.properties.estado.enum) ===
+    JSON.stringify(["SOLICITADO", "TRANSFERIDO", "CONFIRMADO", "FINALIZADO"]),
+  "EstoqueJson.estado divergiu do enum conhecido",
+);
+
 const stockEntry = operation(
   document,
   "/api/solicitacoes-entrada-estoque",

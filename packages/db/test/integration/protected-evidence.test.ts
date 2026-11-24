@@ -55,6 +55,55 @@ afterAll(async () => {
 });
 
 describe("protected_evidence", () => {
+  it("aceita a ação de estoque e recusa ação não autorizada", async () => {
+    const stockEvidenceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    await withTenant(appPool, tenantA.id, (client) =>
+      client.query(
+        `insert into renave.protected_evidence (
+           id, tenant_id, establishment_id, action,
+           request_key_id, request_nonce, request_auth_tag, request_ciphertext
+         ) values ($1, $2, $3, 'renave.stock.read', 'key-1', $4, $5, $6)`,
+        [
+          stockEvidenceId,
+          tenantA.id,
+          establishmentAId,
+          Buffer.alloc(12, 1),
+          Buffer.alloc(16, 2),
+          Buffer.from([3]),
+        ],
+      ),
+    );
+
+    await expect(
+      withTenant(appPool, tenantA.id, async (client) => {
+        const { rows } = await client.query(
+          "select action, status from renave.protected_evidence where id = $1",
+          [stockEvidenceId],
+        );
+        return rows;
+      }),
+    ).resolves.toEqual([{ action: "renave.stock.read", status: "pending" }]);
+
+    await expect(
+      withTenant(appPool, tenantA.id, (client) =>
+        client.query(
+          `insert into renave.protected_evidence (
+             id, tenant_id, establishment_id, action,
+             request_key_id, request_nonce, request_auth_tag, request_ciphertext
+           ) values ($1, $2, $3, 'renave.stock.export', 'key-1', $4, $5, $6)`,
+          [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            tenantA.id,
+            establishmentAId,
+            Buffer.alloc(12, 1),
+            Buffer.alloc(16, 2),
+            Buffer.from([3]),
+          ],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
+  });
+
   it("isola por tenant e permite somente a transição pendente para concluída", async () => {
     await withTenant(appPool, tenantA.id, async (client) => {
       await client.query(

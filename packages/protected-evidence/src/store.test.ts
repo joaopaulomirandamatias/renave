@@ -11,8 +11,15 @@ import {
 const tenantId = "11111111-1111-4111-8111-111111111111";
 const establishmentId = "22222222-2222-4222-8222-222222222222";
 const action = "renave.vehicle.eligibility.read" as const;
+type EvidenceAction =
+  | "renave.identity.verify"
+  | "renave.stock.read"
+  | "renave.vehicle.eligibility.read";
 
-function setup(rowCounts: number[] = [1, 1]) {
+function setup(
+  rowCounts: number[] = [1, 1],
+  bindingAction: EvidenceAction = action,
+) {
   const query = vi.fn(async (_text: string, _params?: readonly unknown[]) => ({
     rowCount: rowCounts.shift() ?? 1,
     rows: [],
@@ -39,7 +46,7 @@ function setup(rowCounts: number[] = [1, 1]) {
     keys: new Map([["active-key", Buffer.alloc(32, 5)]]),
   });
   const store = new PostgresProtectedEvidenceStore(pool, cipher, {
-    action,
+    action: bindingAction,
     establishmentId,
     tenantId,
   });
@@ -47,6 +54,33 @@ function setup(rowCounts: number[] = [1, 1]) {
 }
 
 describe("PostgresProtectedEvidenceStore", () => {
+  it("aceita consulta de estoque e persiste a placa somente cifrada", async () => {
+    const stockAction = "renave.stock.read" as const;
+    const { query, store } = setup([1], stockAction);
+
+    await store.begin({
+      action: stockAction,
+      actorSubject: "oidc|stock-operator",
+      establishmentId,
+      request: { placa: "ABC1D23" },
+      tenantId,
+    });
+
+    const insertParams = query.mock.calls[0]?.[1] as unknown[];
+    const persisted = JSON.stringify(insertParams, (_key, value) =>
+      Buffer.isBuffer(value) ? value.toString("base64") : value,
+    );
+    expect(insertParams[3]).toBe(stockAction);
+    expect(persisted).not.toContain("ABC1D23");
+    expect(persisted).not.toContain("stock-operator");
+  });
+
+  it("recusa ação fora da allowlist antes de abrir conexão", () => {
+    expect(() => setup([1], "renave.stock.export" as never)).toThrow(
+      ProtectedEvidenceInputError,
+    );
+  });
+
   it("insere somente ciphertext e finaliza pending atomicamente", async () => {
     const { connect, query, release, store } = setup();
     const result = await store.begin({

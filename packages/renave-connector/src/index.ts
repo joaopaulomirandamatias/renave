@@ -41,6 +41,7 @@ export {
   RenaveEnvironmentMismatchError,
   RenaveIdentityMismatchError,
   RenaveProductionBlockedError,
+  RenaveStockQueryResultError,
   type AuthenticatedClientIdentity,
   type EstablishmentHeaders,
   type IdentityMismatchReason,
@@ -48,8 +49,11 @@ export {
   type RenaveEnvironment,
   type RenaveServerContext,
   type RenaveTransport,
+  type StockQueryResult,
+  type StockSummary,
   type VerifiedRenaveIdentity,
 } from "./connector.js";
+export { InvalidStockPlateQueryError, normalizeStockPlate } from "./plate.js";
 export {
   InvalidStockEntryReconciliationError,
   reconcileStockEntry,

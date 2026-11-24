@@ -11,6 +11,7 @@ const REFERENCE =
 const ERROR_CODE = /^[A-Z][A-Z0-9_]{2,79}$/u;
 const ACTIONS = [
   "renave.identity.verify",
+  "renave.stock.read",
   "renave.vehicle.eligibility.read",
 ] as const;
 type ProtectedEvidenceAction = (typeof ACTIONS)[number];

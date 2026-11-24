@@ -17,7 +17,7 @@ describe("authorize", () => {
   it("autoriza operador somente no estabelecimento atribuído", () => {
     expect(
       authorize(operator, {
-        action: "renave.vehicle.eligibility.read",
+        action: "renave.stock.read",
         establishmentId: "establishment-a",
         tenantId: "tenant-a",
       }),

@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { PostgresVehicleEligibilityUseCase } from "../renave/use-case.js";
 import { PostgresRenaveLinkPreflightUseCase } from "../renave/preflight-use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "../renave/link-status-use-case.js";
+import { PostgresStockQueryUseCase } from "../renave/stock-query-use-case.js";
 import { createPostgresTenantDirectory } from "../tenant/directory.js";
 
 interface DbUrls {
@@ -156,6 +157,99 @@ function preflightInput(scenario: PreflightScenario, traceId: string) {
     tenantId: scenario.tenant.id,
     traceId,
   };
+}
+
+function createStockQueryUseCase(
+  scenario: PreflightScenario,
+  getStocksByPlate: ReturnType<typeof vi.fn>,
+): PostgresStockQueryUseCase {
+  return new PostgresStockQueryUseCase({
+    certificateThumbprintSha256: "f".repeat(64),
+    cipher: new EvidenceCipher({
+      activeKeyId: "stock-query-integration-key",
+      keys: new Map([["stock-query-integration-key", Buffer.alloc(32, 10)]]),
+    }),
+    connector: { getStocksByPlate } as unknown as RenaveConnector,
+    integratorCnpj: INTEGRATOR_CNPJ,
+    pool: appPool,
+  });
+}
+
+function stockQueryInput(scenario: PreflightScenario, traceId: string) {
+  return {
+    actorIp: "198.51.100.13",
+    establishmentId: scenario.store.id,
+    plate: "ABC1D23",
+    subject: ADMIN,
+    tenantId: scenario.tenant.id,
+    traceId,
+  };
+}
+
+async function stockEvidenceState(scenario: PreflightScenario) {
+  const { rows } = await adminPool.query<{
+    failure_code: string | null;
+    request_clear_absent: boolean;
+    response_ciphertext_present: boolean;
+    response_clear_absent: boolean;
+    status: string;
+  }>(
+    `select status, failure_code,
+            response_ciphertext is not null as response_ciphertext_present,
+            position(convert_to('ABC1D23', 'UTF8') in request_ciphertext) = 0
+              as request_clear_absent,
+            response_ciphertext is null
+              or position(convert_to('12345678901', 'UTF8') in response_ciphertext) = 0
+              as response_clear_absent
+       from renave.protected_evidence
+      where tenant_id = $1
+        and establishment_id = $2
+        and action = 'renave.stock.read'
+      order by created_at`,
+    [scenario.tenant.id, scenario.store.id],
+  );
+  return rows;
+}
+
+async function stockAuditOutcomes(
+  scenario: PreflightScenario,
+): Promise<string[]> {
+  const audits = await withTenant(appPool, scenario.tenant.id, (client) =>
+    listAuditEvents(client),
+  );
+  return audits
+    .filter(({ action }) => action === "renave.stock.read")
+    .map(({ outcome }) => outcome);
+}
+
+function successfulStockConnector(scenario: PreflightScenario) {
+  return vi.fn(async () => ({
+    result: {
+      evidence: [
+        {
+          cancelamentoEstoque: { motivo: "somente evidência" },
+          codigoSegurancaCrv: "12345678901",
+          entradaEstoque: { cpfOperadorResponsavel: "12345678901" },
+          estado: "CONFIRMADO" as const,
+          id: 71,
+          numeroCrv: "123456789012",
+          placa: "ABC1D23",
+          renavam: "00607701676",
+          tipoCrv: "DIGITAL" as const,
+        },
+      ],
+      publicResult: [
+        { estado: "CONFIRMADO" as const, id: 71, placa: "ABC1D23" },
+      ],
+    },
+    verifiedIdentity: {
+      confirmedEstablishmentCnpj: scenario.store.cnpj,
+      confirmedIntegratorCnpj: INTEGRATOR_CNPJ,
+      environment: "homologation" as const,
+      establishmentId: scenario.store.id,
+      tenantId: scenario.tenant.id,
+    },
+  }));
 }
 
 beforeAll(async () => {
@@ -570,6 +664,127 @@ describe("composição PostgreSQL real da API", () => {
     } finally {
       await adminPool.query(
         `drop trigger if exists ${triggerName} on renave.credential_link_history`,
+      );
+      await adminPool.query(`drop function if exists ${functionName}()`);
+    }
+  });
+
+  it.each(["not_started", "pending"] as const)(
+    "bloqueia consulta de estoque com vínculo %s antes do conector",
+    async (status) => {
+      const scenario = await createPreflightScenario(
+        `stock-block-${status.replaceAll("_", "-")}`,
+      );
+      await prepareCredentialLink(scenario, status);
+      const getStocksByPlate = successfulStockConnector(scenario);
+      const useCase = createStockQueryUseCase(scenario, getStocksByPlate);
+
+      await expect(
+        useCase.execute(stockQueryInput(scenario, `stock-block-${status}`)),
+      ).rejects.toMatchObject({ code: "RENAVE_LINK_NOT_READY" });
+      expect(getStocksByPlate).not.toHaveBeenCalled();
+      expect(await stockEvidenceState(scenario)).toEqual([]);
+      expect(await stockAuditOutcomes(scenario)).toEqual([]);
+    },
+  );
+
+  it("consulta estoque com vínculo confirmado e mantém dados sensíveis somente cifrados", async () => {
+    const scenario = await createPreflightScenario("stock-success");
+    await prepareCredentialLink(scenario, "confirmed");
+    const getStocksByPlate = successfulStockConnector(scenario);
+    const useCase = createStockQueryUseCase(scenario, getStocksByPlate);
+
+    await expect(
+      useCase.execute(stockQueryInput(scenario, "stock-success-trace")),
+    ).resolves.toEqual([{ estado: "CONFIRMADO", id: 71, placa: "ABC1D23" }]);
+    expect(getStocksByPlate).toHaveBeenCalledOnce();
+    expect(await stockEvidenceState(scenario)).toEqual([
+      {
+        failure_code: null,
+        request_clear_absent: true,
+        response_ciphertext_present: true,
+        response_clear_absent: true,
+        status: "completed",
+      },
+    ]);
+    expect(await stockAuditOutcomes(scenario)).toEqual([
+      "attempted",
+      "succeeded",
+    ]);
+  });
+
+  it("finaliza evidência e auditoria como rejeitadas quando o conector falha", async () => {
+    const scenario = await createPreflightScenario("stock-failure");
+    await prepareCredentialLink(scenario, "confirmed");
+    const connectorError = Object.assign(new Error("timeout"), {
+      code: "RENAVE_HTTP_ERROR",
+    });
+    const getStocksByPlate = vi.fn(async () => Promise.reject(connectorError));
+    const useCase = createStockQueryUseCase(scenario, getStocksByPlate);
+
+    await expect(
+      useCase.execute(stockQueryInput(scenario, "stock-failure-trace")),
+    ).rejects.toBe(connectorError);
+    expect(await stockEvidenceState(scenario)).toEqual([
+      {
+        failure_code: "RENAVE_HTTP_ERROR",
+        request_clear_absent: true,
+        response_ciphertext_present: false,
+        response_clear_absent: true,
+        status: "failed",
+      },
+    ]);
+    expect(await stockAuditOutcomes(scenario)).toEqual([
+      "attempted",
+      "rejected",
+    ]);
+  });
+
+  it("reverte evidência concluída quando a auditoria final falha", async () => {
+    const scenario = await createPreflightScenario("stock-atomic-rollback");
+    await prepareCredentialLink(scenario, "confirmed");
+    const functionName = "renave.test_fail_stock_success_audit";
+    const triggerName = "test_fail_stock_success_audit";
+    await adminPool.query(
+      `create function ${functionName}()
+       returns trigger
+       language plpgsql
+       as $$
+       begin
+         if new.action = 'renave.stock.read' and new.outcome = 'succeeded' then
+           raise exception 'falha local induzida na auditoria final';
+         end if;
+         return new;
+       end
+       $$`,
+    );
+    await adminPool.query(
+      `create trigger ${triggerName}
+       before insert on renave.audit_event
+       for each row execute function ${functionName}()`,
+    );
+
+    try {
+      const useCase = createStockQueryUseCase(
+        scenario,
+        successfulStockConnector(scenario),
+      );
+      await expect(
+        useCase.execute(stockQueryInput(scenario, "stock-rollback-trace")),
+      ).rejects.toMatchObject({ code: "P0001" });
+      expect(await stockEvidenceState(scenario)).toEqual([
+        {
+          failure_code: null,
+          request_clear_absent: true,
+          response_ciphertext_present: false,
+          response_clear_absent: true,
+          status: "pending",
+        },
+      ]);
+      expect(await stockAuditOutcomes(scenario)).toEqual(["attempted"]);
+    } finally {
+      await adminPool.query(
+        `drop trigger if exists ${triggerName} on renave.audit_event`,
       );
       await adminPool.query(`drop function if exists ${functionName}()`);
     }

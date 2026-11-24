@@ -1,11 +1,13 @@
 import { normalizeCnpj } from "./cnpj.js";
 import type {
   RenaveMutationOperation,
+  RenaveStockState,
   StockEntryRequest,
   StockEntryResponse,
   VehicleEligibilityQuery,
   VehicleEligibilityResponse,
 } from "./operations.js";
+import { normalizeStockPlate } from "./plate.js";
 import {
   reconcileStockEntry as reconcileStockEntryRecords,
   type RenaveStockRecord,
@@ -34,6 +36,18 @@ export interface VerifiedRenaveIdentity {
   environment: RenaveEnvironment;
   establishmentId: string;
   tenantId: string;
+}
+
+export interface StockSummary {
+  estado: RenaveStockState;
+  id: number;
+  placa: string;
+}
+
+export interface StockQueryResult {
+  /** Resposta validada para persistência cifrada; nunca deve ser serializada pelo BFF. */
+  evidence: readonly RenaveStockRecord[];
+  publicResult: readonly StockSummary[];
 }
 
 export type EstablishmentHeaders = Readonly<{
@@ -111,6 +125,44 @@ export class InvalidVehicleEligibilityQueryError extends Error {
     super("Informe exatamente um identificador de veículo em formato válido");
     this.name = "InvalidVehicleEligibilityQueryError";
   }
+}
+
+export class RenaveStockQueryResultError extends Error {
+  readonly code = "RENAVE_STOCK_QUERY_RESULT_INVALID";
+
+  constructor() {
+    super("O RENAVE respondeu com um estoque incompatível com a consulta");
+    this.name = "RenaveStockQueryResultError";
+  }
+}
+
+const STOCK_STATES = new Set<RenaveStockState>([
+  "SOLICITADO",
+  "TRANSFERIDO",
+  "CONFIRMADO",
+  "FINALIZADO",
+]);
+
+function stockSummaryFrom(
+  record: RenaveStockRecord,
+  expectedPlate: string,
+): StockSummary {
+  let plate: string;
+  try {
+    plate = normalizeStockPlate(record.placa);
+  } catch {
+    throw new RenaveStockQueryResultError();
+  }
+  if (
+    plate !== expectedPlate ||
+    !Number.isSafeInteger(record.id) ||
+    (record.id ?? 0) <= 0 ||
+    !record.estado ||
+    !STOCK_STATES.has(record.estado)
+  ) {
+    throw new RenaveStockQueryResultError();
+  }
+  return Object.freeze({ estado: record.estado, id: record.id!, placa: plate });
 }
 
 function normalizeConfirmedCnpj(
@@ -260,6 +312,28 @@ export class RenaveConnector {
     );
 
     return { result, verifiedIdentity };
+  }
+
+  async getStocksByPlate(
+    context: RenaveServerContext,
+    plate: string,
+  ): Promise<MutationResult<StockQueryResult>> {
+    const normalizedPlate = normalizeStockPlate(plate);
+    const { headers, verifiedIdentity } = await this.authorize(context);
+    const records = await this.transport.findStocksByPlate(
+      headers,
+      normalizedPlate,
+    );
+    const publicResult = records.map((record) =>
+      stockSummaryFrom(record, normalizedPlate),
+    );
+    return {
+      result: {
+        evidence: Object.freeze(records),
+        publicResult: Object.freeze(publicResult),
+      },
+      verifiedIdentity,
+    };
   }
 
   async reconcileStockEntry(

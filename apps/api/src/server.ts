@@ -19,6 +19,7 @@ const app = buildApp({
   ...(runtime.eligibility ? { eligibility: runtime.eligibility } : {}),
   ...(runtime.linkStatus ? { linkStatus: runtime.linkStatus } : {}),
   ...(runtime.preflight ? { preflight: runtime.preflight } : {}),
+  ...(runtime.stockQuery ? { stockQuery: runtime.stockQuery } : {}),
   ...(runtime.tenantDirectory
     ? { tenantDirectory: runtime.tenantDirectory }
     : {}),

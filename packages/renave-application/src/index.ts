@@ -17,3 +17,22 @@ export {
   type VehicleEligibilityPorts,
   type VehicleEligibilityServiceConfig,
 } from "./vehicle-eligibility.js";
+export {
+  InvalidStockQueryApplicationInputError,
+  StockQueryEvidenceError,
+  StockQueryResultInvalidError,
+  StockQueryService,
+  StockQueryVerifiedIdentityMismatchError,
+  type StockQueryAuditOutcome,
+  type StockQueryAuditPort,
+  type StockQueryAuditRecord,
+  type StockQueryAuthorizationContextPort,
+  type StockQueryConnectorPort,
+  type StockQueryEstablishmentPort,
+  type StockQueryEvidenceContext,
+  type StockQueryEvidencePort,
+  type StockQueryFinalizationPort,
+  type StockQueryInput,
+  type StockQueryPorts,
+  type StockQueryServiceConfig,
+} from "./stock-query.js";

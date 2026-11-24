@@ -11,6 +11,7 @@ import {
   type VehicleEligibilityResponse,
 } from "./operations.js";
 import type { RenaveStockRecord } from "./reconciliation.js";
+import { normalizeStockPlate } from "./plate.js";
 
 const baseUrls: Readonly<Record<RenaveEnvironment, string>> = Object.freeze({
   homologation: "https://hom.renave.estaleiro.serpro.gov.br/renave-ws",
@@ -349,6 +350,7 @@ function stockRecordFrom(value: unknown): RenaveStockRecord {
   }
 
   return {
+    ...candidate,
     ...(entradaEstoque === undefined ? {} : { entradaEstoque }),
     ...(candidate.cancelamentoEstoque === undefined
       ? {}
@@ -482,7 +484,8 @@ export class HttpRenaveTransport implements RenaveTransport {
     headers: EstablishmentHeaders,
     plate: string,
   ): Promise<RenaveStockRecord[]> {
-    const search = new URLSearchParams({ placa: plate });
+    const normalizedPlate = normalizeStockPlate(plate);
+    const search = new URLSearchParams({ placa: normalizedPlate });
     let response: Response;
     try {
       response = await this.request(

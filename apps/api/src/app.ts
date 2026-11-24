@@ -11,6 +11,7 @@ import type { AppConfig } from "./config.js";
 import {
   registerRenaveRoutes,
   type SerproQueryLimiter,
+  type StockQueryUseCase,
 } from "./renave/routes.js";
 import type { EligibilityUseCase } from "./renave/use-case.js";
 import type { RenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
@@ -36,6 +37,8 @@ export interface BuildAppOptions {
   preflight?: RenaveLinkPreflightUseCase;
   /** Limite distribuído obrigatório quando a consulta RENAVE está composta. */
   serproQueryLimiter?: SerproQueryLimiter;
+  /** Consulta pontual e minimizada de estoque por placa. */
+  stockQuery?: StockQueryUseCase;
   /** Diretório global mínimo; ausente mantém descoberta de tenants bloqueada. */
   tenantDirectory?: TenantDirectory;
   /** Probe das dependências já compostas pelo runtime. */
@@ -69,7 +72,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     );
   }
   if (
-    (options.eligibility || options.preflight) &&
+    (options.eligibility || options.preflight || options.stockQuery) &&
     !options.serproQueryLimiter
   ) {
     throw new Error("Consulta RENAVE exige limitador distribuído");
@@ -144,6 +147,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       ...(options.eligibility ? { eligibility: options.eligibility } : {}),
       ...(options.linkStatus ? { linkStatus: options.linkStatus } : {}),
       ...(options.preflight ? { preflight: options.preflight } : {}),
+      ...(options.stockQuery ? { stockQuery: options.stockQuery } : {}),
       ...(options.sessionLookupGate
         ? { sessionLookupGate: options.sessionLookupGate }
         : {}),
