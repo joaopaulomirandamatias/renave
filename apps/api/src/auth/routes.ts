@@ -8,12 +8,15 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import type { AppConfig } from "../config.js";
+import type { RequestAccessGuard } from "./request-access-guard.js";
+
+export type { SessionLookupGate } from "./request-access-guard.js";
 
 export interface AuthRoutesOptions {
   config: AppConfig;
   identity: IdentityService | undefined;
+  accessGuard?: RequestAccessGuard;
   loginRateLimiter?: LoginRateLimiter;
-  sessionLookupGate?: SessionLookupGate;
 }
 
 export interface LoginRateLimiter {
@@ -27,10 +30,6 @@ export interface LoginRateLimiter {
   >;
 }
 
-export interface SessionLookupGate {
-  tryAcquire(): (() => void) | undefined;
-}
-
 function queryValue(request: FastifyRequest, name: string): unknown {
   const query = request.query;
   if (typeof query !== "object" || query === null) return undefined;
@@ -40,7 +39,7 @@ function queryValue(request: FastifyRequest, name: string): unknown {
 /** Rotas de autenticação do BFF. Nunca registra segredos; só eventos e motivos. */
 export function registerAuthRoutes(
   app: FastifyInstance,
-  { config, identity, loginRateLimiter, sessionLookupGate }: AuthRoutesOptions,
+  { accessGuard, config, identity, loginRateLimiter }: AuthRoutesOptions,
 ): void {
   const secure = config.appEnvironment !== "development";
   const names = cookieNames(secure);
@@ -81,36 +80,13 @@ export function registerAuthRoutes(
       authMode: config.authMode,
       environment: config.appEnvironment,
     };
-    if (!identity) return base;
-    const sessionId = readCookie(request.headers.cookie, names.session);
-    if (!sessionId) return base;
-
-    let release: (() => void) | undefined;
-    try {
-      release = sessionLookupGate?.tryAcquire();
-      if (sessionLookupGate && !release) {
-        request.log.warn({ event: "identity.session_lookup_saturated" });
-        reply.header("retry-after", "1");
-        return reply.code(429).send({ ...base, code: "SESSION_LOOKUP_BUSY" });
-      }
-    } catch {
-      request.log.error({ event: "identity.session_lookup_gate_failed" });
-      return reply
-        .code(503)
-        .send({ ...base, code: "SESSION_LOOKUP_UNAVAILABLE" });
-    }
-
-    let session;
-    try {
-      session = await identity.getSession(sessionId);
-    } catch {
-      request.log.error({ event: "identity.session_lookup_failed" });
-      return reply
-        .code(503)
-        .send({ ...base, code: "SESSION_STORE_UNAVAILABLE" });
-    } finally {
-      release?.();
-    }
+    if (!identity || !accessGuard) return base;
+    const lookup = await accessGuard.authenticate(request, reply, {
+      required: false,
+      responseBase: base,
+    });
+    if (!lookup.ok) return;
+    const session = lookup.session;
     if (!session) return base;
     return {
       ...base,

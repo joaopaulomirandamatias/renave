@@ -2,6 +2,7 @@ import type { IdentityService } from "@seu-renave/identity";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { redactedLogPaths, stripQuery } from "./auth/redaction.js";
+import { createRequestAccessGuard } from "./auth/request-access-guard.js";
 import {
   registerAuthRoutes,
   type LoginRateLimiter,
@@ -100,6 +101,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           },
   });
 
+  const accessGuard = options.identity
+    ? createRequestAccessGuard({
+        identity: options.identity,
+        secure: options.config.appEnvironment !== "development",
+        ...(options.sessionLookupGate
+          ? { sessionLookupGate: options.sessionLookupGate }
+          : {}),
+      })
+    : undefined;
+
   app.addHook("onSend", async (_request, reply, payload) => {
     reply.header("cache-control", "no-store");
     reply.header("referrer-policy", "no-referrer");
@@ -121,36 +132,29 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   });
 
   registerAuthRoutes(app, {
+    ...(accessGuard ? { accessGuard } : {}),
     config: options.config,
     identity: options.identity,
     ...(options.loginRateLimiter
       ? { loginRateLimiter: options.loginRateLimiter }
       : {}),
-    ...(options.sessionLookupGate
-      ? { sessionLookupGate: options.sessionLookupGate }
-      : {}),
   });
   if (options.identity) {
+    if (!accessGuard) throw new Error("Guard de acesso não configurado");
     registerTenantRoutes(app, {
-      config: options.config,
-      identity: options.identity,
-      ...(options.sessionLookupGate
-        ? { sessionLookupGate: options.sessionLookupGate }
-        : {}),
+      accessGuard,
       ...(options.tenantDirectory
         ? { directory: options.tenantDirectory }
         : {}),
     });
     registerRenaveRoutes(app, {
+      accessGuard,
       config: options.config,
       identity: options.identity,
       ...(options.eligibility ? { eligibility: options.eligibility } : {}),
       ...(options.linkStatus ? { linkStatus: options.linkStatus } : {}),
       ...(options.preflight ? { preflight: options.preflight } : {}),
       ...(options.stockQuery ? { stockQuery: options.stockQuery } : {}),
-      ...(options.sessionLookupGate
-        ? { sessionLookupGate: options.sessionLookupGate }
-        : {}),
       ...(options.serproQueryLimiter
         ? { queryLimiter: options.serproQueryLimiter }
         : {}),

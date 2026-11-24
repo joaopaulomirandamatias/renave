@@ -1,12 +1,8 @@
-import {
-  cookieNames,
-  readCookie,
-  type IdentityService,
-} from "@seu-renave/identity";
+import type { IdentityService } from "@seu-renave/identity";
 import type { CrvType, StockSummary } from "@seu-renave/renave-connector";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 
-import type { SessionLookupGate } from "../auth/routes.js";
+import type { RequestAccessGuard } from "../auth/request-access-guard.js";
 import type { AppConfig } from "../config.js";
 import type { RenaveLinkStatusUseCase } from "./link-status-use-case.js";
 import type { EligibilityUseCase } from "./use-case.js";
@@ -47,13 +43,13 @@ export interface StockQueryUseCase {
 }
 
 export interface RenaveRoutesOptions {
+  accessGuard: RequestAccessGuard;
   config: AppConfig;
   eligibility?: EligibilityUseCase;
   identity: IdentityService;
   linkStatus?: RenaveLinkStatusUseCase;
   preflight?: RenaveLinkPreflightUseCase;
   queryLimiter?: SerproQueryLimiter;
-  sessionLookupGate?: SessionLookupGate;
   stockQuery?: StockQueryUseCase;
 }
 
@@ -203,57 +199,13 @@ export function registerRenaveRoutes(
   app: FastifyInstance,
   options: RenaveRoutesOptions,
 ): void {
-  const secure = options.config.appEnvironment !== "development";
-  const sessionCookie = cookieNames(secure).session;
-
-  async function guardedSession(
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<
-    | {
-        ok: true;
-        session: NonNullable<
-          Awaited<ReturnType<IdentityService["getSession"]>>
-        >;
-      }
-    | { ok: false }
-  > {
-    const sessionId = readCookie(request.headers.cookie, sessionCookie);
-    if (!sessionId) {
-      await reply.code(401).send({ code: "AUTHENTICATION_REQUIRED" });
-      return { ok: false };
-    }
-    let release: (() => void) | undefined;
-    try {
-      release = options.sessionLookupGate?.tryAcquire();
-      if (options.sessionLookupGate && !release) {
-        reply.header("retry-after", "1");
-        await reply.code(429).send({ code: "SESSION_LOOKUP_BUSY" });
-        return { ok: false };
-      }
-    } catch {
-      await reply.code(503).send({ code: "SESSION_LOOKUP_UNAVAILABLE" });
-      return { ok: false };
-    }
-    try {
-      const session = await options.identity.getSession(sessionId);
-      if (!session) {
-        await reply.code(401).send({ code: "AUTHENTICATION_REQUIRED" });
-        return { ok: false };
-      }
-      return { ok: true, session };
-    } catch {
-      await reply.code(503).send({ code: "SESSION_STORE_UNAVAILABLE" });
-      return { ok: false };
-    } finally {
-      release?.();
-    }
-  }
-
   app.get(
     "/api/tenants/:tenantId/establishments/:establishmentId/renave-link",
     async (request, reply) => {
-      const sessionResult = await guardedSession(request, reply);
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
       if (!sessionResult.ok) return;
       const { session } = sessionResult;
       if (!options.linkStatus) {
@@ -284,7 +236,10 @@ export function registerRenaveRoutes(
       if (request.headers.origin !== options.identity.config.publicOrigin) {
         return reply.code(403).send({ code: "CSRF_ORIGIN_MISMATCH" });
       }
-      const sessionResult = await guardedSession(request, reply);
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
       if (!sessionResult.ok) return;
       const { session } = sessionResult;
       if (!options.preflight) {
@@ -366,7 +321,10 @@ export function registerRenaveRoutes(
       if (request.headers.origin !== options.identity.config.publicOrigin) {
         return reply.code(403).send({ code: "CSRF_ORIGIN_MISMATCH" });
       }
-      const sessionResult = await guardedSession(request, reply);
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
       if (!sessionResult.ok) return;
       const { session } = sessionResult;
       if (!options.eligibility) {
@@ -460,7 +418,10 @@ export function registerRenaveRoutes(
       if (request.headers.origin !== options.identity.config.publicOrigin) {
         return reply.code(403).send({ code: "CSRF_ORIGIN_MISMATCH" });
       }
-      const sessionResult = await guardedSession(request, reply);
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
       if (!sessionResult.ok) return;
       if (!options.stockQuery) {
         return reply.code(503).send({ code: "RENAVE_NOT_CONFIGURED" });
