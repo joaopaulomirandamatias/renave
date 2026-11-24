@@ -225,6 +225,28 @@ describe("guard do banco de runtime", () => {
     await expectAppContractReady();
   });
 
+  it("recusa checksum divergente da migration de recovery", async () => {
+    const original = await adminPool.query<{ checksum: string }>(
+      `select checksum from renave.schema_migrations
+        where version = '0031_operation_recover_expired_send'`,
+    );
+    await adminPool.query(
+      `update renave.schema_migrations set checksum = $1
+        where version = '0031_operation_recover_expired_send'`,
+      ["0".repeat(64)],
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `update renave.schema_migrations set checksum = $1
+          where version = '0031_operation_recover_expired_send'`,
+        [original.rows[0]!.checksum],
+      );
+    }
+    await expectAppContractReady();
+  });
+
   it("recusa RLS desabilitada nas tabelas do outbox", async () => {
     await adminPool.query(
       "alter table renave.operation_outbox disable row level security",
@@ -674,6 +696,74 @@ describe("guard do banco de runtime", () => {
          from begin_dispatch_acl_probe`,
       );
       await adminPool.query("drop role begin_dispatch_acl_probe");
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa recovery adulterado ou sem SECURITY DEFINER", async () => {
+    const original = await adminPool.query<{ definition: string }>(
+      `select pg_catalog.pg_get_functiondef(
+         'renave.recover_expired_operation_sends(integer)'::regprocedure
+       ) as definition`,
+    );
+    await adminPool.query(
+      `create or replace function renave.recover_expired_operation_sends(
+         p_limit integer
+       )
+       returns table (
+         operation_id uuid, send_outbox_id uuid, reconcile_outbox_id uuid,
+         operation_version bigint, recovered_at timestamptz,
+         reconcile_available_at timestamptz
+       )
+       language plpgsql
+       security definer
+       set search_path = pg_catalog
+       as $$
+       begin
+         return;
+       end;
+       $$`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+
+    await adminPool.query(
+      `alter function renave.recover_expired_operation_sends(integer)
+       security invoker`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `alter function renave.recover_expired_operation_sends(integer)
+         security definer`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa grant inesperado na função de recovery", async () => {
+    await adminPool.query(
+      "create role expired_send_recovery_acl_probe nologin",
+    );
+    await adminPool.query(
+      `grant execute on function
+         renave.recover_expired_operation_sends(integer)
+       to expired_send_recovery_acl_probe`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `revoke execute on function
+           renave.recover_expired_operation_sends(integer)
+         from expired_send_recovery_acl_probe`,
+      );
+      await adminPool.query("drop role expired_send_recovery_acl_probe");
     }
     await expectAppContractReady();
   });
