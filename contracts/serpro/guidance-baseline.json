@@ -1,0 +1,95 @@
+{
+  "pages": [
+    {
+      "name": "central-ajuda",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/",
+      "requiredText": [
+        "Escolha seu perfil e acesse as operações, manuais e fluxos do Renave",
+        "Lojistas e concessionárias - gestão de estoque e vendas",
+        "Swagger / OpenAPI"
+      ]
+    },
+    {
+      "name": "integradores",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/central-ajuda/dicas/",
+      "requiredText": [
+        "Os integradores são responsáveis por implementar a comunicação",
+        "mesmos schemas, regras de negócio e retornos de erro do ambiente produtivo",
+        "disponível 24/7"
+      ]
+    },
+    {
+      "name": "homologacao",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/central-ajuda/homologacao/",
+      "requiredText": [
+        "Cliente padrão de homologação",
+        "Estabelecimento padrão de teste",
+        "Zangão Acabador (ITE)",
+        "Besoura Montadora",
+        "basta não informar nenhum certificado digital nas requisições"
+      ]
+    },
+    {
+      "name": "diagramas",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/diagramas/",
+      "requiredText": [
+        "Fluxo de entrada em estoque",
+        "Estados de um estoque",
+        "Fluxo de transferência de estoque entre filiais",
+        "Ciclo de vida da intenção de venda"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "name": "fluxo-entrada-usado",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/entrada_de_veiculo_em_estoque-hom.png",
+      "sha256": "72be410f2af9e4fc2854b63b91fb68646550fb4ee45f50ae618028ecfa0d9306"
+    },
+    {
+      "name": "estados-estoque-usado",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/estados-estoque.png",
+      "sha256": "a98d03f5f74082fdf5e29d33bcb344f907718a60662b47f769a7b793256705df"
+    },
+    {
+      "name": "fluxo-entrada-veiculo-proprio",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/entrada_de_veiculo_proprio_em_estoque.png",
+      "sha256": "d639c742bcc1e00b94ce4e1aaddb9debe10a3dae31723a0f1aca368454e4fdca"
+    },
+    {
+      "name": "fluxo-saida-usado",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/saida_de_veiculo_em_estoque-hom.png",
+      "sha256": "960c94e8ba1d093f76cbb5a39a905806c38c44fb7525f305dc8aa197c1c9990d"
+    },
+    {
+      "name": "fluxo-transferencia-estabelecimentos",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/transferencia_entre_estabelecimentos.png",
+      "sha256": "1651aea9f2027ae4c30c2a10cc2c43ffd077c97d632af0f166223cc51c73c233"
+    },
+    {
+      "name": "fluxo-transferencia-filiais",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/transferencia_entre_filiais.png",
+      "sha256": "0be4b3f883a2f3646bc9ce2e9144d4e21c504c81445c3eacf1c6f2996734b4e1"
+    },
+    {
+      "name": "fluxo-cancelamento-entrada",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/cancelamento_entrada_estoque-hom.png",
+      "sha256": "c60afedb0f2f4469568046e494aa2a9db774fb1b7d48df436611645073f706ae"
+    },
+    {
+      "name": "fluxo-cancelamento-saida",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/cancelamento_saida_estoque-hom.png",
+      "sha256": "d7fb3219b742ac38510eb47ebc8559717909df9808249151d79a8aa3f423713b"
+    },
+    {
+      "name": "estados-intencao-venda",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/estados_intencao_venda.png",
+      "sha256": "cbb2b365f209fef5cca71c427f0c3e6315e869e38d50ed450647dc5f4993f463"
+    },
+    {
+      "name": "fluxo-assinatura-avancada-atpv",
+      "source": "https://centraldeajuda.serpro.gov.br/renave/assets/diagramas/assinatura_avancada_atpv-hom.png",
+      "sha256": "7662ea0d897505432777c325f720a3f9247ad44b2cc5c27dd2bb1f2b532ba263"
+    }
+  ]
+}

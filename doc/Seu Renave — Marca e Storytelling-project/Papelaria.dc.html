@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Papelaria — ViaAuto</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          width: 1600px;
+          height: 1000px;
+          box-sizing: border-box;
+          padding: 48px 64px;
+          background: #e4e7ec;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          "
+        >
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div
+              style="
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #115e59;
+              "
+            >
+              13 · Papelaria
+            </div>
+            <h1
+              style="
+                margin: 0;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 40px;
+                font-weight: 600;
+                letter-spacing: -0.025em;
+              "
+            >
+              Pontos de contato impressos e digitais
+            </h1>
+          </div>
+          <span style="font-size: 14px; color: #344054"
+            >Nomes e contatos são exemplos.</span
+          >
+        </div>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 260px;
+            gap: 28px;
+            flex-grow: 1;
+          "
+        >
+          <div style="display: flex; flex-direction: column; gap: 22px">
+            <div
+              style="
+                width: 425px;
+                height: 275px;
+                border-radius: 10px;
+                background: #0f766e;
+                color: #ffffff;
+                position: relative;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: 12px;
+                box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+              "
+            >
+              <svg
+                aria-hidden="true"
+                width="425"
+                height="140"
+                viewBox="0 0 425 140"
+                style="position: absolute; bottom: 0; left: 0; opacity: 0.3"
+              >
+                <path
+                  d="M-20 140C90 140 130 70 220 70S360 10 450 10"
+                  fill="none"
+                  stroke="#CCFBF1"
+                  stroke-width="26"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <svg
+                width="64"
+                height="64"
+                viewBox="0 0 48 48"
+                aria-hidden="true"
+                style="position: relative"
+              >
+                <path
+                  d="M2.5 28.5L8.5 22.5L19 33L41 6.5L44 9.5L19.5 42Z"
+                  fill="#FFFFFF"
+                  stroke="#FFFFFF"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M21 35.6L41.8 9"
+                  fill="none"
+                  stroke="#0F766E"
+                  stroke-width="1.5"
+                  stroke-dasharray="3 2.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span
+                style="
+                  position: relative;
+                  font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                  font-size: 36px;
+                  font-weight: 700;
+                  letter-spacing: -0.04em;
+                "
+                >Via<span style="color: #ccfbf1">Auto</span></span
+              >
+            </div>
+            <div
+              style="
+                width: 425px;
+                height: 275px;
+                border-radius: 10px;
+                background: #ffffff;
+                padding: 28px 30px;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 2px">
+                <strong
+                  style="
+                    font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                    font-size: 22px;
+                  "
+                  >Ana Ribeiro</strong
+                >
+                <span style="font-size: 14px; color: #0f766e; font-weight: 600"
+                  >Especialista em Conformidade RENAVE</span
+                >
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                  font-size: 13px;
+                  color: #344054;
+                "
+              >
+                <span>ana.ribeiro@[dominio].com.br</span>
+                <span>[TELEFONE]</span>
+                <span>[SITE]</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <span style="font-size: 12px; color: #475467"
+                  >O caminho simples para sua operação veicular.</span
+                >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 48 48"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2.5 28.5L8.5 22.5L19 33L41 6.5L44 9.5L19.5 42Z"
+                    fill="#0F766E"
+                    stroke="#0F766E"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+            </div>
+            <span style="font-size: 13px; color: #344054"
+              >Cartão 85 × 55 mm · frente e verso · papel couché fosco 350
+              g</span
+            >
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 22px">
+            <div
+              style="
+                background: #ffffff;
+                border-radius: 10px;
+                padding: 22px 26px;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+              "
+            >
+              <span
+                style="
+                  font-size: 12px;
+                  font-weight: 600;
+                  color: #475467;
+                  text-transform: uppercase;
+                  letter-spacing: 0.06em;
+                "
+                >Assinatura de e-mail</span
+              >
+              <div
+                style="
+                  display: flex;
+                  gap: 16px;
+                  align-items: center;
+                  border-top: 1px solid #e4e7ec;
+                  padding-top: 14px;
+                "
+              >
+                <svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 48 48"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2.5 28.5L8.5 22.5L19 33L41 6.5L44 9.5L19.5 42Z"
+                    fill="#0F766E"
+                    stroke="#0F766E"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M21 35.6L41.8 9"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    stroke-width="1.5"
+                    stroke-dasharray="3 2.6"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <div
+                  style="width: 1px; align-self: stretch; background: #e4e7ec"
+                ></div>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                    font-size: 14px;
+                  "
+                >
+                  <strong>Ana Ribeiro</strong>
+                  <span style="color: #0f766e; font-weight: 600"
+                    >Especialista em Conformidade RENAVE · ViaAuto</span
+                  >
+                  <span style="color: #475467">[TELEFONE] · [SITE]</span>
+                </div>
+              </div>
+            </div>
+            <div
+              style="
+                background: #ffffff;
+                border-radius: 10px;
+                padding: 32px 36px;
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+                flex-grow: 1;
+                box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding-bottom: 16px;
+                  border-bottom: 2px solid #0f766e;
+                "
+              >
+                <span style="display: flex; align-items: center; gap: 8px"
+                  ><svg
+                    width="30"
+                    height="30"
+                    viewBox="0 0 48 48"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M2.5 28.5L8.5 22.5L19 33L41 6.5L44 9.5L19.5 42Z"
+                      fill="#0F766E"
+                      stroke="#0F766E"
+                      stroke-width="2"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M21 35.6L41.8 9"
+                      fill="none"
+                      stroke="#FFFFFF"
+                      stroke-width="1.5"
+                      stroke-dasharray="3 2.6"
+                      stroke-linecap="round"
+                    /></svg
+                  ><span
+                    style="
+                      font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                      font-size: 22px;
+                      font-weight: 700;
+                      letter-spacing: -0.035em;
+                    "
+                    ><span style="color: #0f766e">Via</span>Auto</span
+                  ></span
+                >
+                <span style="font-size: 12px; color: #475467; text-align: right"
+                  >Proposta comercial nº [NÚMERO]<br />[DATA]</span
+                >
+              </div>
+              <h2
+                style="
+                  margin: 0;
+                  font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                  font-size: 28px;
+                  font-weight: 600;
+                  letter-spacing: -0.02em;
+                "
+              >
+                Integração RENAVE para [NOME DO CLIENTE]
+              </h2>
+              <p
+                style="
+                  margin: 0;
+                  font-size: 14px;
+                  line-height: 1.6;
+                  color: #344054;
+                "
+              >
+                Esta proposta descreve a contratação do serviço de integração e
+                conformidade RENAVE da ViaAuto para [N] estabelecimentos, com
+                onboarding assistido, assistentes de operação, trilha de
+                auditoria e suporte em horário ampliado.
+              </p>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(3, minmax(0, 1fr));
+                  gap: 12px;
+                "
+              >
+                <div
+                  style="padding: 12px; border-radius: 8px; background: #f6f7f9"
+                >
+                  <span style="font-size: 12px; color: #475467"
+                    >Estabelecimentos</span
+                  ><br /><strong>[N]</strong>
+                </div>
+                <div
+                  style="padding: 12px; border-radius: 8px; background: #f6f7f9"
+                >
+                  <span style="font-size: 12px; color: #475467"
+                    >Preço por operação</span
+                  ><br /><strong>[PREÇO]</strong>
+                </div>
+                <div
+                  style="padding: 12px; border-radius: 8px; background: #f6f7f9"
+                >
+                  <span style="font-size: 12px; color: #475467"
+                    >Início previsto</span
+                  ><br /><strong>[DATA]</strong>
+                </div>
+              </div>
+              <span style="margin-top: auto; font-size: 11px; color: #475467"
+                >ViaAuto · [RAZÃO SOCIAL] · [CNPJ] · Produto independente — não
+                é sistema oficial do governo.</span
+              >
+            </div>
+          </div>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              align-items: center;
+            "
+          >
+            <div
+              style="
+                width: 260px;
+                height: 414px;
+                border-radius: 14px;
+                background: #ffffff;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+              "
+            >
+              <div
+                style="
+                  height: 120px;
+                  background: #0f766e;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 8px;
+                  color: #ffffff;
+                "
+              >
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 48 48"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2.5 28.5L8.5 22.5L19 33L41 6.5L44 9.5L19.5 42Z"
+                    fill="#FFFFFF"
+                    stroke="#FFFFFF"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M21 35.6L41.8 9"
+                    fill="none"
+                    stroke="#0F766E"
+                    stroke-width="1.5"
+                    stroke-dasharray="3 2.6"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <span
+                  style="
+                    font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                    font-size: 26px;
+                    font-weight: 700;
+                    letter-spacing: -0.04em;
+                  "
+                  >Via<span style="color: #ccfbf1">Auto</span></span
+                >
+              </div>
+              <div
+                style="
+                  flex-grow: 1;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 10px;
+                  padding: 22px 18px;
+                "
+              >
+                <div
+                  style="
+                    width: 104px;
+                    height: 104px;
+                    border-radius: 999px;
+                    border: 1.5px dashed #98a2b3;
+                    background: #f2f4f7;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 12px;
+                    color: #475467;
+                  "
+                >
+                  [FOTO]
+                </div>
+                <strong
+                  style="
+                    font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                    font-size: 20px;
+                  "
+                  >Ana Ribeiro</strong
+                >
+                <span
+                  style="
+                    font-size: 13px;
+                    color: #0f766e;
+                    font-weight: 600;
+                    text-align: center;
+                  "
+                  >Conformidade RENAVE</span
+                >
+                <span
+                  style="
+                    margin-top: auto;
+                    padding: 6px 12px;
+                    border-radius: 999px;
+                    background: #e6f4f1;
+                    color: #115e59;
+                    font-size: 12px;
+                    font-weight: 600;
+                  "
+                  >Colaborador</span
+                >
+              </div>
+            </div>
+            <span style="font-size: 13px; color: #344054"
+              >Crachá 54 × 86 mm</span
+            >
+          </div>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1600,"height":1000}}'
+    >
+      class Component extends DCLogic {
+        renderVals() { return {}; }
+      }
+    </script>
+  </body>
+</html>

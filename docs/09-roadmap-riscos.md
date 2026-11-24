@@ -57,7 +57,7 @@ gantt
 
 | # | Cenário | Tipo | Como provocar |
 |---|---|---|---|
-| H-01 | Entrada de usado comprado de PF → assinatura P7S → NF-e → CONFIRMADO | Positivo | `veiculos-usados-mock` + `transferencia-no-detran` |
+| H-01 | Entrada de usado comprado de PF: solicitação → SOLICITADO → ATPV/P7S ou CDT → TRANSFERIDO → novo CRV/TR 227 → CONFIRMADO → NF-e → CRLV | Positivo | `veiculos-usados-mock` + `transferencia-no-detran` |
 | H-02 | Entrada de veículo próprio | Positivo | Mock |
 | H-03 | Saída de usado → ATPV-e → FINALIZADO | Positivo | Mock |
 | H-04 | Aptidão com roubo/furto | Negativo | Mock `comRouboFurto` |
@@ -70,10 +70,11 @@ gantt
 | H-11 | Cancelar saída antes da transferência no DETRAN | Positivo | Mock |
 | H-12 | Transferência entre estabelecimentos (autorizar → cancelar → autorizar → aceitar) | Positivo | Dois clientes-padrão |
 | H-13 | Transferência entre filiais | Positivo | Mesma raiz |
-| H-14 | 0 km: pendente → entrada → saída → entrega | Positivo | `veiculos-zero-km-mock` |
+| H-14 | 0 km: pendente → entrada → saída → entrega, com sufixo de chassi único por execução (4 caracteres, sem I/O/Q) e sem reutilizar fixture já emplacada | Positivo | `veiculos-zero-km-mock` |
 | H-15 | 0 km Renovar (não cancelável) | Positivo / negativo | Mock |
 | H-16 | Inacabado → ITE → acabar (TR 107) → saída | Positivo | `ite/veiculos-inacabados-mock/acabar` |
 | H-17 | Consignação: entrada e cancelamento + mocks de DETRAN | Positivo | `/api/consignados/*` |
+| H-18 | Entrada usada interestadual: TR 206/249/204 → TRANSFERIDO → TR 227 → CONFIRMADO | Positivo | Mock com UF do estabelecimento diferente da jurisdição atual |
 | H-18 | Timeout simulado → INCERTA → reconciliação → CONFIRMADA sem duplicar | Resiliência | Proxy de falhas (toxiproxy) |
 | H-19 | 500 com `logIdRastreabilidade` → reenvio idêntico converge | Resiliência | Injeção |
 | H-20 | Certificado expirado / revogado → bloqueio local | Segurança | Certificado de teste |

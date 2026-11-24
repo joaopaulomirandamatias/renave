@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Painel operacional — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="painel"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                align-items: flex-end;
+                justify-content: space-between;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Boa tarde, Marina
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Auto Prime Veículos Ltda · Matriz São Paulo · segunda-feira,
+                  23/11/2026
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <a
+                  href="Estoque.dc.html"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #344054;
+                    font-size: 14px;
+                    font-weight: 600;
+                  "
+                  >Ver estoque</a
+                >
+                <a
+                  href="Entrada.dc.html"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    height: 44px;
+                    padding: 0 16px;
+                    border-radius: 8px;
+                    background: #067a45;
+                    color: #ffffff;
+                    font-size: 14px;
+                    font-weight: 600;
+                  "
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M5 12h14"></path>
+                  </svg>
+                  Dar entrada
+                </a>
+              </div>
+            </div>
+
+            <!-- Alertas -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 12px;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  align-items: flex-start;
+                  padding: 16px;
+                  background: #fffaeb;
+                  border: 1px solid #fedf89;
+                  border-radius: 10px;
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B54708"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  style="flex-shrink: 0; margin-top: 2px"
+                >
+                  <path
+                    d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"
+                  ></path>
+                </svg>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    flex: 1;
+                  "
+                >
+                  <strong style="font-size: 14px; color: #93370d"
+                    >Certificado e-CNPJ da filial Santos vence em 12
+                    dias</strong
+                  >
+                  <span style="font-size: 14px; color: #475467"
+                    >Sem certificado válido, a filial não consegue registrar
+                    entradas e saídas no RENAVE.</span
+                  >
+                </div>
+                <a
+                  href="Estabelecimentos.dc.html"
+                  style="
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #b54708;
+                    white-space: nowrap;
+                  "
+                  >Renovar agora</a
+                >
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  align-items: flex-start;
+                  padding: 16px;
+                  background: #fef3f2;
+                  border: 1px solid #fecdca;
+                  border-radius: 10px;
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B42318"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  style="flex-shrink: 0; margin-top: 2px"
+                >
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"></path>
+                </svg>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    flex: 1;
+                  "
+                >
+                  <strong style="font-size: 14px; color: #912018"
+                    >2 operações com resultado incerto</strong
+                  >
+                  <span style="font-size: 14px; color: #475467"
+                    >O RENAVE não respondeu a tempo. Verifique a situação antes
+                    de qualquer novo envio.</span
+                  >
+                </div>
+                <a
+                  href="Pendencias.dc.html"
+                  style="
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #b42318;
+                    white-space: nowrap;
+                  "
+                  >Reconciliar</a
+                >
+              </div>
+            </div>
+
+            <!-- KPIs -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+                gap: 12px;
+              "
+            >
+              <sc-for list="{{kpis}}" as="k" hint-placeholder-count="6">
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    padding: 16px;
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+                  "
+                >
+                  <span
+                    style="font-size: 13px; font-weight: 500; color: #475467"
+                    >{{k.label}}</span
+                  >
+                  <span
+                    style="
+                      font-size: 28px;
+                      font-weight: 600;
+                      letter-spacing: -0.02em;
+                    "
+                    >{{k.value}}</span
+                  >
+                  <span
+                    style="font-size: 12px; font-weight: 500; color: {{k.noteColor}}"
+                    >{{k.note}}</span
+                  >
+                </div>
+              </sc-for>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <!-- Atenção agora -->
+              <section
+                style="
+                  flex: 2 1 560px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 16px 20px;
+                    border-bottom: 1px solid #e4e7ec;
+                  "
+                >
+                  <div style="display: flex; flex-direction: column; gap: 2px">
+                    <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                      O que precisa da sua atenção agora
+                    </h2>
+                    <span style="font-size: 13px; color: #475467"
+                      >Ordenado por risco e prazo</span
+                    >
+                  </div>
+                  <a
+                    href="Pendencias.dc.html"
+                    style="font-size: 14px; font-weight: 600"
+                    >Ver as 14 pendências</a
+                  >
+                </div>
+                <sc-for list="{{attention}}" as="a" hint-placeholder-count="5">
+                  <div
+                    style="
+                      display: flex;
+                      flex-wrap: wrap;
+                      gap: 12px 16px;
+                      align-items: center;
+                      padding: 16px 20px;
+                      border-bottom: 1px solid #f2f4f7;
+                    "
+                  >
+                    <span
+                      style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: {{a.tagBg}}; color: {{a.tagColor}}; white-space: nowrap"
+                      >{{a.tag}}</span
+                    >
+                    <div
+                      style="
+                        flex: 1 1 280px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 4px;
+                        min-width: 0;
+                      "
+                    >
+                      <span style="font-size: 14px; font-weight: 600"
+                        >{{a.title}}</span
+                      >
+                      <span style="font-size: 13px; color: #475467"
+                        >{{a.cause}}</span
+                      >
+                    </div>
+                    <span
+                      style="
+                        font-size: 13px;
+                        color: #475467;
+                        white-space: nowrap;
+                      "
+                      >{{a.due}}</span
+                    >
+                    <a
+                      href="{{a.href}}"
+                      style="
+                        display: inline-flex;
+                        align-items: center;
+                        height: 36px;
+                        padding: 0 14px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        color: #344054;
+                        font-size: 13px;
+                        font-weight: 600;
+                        white-space: nowrap;
+                      "
+                      >{{a.action}}</a
+                    >
+                  </div>
+                </sc-for>
+              </section>
+
+              <!-- Ações rápidas + idade -->
+              <div
+                style="
+                  flex: 1 1 300px;
+                  min-width: 0;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 24px;
+                "
+              >
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                  "
+                >
+                  <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                    Ações rápidas
+                  </h2>
+                  <a
+                    href="Entrada.dc.html"
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 12px;
+                      min-height: 56px;
+                      padding: 12px 16px;
+                      border: 1px solid #e4e7ec;
+                      border-radius: 10px;
+                      color: #101828;
+                    "
+                  >
+                    <span
+                      style="
+                        display: inline-flex;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 8px;
+                        background: #e7f6ee;
+                        color: #067a45;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                      ><svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.75"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M3 12h13M12 7l5 5-5 5M21 4v16"></path></svg
+                    ></span>
+                    <span
+                      style="display: flex; flex-direction: column; gap: 2px"
+                      ><strong style="font-size: 15px">Dar entrada</strong
+                      ><span style="font-size: 13px; color: #475467"
+                        >Usado, 0 km, próprio ou retomado</span
+                      ></span
+                    >
+                  </a>
+                  <a
+                    href="Saida.dc.html"
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 12px;
+                      min-height: 56px;
+                      padding: 12px 16px;
+                      border: 1px solid #e4e7ec;
+                      border-radius: 10px;
+                      color: #101828;
+                    "
+                  >
+                    <span
+                      style="
+                        display: inline-flex;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 8px;
+                        background: #e7f6ee;
+                        color: #067a45;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                      ><svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.75"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 12H8M12 7l-5 5 5 5M3 4v16"></path></svg
+                    ></span>
+                    <span
+                      style="display: flex; flex-direction: column; gap: 2px"
+                      ><strong style="font-size: 15px">Registrar saída</strong
+                      ><span style="font-size: 13px; color: #475467"
+                        >Venda com NF-e e ATPV-e</span
+                      ></span
+                    >
+                  </a>
+                  <a
+                    href="Veiculo.dc.html"
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 12px;
+                      min-height: 56px;
+                      padding: 12px 16px;
+                      border: 1px solid #e4e7ec;
+                      border-radius: 10px;
+                      color: #101828;
+                    "
+                  >
+                    <span
+                      style="
+                        display: inline-flex;
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 8px;
+                        background: #e7f6ee;
+                        color: #067a45;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                      ><svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.75"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <path d="m20 20-3.5-3.5"></path></svg
+                    ></span>
+                    <span
+                      style="display: flex; flex-direction: column; gap: 2px"
+                      ><strong style="font-size: 15px"
+                        >Consultar no RENAVE</strong
+                      ><span style="font-size: 13px; color: #475467"
+                        >Placa, chassi ou RENAVAM</span
+                      ></span
+                    >
+                  </a>
+                </section>
+
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 14px;
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: baseline;
+                    "
+                  >
+                    <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                      Prazos de escrituração
+                    </h2>
+                    <span style="font-size: 13px; color: #475467"
+                      >23 operações abertas</span
+                    >
+                  </div>
+                  <sc-for list="{{ages}}" as="g" hint-placeholder-count="4">
+                    <div
+                      style="display: flex; flex-direction: column; gap: 6px"
+                    >
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          font-size: 13px;
+                        "
+                      >
+                        <span style="color: #344054; font-weight: 500"
+                          >{{g.label}}</span
+                        ><span style="color: #475467"
+                          >{{g.count}} operações</span
+                        >
+                      </div>
+                      <div
+                        style="
+                          height: 8px;
+                          border-radius: 999px;
+                          background: #f2f4f7;
+                          overflow: hidden;
+                        "
+                      >
+                        <div
+                          style="height: 8px; border-radius: 999px; width: {{g.pct}}; background: {{g.color}}"
+                        ></div>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <span style="font-size: 13px; color: #475467"
+                    >Atraso na escrituração sujeita o estabelecimento a multa
+                    (CTB, art. 330).
+                    <a href="Pendencias.dc.html" style="font-weight: 600"
+                      >Ver as 3 vencidas</a
+                    ></span
+                  >
+                </section>
+              </div>
+            </div>
+
+            <!-- Gráfico -->
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 12px;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 2px">
+                  <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                    Entradas × saídas — últimos 14 dias
+                  </h2>
+                  <span style="font-size: 13px; color: #475467"
+                    >Todos os estabelecimentos · registros confirmados no
+                    RENAVE</span
+                  >
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    gap: 16px;
+                    font-size: 13px;
+                    color: #344054;
+                  "
+                >
+                  <span
+                    style="display: inline-flex; align-items: center; gap: 6px"
+                    ><span
+                      style="
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 3px;
+                        background: #067a45;
+                      "
+                    ></span
+                    >Entradas (112)</span
+                  >
+                  <span
+                    style="display: inline-flex; align-items: center; gap: 6px"
+                    ><span
+                      style="
+                        width: 10px;
+                        height: 10px;
+                        border-radius: 3px;
+                        background: #98a2b3;
+                      "
+                    ></span
+                    >Saídas (97)</span
+                  >
+                </div>
+              </div>
+              <div style="overflow-x: auto">
+                <div
+                  style="
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 12px;
+                    height: 180px;
+                    min-width: 640px;
+                    border-bottom: 1px solid #e4e7ec;
+                    padding: 0 4px;
+                  "
+                >
+                  <sc-for list="{{days}}" as="d" hint-placeholder-count="14">
+                    <div
+                      style="
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 6px;
+                      "
+                    >
+                      <div
+                        style="
+                          display: flex;
+                          align-items: flex-end;
+                          gap: 3px;
+                          height: 150px;
+                        "
+                      >
+                        <div
+                          title="Entradas"
+                          style="width: 12px; border-radius: 3px 3px 0 0; background: #067A45; height: {{d.eh}}"
+                        ></div>
+                        <div
+                          title="Saídas"
+                          style="width: 12px; border-radius: 3px 3px 0 0; background: #98A2B3; height: {{d.sh}}"
+                        ></div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    gap: 12px;
+                    min-width: 640px;
+                    padding: 6px 4px 0;
+                  "
+                >
+                  <sc-for list="{{days}}" as="d" hint-placeholder-count="14">
+                    <span
+                      style="
+                        flex: 1;
+                        text-align: center;
+                        font-size: 11px;
+                        color: #475467;
+                      "
+                      >{{d.label}}</span
+                    >
+                  </sc-for>
+                </div>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1500}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const ok = '#067647', warn = '#B54708', err = '#B42318', neu = '#475467';
+          const raw = [[9,6],[7,8],[11,5],[6,9],[8,7],[4,3],[2,1],[10,8],[9,10],[12,7],[8,9],[7,6],[10,12],[9,6]];
+          const labels = ['10/11','11/11','12/11','13/11','14/11','15/11','16/11','17/11','18/11','19/11','20/11','21/11','22/11','23/11'];
+          return {
+            kpis: [
+              { label: 'Em estoque', value: '184', note: 'Matriz 112 · Campinas 47 · Santos 25', noteColor: neu },
+              { label: 'Entradas hoje', value: '9', note: '+2 em relação a ontem', noteColor: ok },
+              { label: 'Saídas hoje', value: '6', note: '3 aguardando ATPV-e', noteColor: warn },
+              { label: 'Pendências abertas', value: '14', note: '3 vencem hoje', noteColor: warn },
+              { label: 'Divergências', value: '2', note: 'Resultado incerto', noteColor: err },
+              { label: 'Conector RENAVE', value: '99,8%', note: 'Disponibilidade 30 dias', noteColor: ok }
+            ],
+            attention: [
+              { tag: 'Resultado incerto', tagBg: '#FEF3F2', tagColor: '#B42318', title: 'Saída de QTP4H82 sem resposta do RENAVE', cause: 'Tempo de resposta esgotado às 14:02. Não reenvie: verifique a situação primeiro.', due: 'Agora', action: 'Reconciliar', href: 'Operacao.dc.html' },
+              { tag: 'Documental', tagBg: '#FFFAEB', tagColor: '#B54708', title: 'ATPV-e de entrada sem assinatura do vendedor — RVA2C17', cause: 'Sem a assinatura, o veículo não pode ser vendido.', due: 'Vence hoje, 18:00', action: 'Reenviar convite', href: 'Veiculo.dc.html' },
+              { tag: 'Fiscal', tagBg: '#FFFAEB', tagColor: '#B54708', title: 'NF-e de saída com CNPJ do emitente diferente — SGL8B03', cause: 'A nota foi emitida pela filial Campinas, mas o veículo está no estoque da Matriz.', due: 'Vence hoje', action: 'Corrigir NF-e', href: 'Saida.dc.html' },
+              { tag: 'Transferência', tagBg: '#EFF8FF', tagColor: '#175CD3', title: 'Transferência recebida de Campinas aguardando aceite', cause: '2 veículos (FJK3D21, PLM7E44) — o registro só conclui após seu aceite.', due: 'Até 25/11/2026', action: 'Aceitar', href: 'Transferencias.dc.html' },
+              { tag: 'Consignação', tagBg: '#F2F4F7', tagColor: '#344054', title: 'Consignante ainda não assinou a ATPV-e — HBX5J90', cause: 'Restam 6 dias do prazo de 30 dias; depois disso a venda é cancelada.', due: '29/11/2026', action: 'Ver contrato', href: 'Consignacao.dc.html' }
+            ],
+            ages: [
+              { label: 'Concluir hoje', count: 9, pct: '39%', color: '#F79009' },
+              { label: 'Em 1–2 dias', count: 11, pct: '48%', color: '#067A45' },
+              { label: 'Vencidas', count: 3, pct: '13%', color: '#D92D20' }
+            ],
+            days: raw.map((r, i) => ({ label: labels[i], eh: (r[0] * 11) + 'px', sh: (r[1] * 11) + 'px' }))
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

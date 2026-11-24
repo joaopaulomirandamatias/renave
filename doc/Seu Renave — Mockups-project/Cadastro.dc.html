@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Criar conta da empresa — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Nunito:wght@900&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          input,
+          select {
+            font: inherit;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          box-sizing: border-box;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 40px 16px;
+          gap: 28px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+          "
+        >
+          <div
+            role="img"
+            aria-label="Seu Renave"
+            style="display: flex; align-items: center; gap: 14px"
+          >
+            <svg
+              width="76"
+              height="76"
+              viewBox="0 0 120 120"
+              aria-hidden="true"
+            >
+              <path
+                d="M4 112 C 34 96, 72 110, 116 92"
+                fill="none"
+                stroke="#F2A90C"
+                stroke-width="16"
+                stroke-linecap="round"
+              />
+              <path
+                d="M4 110 C 34 94, 72 108, 116 90"
+                fill="none"
+                stroke="#0A9B55"
+                stroke-width="13"
+                stroke-linecap="round"
+              />
+              <path
+                d="M4 110 C 34 94, 72 108, 116 90"
+                fill="none"
+                stroke="#FFFFFF"
+                stroke-width="2"
+                stroke-dasharray="6 5"
+              />
+              <path
+                d="M30 8h38l20 20v58a8 8 0 0 1-8 8H30a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8z"
+                fill="#FFFFFF"
+                stroke="#0B2550"
+                stroke-width="7"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M68 8v20h20z"
+                fill="#0A9B55"
+                stroke="#0A9B55"
+                stroke-width="4"
+                stroke-linejoin="round"
+              />
+              <rect
+                x="34"
+                y="26"
+                width="28"
+                height="7"
+                rx="3.5"
+                fill="#0B2550"
+              />
+              <rect
+                x="34"
+                y="39"
+                width="20"
+                height="7"
+                rx="3.5"
+                fill="#0B2550"
+              />
+              <path
+                d="M32 66 L39 52 H71 L78 66 H88 a8 8 0 0 1 8 8 V88 a4 4 0 0 1-4 4 H86 v5 a3 3 0 0 1-3 3 h-7 a3 3 0 0 1-3-3 v-5 H37 v5 a3 3 0 0 1-3 3 h-7 a3 3 0 0 1-3-3 v-5 H18 a4 4 0 0 1-4-4 V74 a8 8 0 0 1 8-8 z"
+                fill="#0B2550"
+              />
+              <path
+                d="M42 56 H68 L73 64 H37 Z"
+                fill="none"
+                stroke="#FFFFFF"
+                stroke-width="2.5"
+                stroke-linejoin="round"
+              />
+              <rect x="19" y="73" width="12" height="6" rx="3" fill="#FFFFFF" />
+              <rect x="79" y="73" width="12" height="6" rx="3" fill="#FFFFFF" />
+              <circle
+                cx="88"
+                cy="45"
+                r="15"
+                fill="#0A9B55"
+                stroke="#FFFFFF"
+                stroke-width="4"
+              />
+              <path
+                d="M80.5 45.5l5 5 9.5-10"
+                fill="none"
+                stroke="#FFFFFF"
+                stroke-width="5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span
+              style="
+                font-family: Nunito, Inter, sans-serif;
+                font-weight: 900;
+                font-size: 38px;
+                letter-spacing: -0.01em;
+                line-height: 1;
+              "
+              ><span style="color: #0b2550">Seu</span>
+              <span style="color: #0a9b55">Renave</span></span
+            >
+          </div>
+          <span style="font-size: 14px; color: #475467"
+            >O RENAVE da sua empresa, do seu jeito.</span
+          >
+          <span style="font-size: 12px; font-weight: 600; color: #475467"
+            >Plataforma privada — não é o sistema oficial do governo</span
+          >
+        </div>
+
+        <div
+          style="
+            width: 100%;
+            max-width: 1080px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: flex-start;
+            justify-content: center;
+          "
+        >
+          <section
+            style="
+              flex: 2 1 460px;
+              box-sizing: border-box;
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 12px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 18px;
+              box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 26px;
+                  font-weight: 600;
+                  letter-spacing: -0.01em;
+                "
+              >
+                Criar conta da empresa
+              </h1>
+              <p style="margin: 0; font-size: 14px; color: #475467">
+                Ambiente de homologação gratuito para testes. Em produção, você
+                paga somente por registro confirmado no RENAVE, pelo valor da
+                tabela oficial — sem mensalidade.
+              </p>
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 16px;
+              "
+            >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >CNPJ da empresa<input
+                  value="23.456.789/0001-10"
+                  style="
+                    height: 44px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font-size: 15px;
+                  "
+                /><span
+                  style="font-size: 12px; font-weight: 600; color: #067647"
+                  >Concessionária Litoral Norte S.A. · CNAE compatível</span
+                ></label
+              >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Tipo de estabelecimento<select
+                  style="
+                    height: 44px;
+                    padding: 0 10px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font-size: 15px;
+                    background: #ffffff;
+                  "
+                >
+                  <option>Concessionária</option>
+                  <option>Revenda de usados</option>
+                  <option>Grupo com filiais</option>
+                  <option>Montadora / importadora</option>
+                  <option>
+                    ITE (implementadora, transformadora, encarroçadora)
+                  </option>
+                  <option>Instituição credora</option>
+                </select></label
+              >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Nome do responsável<input
+                  value="Beatriz Nascimento"
+                  style="
+                    height: 44px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font-size: 15px;
+                  "
+              /></label>
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >CPF do responsável<input
+                  value="111.222.333-96"
+                  style="
+                    height: 44px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font-size: 15px;
+                  "
+              /></label>
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >E-mail corporativo<input
+                  value="beatriz@litoralnorte.com.br"
+                  style="
+                    height: 44px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font-size: 15px;
+                  "
+              /></label>
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 14px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Telefone / WhatsApp<input
+                  value="(12) 99876-5432"
+                  style="
+                    height: 44px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font-size: 15px;
+                  "
+              /></label>
+            </div>
+            <label
+              style="
+                display: flex;
+                gap: 10px;
+                align-items: flex-start;
+                font-size: 14px;
+                color: #344054;
+                line-height: 1.45;
+              "
+              ><input
+                type="checkbox"
+                checked="{{accepted}}"
+                onChange="{{toggle}}"
+                style="
+                  width: 18px;
+                  height: 18px;
+                  margin-top: 2px;
+                  accent-color: #067a45;
+                "
+              /><span
+                >Li e aceito os
+                <a href="#termos" style="font-weight: 600">Termos de uso</a> e a
+                <a href="#privacidade" style="font-weight: 600"
+                  >Política de privacidade</a
+                >. Os dados serão usados apenas para operar o RENAVE em nome da
+                empresa.</span
+              ></label
+            >
+            <button
+              type="button"
+              style="height: 48px; border: 0; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; background: {{btnBg}}; color: {{btnColor}}"
+            >
+              Criar conta em homologação
+            </button>
+            <span style="font-size: 13px; color: #475467; text-align: center"
+              >Já tem conta?
+              <a href="Login.dc.html" style="font-weight: 600">Entrar</a></span
+            >
+          </section>
+
+          <aside
+            style="
+              flex: 1 1 300px;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+            "
+          >
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+              "
+            >
+              <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                Depois daqui, 3 passos
+              </h2>
+              <ol
+                style="
+                  list-style: none;
+                  margin: 0;
+                  padding: 0;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 16px;
+                "
+              >
+                <li style="display: flex; gap: 12px">
+                  <span
+                    style="
+                      flex-shrink: 0;
+                      display: inline-flex;
+                      width: 28px;
+                      height: 28px;
+                      border-radius: 999px;
+                      background: #e7f6ee;
+                      color: #067a45;
+                      font-size: 13px;
+                      font-weight: 700;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                    >1</span
+                  ><span style="display: flex; flex-direction: column; gap: 2px"
+                    ><strong style="font-size: 14px">Validar seu e-mail</strong
+                    ><span style="font-size: 13px; color: #475467"
+                      >E ativar a verificação em duas etapas.</span
+                    ></span
+                  >
+                </li>
+                <li style="display: flex; gap: 12px">
+                  <span
+                    style="
+                      flex-shrink: 0;
+                      display: inline-flex;
+                      width: 28px;
+                      height: 28px;
+                      border-radius: 999px;
+                      background: #e7f6ee;
+                      color: #067a45;
+                      font-size: 13px;
+                      font-weight: 700;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                    >2</span
+                  ><span style="display: flex; flex-direction: column; gap: 2px"
+                    ><strong style="font-size: 14px"
+                      >Configurar o certificado e-CNPJ</strong
+                    ><span style="font-size: 13px; color: #475467"
+                      >A chave fica em cofre seguro; ninguém tem acesso a
+                      ela.</span
+                    ></span
+                  >
+                </li>
+                <li style="display: flex; gap: 12px">
+                  <span
+                    style="
+                      flex-shrink: 0;
+                      display: inline-flex;
+                      width: 28px;
+                      height: 28px;
+                      border-radius: 999px;
+                      background: #e7f6ee;
+                      color: #067a45;
+                      font-size: 13px;
+                      font-weight: 700;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                    >3</span
+                  ><span style="display: flex; flex-direction: column; gap: 2px"
+                    ><strong style="font-size: 14px"
+                      >Homologar e ir para produção</strong
+                    ><span style="font-size: 13px; color: #475467"
+                      >Nós guiamos a adesão no Credencia (SENATRAN) e os
+                      testes.</span
+                    ></span
+                  >
+                </li>
+              </ol>
+            </section>
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                padding: 20px;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+              "
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#067A45"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                style="flex-shrink: 0"
+              >
+                <path
+                  d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM9 12l2 2 4-4"
+                />
+              </svg>
+              <span
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                  font-size: 13px;
+                  color: #344054;
+                  line-height: 1.45;
+                "
+                ><strong style="font-size: 14px; color: #101828"
+                  >Seus dados protegidos</strong
+                >Integradora autorizada pela SENATRAN, dados processados no
+                Brasil, criptografia e trilha de auditoria em todas as
+                operações.</span
+              >
+            </section>
+          </aside>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1000}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { accepted: true }; }
+        renderVals() {
+          const a = this.state.accepted;
+          return { accepted: a, toggle: () => this.setState({ accepted: !a }), btnBg: a ? '#067A45' : '#F2F4F7', btnColor: a ? '#FFFFFF' : '#475467' };
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Consumo e faturas — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="assinatura"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Consumo e faturas
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Você paga somente por registro confirmado no RENAVE · sem
+                  mensalidade
+                </p>
+              </div>
+              <a
+                href="#tabela"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 1px solid #d0d5dd;
+                  border-radius: 8px;
+                  color: #344054;
+                  font-size: 14px;
+                  font-weight: 600;
+                "
+                >Tabela pública de preços</a
+              >
+            </div>
+
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 16px;
+              "
+            >
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467"
+                  >Registros confirmados em novembro</span
+                ><strong style="font-size: 24px">3.604</strong
+                ><span style="font-size: 13px; color: #475467"
+                  >Até 23/11/2026 15:40</span
+                >
+              </section>
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467"
+                  >Valor unitário oficial vigente</span
+                ><strong style="font-size: 16px"
+                  >[VALOR POR REGISTRO — tabela oficial]</strong
+                ><span style="font-size: 13px; color: #475467"
+                  >Vigência: [ATO NORMATIVO]</span
+                >
+              </section>
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467"
+                  >Previsão da fatura</span
+                ><strong style="font-size: 16px"
+                  >3.604 × [VALOR POR REGISTRO]</strong
+                ><span style="font-size: 13px; color: #475467"
+                  >Fecha em 30/11 · vence 05/12/2026</span
+                >
+              </section>
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467"
+                  >Forma de pagamento</span
+                ><strong style="font-size: 18px">Boleto / PIX</strong
+                ><a href="#forma" style="font-size: 14px; font-weight: 600"
+                  >Alterar</a
+                >
+              </section>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <section
+                style="
+                  flex: 1 1 400px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Registros no mês por tipo
+                </h2>
+                <sc-for list="{{tipos}}" as="t" hint-placeholder-count="5">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 13px;
+                      "
+                    >
+                      <span style="font-weight: 500">{{t.label}}</span
+                      ><span style="color: #475467">{{t.n}}</span>
+                    </div>
+                    <div
+                      style="
+                        height: 8px;
+                        border-radius: 999px;
+                        background: #f2f4f7;
+                      "
+                    >
+                      <div
+                        style="height: 8px; border-radius: 999px; background: #067A45; width: {{t.pct}}"
+                      ></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </section>
+              <section
+                style="
+                  flex: 1 1 360px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Registros no mês por estabelecimento
+                </h2>
+                <sc-for list="{{estabs}}" as="e" hint-placeholder-count="3">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 13px;
+                      "
+                    >
+                      <span style="font-weight: 500">{{e.label}}</span
+                      ><span style="color: #475467">{{e.n}}</span>
+                    </div>
+                    <div
+                      style="
+                        height: 8px;
+                        border-radius: 999px;
+                        background: #f2f4f7;
+                      "
+                    >
+                      <div
+                        style="height: 8px; border-radius: 999px; background: #0A9B55; width: {{e.pct}}"
+                      ></div>
+                    </div>
+                  </div>
+                </sc-for>
+                <span style="font-size: 12px; color: #475467"
+                  >Filial Santos está em homologação: nada é cobrado.</span
+                >
+              </section>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  padding: 16px 20px;
+                  border-bottom: 1px solid #e4e7ec;
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 8px;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 2px">
+                  <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                    Extrato detalhado
+                  </h2>
+                  <span style="font-size: 13px; color: #475467"
+                    >Cada registro com placa, tipo, data e valor</span
+                  >
+                </div>
+                <button
+                  type="button"
+                  style="
+                    height: 40px;
+                    padding: 0 14px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #344054;
+                    font: inherit;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  Exportar extrato (CSV)
+                </button>
+              </div>
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 860px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Data/hora</th>
+                      <th>Placa</th>
+                      <th>Tipo de registro</th>
+                      <th>Estabelecimento</th>
+                      <th>Situação</th>
+                      <th>Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for
+                      list="{{extrato}}"
+                      as="x"
+                      hint-placeholder-count="7"
+                    >
+                      <tr>
+                        <td style="color: #344054">{{x.t}}</td>
+                        <td style="font-weight: 600; letter-spacing: 0.04em">
+                          {{x.placa}}
+                        </td>
+                        <td>{{x.tipo}}</td>
+                        <td style="color: #344054">{{x.estab}}</td>
+                        <td>
+                          <span
+                            style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{x.bg}}; color: {{x.color}}"
+                            >{{x.sit}}</span
+                          >
+                        </td>
+                        <td style="font-weight: {{x.w}}; color: {{x.vColor}}">
+                          {{x.valor}}
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <h2
+                style="
+                  margin: 0;
+                  padding: 16px 20px;
+                  font-size: 17px;
+                  font-weight: 600;
+                  border-bottom: 1px solid #e4e7ec;
+                "
+              >
+                Faturas
+              </h2>
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Competência</th>
+                      <th>Registros confirmados</th>
+                      <th>Valor</th>
+                      <th>Vencimento</th>
+                      <th>Situação</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Outubro/2026</td>
+                      <td>3.338</td>
+                      <td>3.338 × [VALOR POR REGISTRO]</td>
+                      <td>05/11/2026</td>
+                      <td style="color: #067647; font-weight: 600">Paga</td>
+                      <td>
+                        <a href="#nf" style="font-size: 13px; font-weight: 600"
+                          >Fatura e NFS-e</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Setembro/2026</td>
+                      <td>3.102</td>
+                      <td>3.102 × [VALOR POR REGISTRO]</td>
+                      <td>05/10/2026</td>
+                      <td style="color: #067647; font-weight: 600">Paga</td>
+                      <td>
+                        <a href="#nf" style="font-size: 13px; font-weight: 600"
+                          >Fatura e NFS-e</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Agosto/2026</td>
+                      <td>2.876</td>
+                      <td>2.876 × [VALOR POR REGISTRO]</td>
+                      <td>05/09/2026</td>
+                      <td style="color: #067647; font-weight: 600">Paga</td>
+                      <td>
+                        <a href="#nf" style="font-size: 13px; font-weight: 600"
+                          >2ª via</a
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                  max-width: 640px;
+                "
+              >
+                <strong style="font-size: 16px"
+                  >Exportar todos os meus dados</strong
+                ><span style="font-size: 14px; color: #475467"
+                  >Pacote completo com veículos, registros, documentos e
+                  auditoria, com hash de integridade. Use para backup ou para
+                  migrar de integradora.</span
+                >
+              </div>
+              <button
+                type="button"
+                style="
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 1px solid #d0d5dd;
+                  border-radius: 8px;
+                  background: #ffffff;
+                  color: #344054;
+                  font: inherit;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Solicitar exportação
+              </button>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1500}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const ok = ['Confirmado', '#ECFDF3', '#067647'], rej = ['Rejeitado', '#FEF3F2', '#B42318'], inc = ['Resultado incerto', '#FFFAEB', '#B54708'];
+          const x = (t, placa, tipo, estab, s) => ({ t, placa, tipo, estab, sit: s[0], bg: s[1], color: s[2],
+            valor: s === ok ? '[VALOR POR REGISTRO]' : 'Não cobrado', w: s === ok ? '600' : '500', vColor: s === ok ? '#101828' : '#475467' });
+          return {
+            tipos: [
+              { label: 'Entrada de usado', n: '1.402', pct: '78%' }, { label: 'Saída de usado', n: '1.288', pct: '72%' },
+              { label: 'Entrada / saída 0 km', n: '611', pct: '34%' }, { label: 'Transferência', n: '184', pct: '10%' }, { label: 'Consignação', n: '119', pct: '7%' }
+            ],
+            estabs: [
+              { label: 'Matriz São Paulo', n: '2.210', pct: '61%' }, { label: 'Filial Campinas', n: '1.394', pct: '39%' }, { label: 'Filial Santos (homologação)', n: '0', pct: '0%' }
+            ],
+            extrato: [
+              x('23/11/2026 14:02', 'QTP4H82', 'Saída de usado', 'Matriz São Paulo', ok),
+              x('23/11/2026 11:05', 'SGL8B03', 'Saída de usado', 'Matriz São Paulo', rej),
+              x('23/11/2026 10:02', 'NBE1F36', 'Transferência', 'Matriz São Paulo', inc),
+              x('22/11/2026 16:30', 'RVA2C17', 'Entrada de usado', 'Matriz São Paulo', ok),
+              x('22/11/2026 09:12', '—', 'Entrada 0 km (chassi …102341)', 'Matriz São Paulo', ok),
+              x('21/11/2026 15:44', 'FJK3D21', 'Entrada de usado', 'Filial Campinas', ok),
+              x('21/11/2026 11:20', 'HBX5J90', 'Consignação', 'Matriz São Paulo', ok)
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

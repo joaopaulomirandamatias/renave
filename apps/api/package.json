@@ -1,0 +1,31 @@
+{
+  "name": "@seu-renave/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node --conditions=production dist/server.js",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@seu-renave/access-control": "workspace:*",
+    "@seu-renave/db": "workspace:*",
+    "@seu-renave/identity": "workspace:*",
+    "@seu-renave/protected-evidence": "workspace:*",
+    "@seu-renave/renave-application": "workspace:*",
+    "@seu-renave/renave-connector": "workspace:*",
+    "fastify": "5.12.7",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

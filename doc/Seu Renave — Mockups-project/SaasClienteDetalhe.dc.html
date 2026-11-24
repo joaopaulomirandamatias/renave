@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Auto Prime Veículos — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 10px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="clientes"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+            <span
+              style="
+                margin-left: auto;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-radius: 999px;
+                background: #ecfdf3;
+                color: #067647;
+              "
+              >PRODUÇÃO</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <nav aria-label="Trilha" style="font-size: 14px; color: #475467">
+              <a href="SaasClientes.dc.html" style="font-weight: 600"
+                >Clientes</a
+              >
+              / Auto Prime Veículos Ltda
+            </nav>
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 24px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 20px;
+                justify-content: space-between;
+                align-items: flex-start;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 3px 10px;
+                      border-radius: 999px;
+                      background: #ecfdf3;
+                      color: #067647;
+                    "
+                    >Ativo</span
+                  ><span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 3px 10px;
+                      border-radius: 999px;
+                      background: #e7f6ee;
+                      color: #05663a;
+                    "
+                    >Cobrança por registro</span
+                  ><span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 3px 10px;
+                      border-radius: 999px;
+                      background: #fffaeb;
+                      color: #b54708;
+                    "
+                    >Saúde 74 · atenção</span
+                  >
+                </div>
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 26px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Auto Prime Veículos Ltda
+                </h1>
+                <span style="font-size: 14px; color: #475467"
+                  >CNPJ raiz 12.345.*** · Grupo · 3 estabelecimentos (SP) ·
+                  cliente desde 02/03/2025 · CSM Carla Dias</span
+                >
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <button
+                  type="button"
+                  onClick="{{openImp}}"
+                  style="
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 0;
+                    border-radius: 8px;
+                    background: #067a45;
+                    color: #ffffff;
+                    font: inherit;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  Acessar como (suporte)
+                </button>
+                <button
+                  type="button"
+                  style="
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #344054;
+                    font: inherit;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  Exportar dados
+                </button>
+                <button
+                  type="button"
+                  style="
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #fedf89;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #b54708;
+                    font: inherit;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  Suspender
+                </button>
+                <button
+                  type="button"
+                  style="
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #fda29b;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #b42318;
+                    font: inherit;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  Encerrar contrato
+                </button>
+              </div>
+            </section>
+
+            <div
+              role="tablist"
+              aria-label="Seções do cliente"
+              style="
+                display: flex;
+                gap: 4px;
+                border-bottom: 1px solid #e4e7ec;
+                overflow-x: auto;
+              "
+            >
+              <sc-for list="{{tabs}}" as="t" hint-placeholder-count="8">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected="{{t.on}}"
+                  onClick="{{t.pick}}"
+                  style="height: 44px; padding: 0 12px; border: 0; background: transparent; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; font-weight: {{t.weight}}; color: {{t.color}}; border-bottom: 2px solid {{t.line}}"
+                >
+                  {{t.label}}
+                </button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{t0}}" hint-placeholder-val="{{ true }}">
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                  gap: 16px;
+                "
+              >
+                <div
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                  "
+                >
+                  <span style="font-size: 13px; color: #475467"
+                    >Registros confirmados no mês</span
+                  ><strong style="font-size: 24px">3.604</strong
+                  ><span
+                    style="font-size: 12px; color: #067647; font-weight: 500"
+                    >+8% vs. outubro</span
+                  >
+                </div>
+                <div
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                  "
+                >
+                  <span style="font-size: 13px; color: #475467"
+                    >Pendências abertas</span
+                  ><strong style="font-size: 24px">14</strong
+                  ><span
+                    style="font-size: 12px; color: #b54708; font-weight: 500"
+                    >2 resultados incertos</span
+                  >
+                </div>
+                <div
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                  "
+                >
+                  <span style="font-size: 13px; color: #475467"
+                    >Certificados</span
+                  ><strong style="font-size: 24px">3</strong
+                  ><span
+                    style="font-size: 12px; color: #b54708; font-weight: 500"
+                    >Santos vence em 12 dias</span
+                  >
+                </div>
+                <div
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                  "
+                >
+                  <span style="font-size: 13px; color: #475467">Financeiro</span
+                  ><strong style="font-size: 24px">Em dia</strong
+                  ><span style="font-size: 12px; color: #475467"
+                    >Próxima fatura 05/12/2026</span
+                  >
+                </div>
+                <div
+                  style="
+                    grid-column: 1 / -1;
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                  "
+                >
+                  <strong style="font-size: 15px"
+                    >Por que a saúde está em 74</strong
+                  >
+                  <span style="font-size: 14px; color: #344054"
+                    >Uso crescente (+), dois resultados incertos abertos há mais
+                    de 1 h (−), certificado de filial perto do vencimento (−),
+                    filial Santos ainda em homologação (−).</span
+                  >
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{t1}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Estabelecimento</th>
+                      <th>CNPJ</th>
+                      <th>Adesão</th>
+                      <th>Ambiente</th>
+                      <th>Certificado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Matriz São Paulo</td>
+                      <td>12.345.678/0001-90</td>
+                      <td>Ativa</td>
+                      <td style="color: #067647; font-weight: 600">Produção</td>
+                      <td>264 dias</td>
+                    </tr>
+                    <tr>
+                      <td>Filial Campinas</td>
+                      <td>12.345.678/0002-71</td>
+                      <td>Ativa</td>
+                      <td style="color: #067647; font-weight: 600">Produção</td>
+                      <td>40 dias</td>
+                    </tr>
+                    <tr>
+                      <td>Filial Santos</td>
+                      <td>12.345.678/0003-52</td>
+                      <td>Etapa 5 de 7</td>
+                      <td style="color: #b54708; font-weight: 600">
+                        Homologação
+                      </td>
+                      <td style="color: #b42318; font-weight: 600">12 dias</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+            <sc-if value="{{t2}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  font-size: 14px;
+                  color: #344054;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                "
+              >
+                <strong
+                  >9 usuários · 1 administrador (Ricardo Almeida) · MFA ativo em
+                  8 de 9</strong
+                ><span
+                  >Lucas Nogueira (Filial Santos) com convite pendente há 3
+                  dias.</span
+                ><span
+                  >Somente o administrador do cliente cria e altera usuários; o
+                  backoffice apenas reenvia convites e bloqueia acessos em
+                  incidentes.</span
+                >
+              </div>
+            </sc-if>
+            <sc-if value="{{t3}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Fatura</th>
+                      <th>Competência</th>
+                      <th>Valor</th>
+                      <th>Vencimento</th>
+                      <th>Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>FAT-2026-1104</td>
+                      <td>Outubro/2026</td>
+                      <td>3.338 registros × [VALOR POR REGISTRO]</td>
+                      <td>05/11/2026</td>
+                      <td style="color: #067647; font-weight: 600">
+                        Paga (PIX)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>FAT-2026-0981</td>
+                      <td>Setembro/2026</td>
+                      <td>3.102 registros × [VALOR POR REGISTRO]</td>
+                      <td>05/10/2026</td>
+                      <td style="color: #067647; font-weight: 600">
+                        Paga (boleto)
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+            <sc-if value="{{t4}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 10px;
+                "
+              >
+                <sc-for list="{{usage}}" as="u" hint-placeholder-count="5"
+                  ><div style="display: flex; flex-direction: column; gap: 4px">
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 13px;
+                      "
+                    >
+                      <span>{{u.label}}</span
+                      ><span style="color: #475467">{{u.n}}</span>
+                    </div>
+                    <div
+                      style="
+                        height: 8px;
+                        border-radius: 999px;
+                        background: #f2f4f7;
+                      "
+                    >
+                      <div
+                        style="height: 8px; border-radius: 999px; background: #067A45; width: {{u.pct}}"
+                      ></div>
+                    </div></div
+                ></sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{t5}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 640px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Módulo</th>
+                      <th>Habilitado em</th>
+                      <th>Por quê</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Veículos usados</td>
+                      <td>Matriz, Campinas, Santos</td>
+                      <td>CNAE de comércio de veículos</td>
+                    </tr>
+                    <tr>
+                      <td>Zero km</td>
+                      <td>Matriz</td>
+                      <td>
+                        Concessionária com veículos faturados pela montadora
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Transferências</td>
+                      <td>Matriz, Campinas, Santos</td>
+                      <td>Todo estabelecimento aderido</td>
+                    </tr>
+                    <tr>
+                      <td>Consignação</td>
+                      <td>Matriz, Campinas</td>
+                      <td>Solicitado pelo cliente</td>
+                    </tr>
+                    <tr>
+                      <td style="color: #475467">ITE / inacabados</td>
+                      <td style="color: #475467">Não habilitado</td>
+                      <td style="color: #475467">
+                        Não é implementadora/transformadora
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="color: #475467">Retomados</td>
+                      <td style="color: #475467">Não habilitado</td>
+                      <td style="color: #475467">Não é instituição credora</td>
+                    </tr>
+                    <tr>
+                      <td>API e webhooks</td>
+                      <td>Todos</td>
+                      <td>Integração com ERP/DMS do cliente</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+            <sc-if value="{{t6}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  font-size: 14px;
+                  color: #344054;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                "
+              >
+                <strong>2 chamados abertos</strong
+                ><span
+                  >CH-4471 · S2 · "Venda sem resposta do RENAVE" · vinculado a
+                  OP-2026-118431</span
+                ><span
+                  >CH-4468 · S3 · "Dúvida sobre certificado da filial
+                  Santos"</span
+                ><a href="SaasSuporte.dc.html" style="font-weight: 600"
+                  >Abrir central de suporte</a
+                >
+              </div>
+            </sc-if>
+            <sc-if value="{{t7}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  font-size: 14px;
+                  color: #344054;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                "
+              >
+                <strong>Últimas ações da plataforma neste cliente</strong
+                ><span
+                  >23/11 15:40 · Joana Mendes · impersonação somente leitura ·
+                  30 min · motivo: CH-4471</span
+                ><span
+                  >19/11 10:12 · Carla Dias · limite de usuários 15 → 25</span
+                ><a href="SaasAuditoria.dc.html" style="font-weight: 600"
+                  >Ver auditoria da plataforma</a
+                >
+              </div>
+            </sc-if>
+          </main>
+
+          <sc-if value="{{imp}}" hint-placeholder-val="{{ true }}">
+            <div
+              style="
+                position: absolute;
+                inset: 0;
+                background: rgba(16, 24, 40, 0.55);
+                display: flex;
+                align-items: flex-start;
+                justify-content: center;
+                padding: 96px 16px;
+              "
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="imp-title"
+                style="
+                  width: 100%;
+                  max-width: 520px;
+                  box-sizing: border-box;
+                  background: #ffffff;
+                  border-radius: 12px;
+                  padding: 24px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 16px;
+                  box-shadow: 0 20px 40px rgba(16, 24, 40, 0.2);
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <h2
+                    id="imp-title"
+                    style="margin: 0; font-size: 20px; font-weight: 600"
+                  >
+                    Acessar como suporte
+                  </h2>
+                  <span style="font-size: 14px; color: #475467"
+                    >Auto Prime Veículos Ltda · todo o acesso fica registrado na
+                    auditoria do cliente e da plataforma.</span
+                  >
+                </div>
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Motivo (obrigatório)<input
+                    value="CH-4471 — verificar operação com resultado incerto"
+                    style="
+                      height: 44px;
+                      box-sizing: border-box;
+                      padding: 0 12px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                    "
+                /></label>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 12px;
+                  "
+                >
+                  <label
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 6px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      color: #344054;
+                    "
+                    >Duração<select
+                      style="
+                        height: 44px;
+                        padding: 0 10px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        font: inherit;
+                        font-size: 14px;
+                        background: #ffffff;
+                      "
+                    >
+                      <option>30 minutos</option>
+                      <option>1 hora</option>
+                      <option>2 horas (máximo)</option>
+                    </select></label
+                  >
+                  <label
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 6px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      color: #344054;
+                    "
+                    >Modo<select
+                      style="
+                        height: 44px;
+                        padding: 0 10px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        font: inherit;
+                        font-size: 14px;
+                        background: #ffffff;
+                      "
+                    >
+                      <option>Somente leitura (padrão)</option>
+                      <option>Leitura e escrita (exige aprovação N2)</option>
+                    </select></label
+                  >
+                </div>
+                <ul
+                  style="
+                    margin: 0;
+                    padding-left: 18px;
+                    font-size: 13px;
+                    color: #344054;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    line-height: 1.45;
+                  "
+                >
+                  <li>
+                    O administrador do cliente é notificado por e-mail e no
+                    painel.
+                  </li>
+                  <li>Dados pessoais continuam mascarados durante o acesso.</li>
+                  <li>
+                    Nenhuma operação no RENAVE pode ser enviada em modo somente
+                    leitura.
+                  </li>
+                </ul>
+                <div style="display: flex; justify-content: flex-end; gap: 8px">
+                  <button
+                    type="button"
+                    onClick="{{closeImp}}"
+                    style="
+                      height: 44px;
+                      padding: 0 16px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      background: #ffffff;
+                      color: #344054;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Cancelar</button
+                  ><button
+                    type="button"
+                    onClick="{{closeImp}}"
+                    style="
+                      height: 44px;
+                      padding: 0 16px;
+                      border: 0;
+                      border-radius: 8px;
+                      background: #067a45;
+                      color: #ffffff;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Iniciar acesso auditado
+                  </button>
+                </div>
+                <div
+                  style="
+                    padding: 12px;
+                    border-radius: 8px;
+                    background: #f9fafb;
+                    border: 1px solid #e4e7ec;
+                    font-size: 13px;
+                    color: #475467;
+                    line-height: 1.45;
+                  "
+                >
+                  <strong style="color: #344054">Exportar dados:</strong> pacote
+                  íntegro, autenticado e com hash, conforme o Anexo da Res.
+                  1.026 (migração em até 60 dias).
+                  <strong style="color: #344054">Encerrar contrato:</strong> o
+                  acesso termina, mas registros e evidências ficam guardados por
+                  5 anos para fiscalização; depois são eliminados com segurança.
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1400}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { tab: 0, imp: true }; }
+        renderVals() {
+          const tab = this.state.tab;
+          const labels = ['Visão geral', 'Estabelecimentos', 'Usuários', 'Consumo e faturas', 'Uso', 'Módulos habilitados', 'Suporte', 'Auditoria'];
+          const v = { imp: this.state.imp, openImp: () => this.setState({ imp: true }), closeImp: () => this.setState({ imp: false }) };
+          labels.forEach((_, i) => { v['t' + i] = tab === i; });
+          v.tabs = labels.map((label, i) => ({ label, on: tab === i ? 'true' : 'false', weight: tab === i ? '600' : '500', color: tab === i ? '#067A45' : '#475467', line: tab === i ? '#067A45' : 'transparent', pick: () => this.setState({ tab: i }) }));
+          v.usage = [
+            { label: 'Entradas de usados', n: '1.402', pct: '78%' }, { label: 'Saídas de usados', n: '1.288', pct: '72%' },
+            { label: 'Zero km (entrada + saída)', n: '611', pct: '34%' }, { label: 'Transferências', n: '184', pct: '10%' }, { label: 'Consignação', n: '119', pct: '7%' }
+          ];
+          return v;
+        }
+      }
+    </script>
+  </body>
+</html>

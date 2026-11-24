@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sidebar do backoffice — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Nunito:wght@900&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+        </style>
+      </helmet>
+      <nav
+        aria-label="Navegação do backoffice"
+        style="
+          box-sizing: border-box;
+          width: 100%;
+          min-height: 900px;
+          padding: 20px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          background: #0b2550;
+          font-family: Inter, system-ui, sans-serif;
+          color: #e4e7ec;
+        "
+      >
+        <a
+          href="SaasVisaoGeral.dc.html"
+          style="
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 8px;
+            text-decoration: none;
+            color: #ffffff;
+          "
+        >
+          <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+            <path
+              d="M8 3.5h10.5l6 6V26a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 26V6A2.5 2.5 0 0 1 8 3.5z"
+              fill="#0B2550"
+              stroke="#FFFFFF"
+              stroke-width="2.6"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M18.5 3.5v6h6z"
+              fill="#0A9B55"
+              stroke="#0A9B55"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            />
+            <circle
+              cx="24.5"
+              cy="17"
+              r="6"
+              fill="#0A9B55"
+              stroke="#0B2550"
+              stroke-width="1.6"
+            />
+            <path
+              d="M21.8 17.1l1.9 1.9 3.5-3.7"
+              fill="none"
+              stroke="#FFFFFF"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span style="display: flex; flex-direction: column; line-height: 1.1">
+            <span
+              style="
+                font-family: Nunito, Inter, sans-serif;
+                font-weight: 900;
+                font-size: 19px;
+                letter-spacing: -0.01em;
+              "
+              ><span style="color: #ffffff">Seu</span>
+              <span style="color: #0a9b55">Renave</span></span
+            >
+            <span style="font-size: 12px; color: #a9b8d4"
+              >Backoffice da plataforma</span
+            >
+          </span>
+        </a>
+
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <sc-for list="{{items}}" as="item" hint-placeholder-count="11">
+            <a
+              href="{{item.href}}"
+              aria-current="{{item.current}}"
+              style="display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: {{item.weight}}; background: {{item.bg}}; color: {{item.color}}; box-shadow: inset 3px 0 0 {{item.bar}}"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="{{item.icon}}" />
+              </svg>
+              <span style="flex: 1">{{item.label}}</span>
+              <sc-if
+                value="{{item.hasBadge}}"
+                hint-placeholder-val="{{ false }}"
+              >
+                <span
+                  style="
+                    font-size: 12px;
+                    font-weight: 700;
+                    min-width: 22px;
+                    text-align: center;
+                    padding: 2px 6px;
+                    border-radius: 999px;
+                    background: #3b1212;
+                    color: #fda29b;
+                  "
+                  >{{item.badge}}</span
+                >
+              </sc-if>
+            </a>
+          </sc-for>
+        </div>
+
+        <div
+          style="
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              padding: 12px;
+              border: 1px solid #1e3a6e;
+              border-radius: 10px;
+            "
+          >
+            <span
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                color: #6ce9a6;
+              "
+              ><span
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 999px;
+                  background: #12b76a;
+                "
+              ></span
+              >Conector RENAVE: Operacional</span
+            >
+            <span style="font-size: 12px; color: #a9b8d4"
+              >Produção · 99,94% em 30 dias</span
+            >
+          </div>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              padding: 4px 6px;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                width: 36px;
+                height: 36px;
+                border-radius: 999px;
+                background: #12336e;
+                color: #6ce9a6;
+                font-size: 13px;
+                font-weight: 700;
+                align-items: center;
+                justify-content: center;
+              "
+              >JM</span
+            >
+            <span
+              style="display: flex; flex-direction: column; line-height: 1.25"
+              ><strong style="font-size: 14px; font-weight: 600; color: #ffffff"
+                >Joana Mendes</strong
+              ><span style="font-size: 12px; color: #a9b8d4"
+                >Super admin</span
+              ></span
+            >
+          </div>
+        </div>
+      </nav>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"active":{"editor":"enum","options":["visao","clientes","novo","planos","faturamento","parceiros","operacao","suporte","equipe","auditoria","config"],"default":"visao"},"$preview":{"width":248,"height":900}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const active = this.props.active ?? 'visao';
+          const items = [
+            { id: 'visao', label: 'Visão geral', href: 'SaasVisaoGeral.dc.html', icon: 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z' },
+            { id: 'clientes', label: 'Clientes (tenants)', href: 'SaasClientes.dc.html', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6' },
+            { id: 'novo', label: 'Novo cliente', href: 'SaasNovoCliente.dc.html', icon: 'M12 5v14M5 12h14' },
+            { id: 'planos', label: 'Preço por registro', href: 'SaasPlanos.dc.html', icon: 'M20 12l-8 8-9-9V3h8zM7.5 7.5h.01' },
+            { id: 'faturamento', label: 'Faturamento', href: 'SaasFaturamento.dc.html', icon: 'M3 6h18v12H3zM3 10h18M7 15h3', badge: '4' },
+            { id: 'parceiros', label: 'Parceiros', href: 'SaasParceiros.dc.html', icon: 'M8 12l3 3 5-6M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z' },
+            { id: 'operacao', label: 'Operação técnica', href: 'Console.dc.html', icon: 'M3 12h4l3-8 4 16 3-8h4' },
+            { id: 'suporte', label: 'Suporte', href: 'SaasSuporte.dc.html', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', badge: '7' },
+            { id: 'equipe', label: 'Equipe da plataforma', href: 'SaasEquipe.dc.html', icon: 'M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM21 19v-1a4 4 0 0 0-3-3.9M16 4.1a3 3 0 0 1 0 5.8' },
+            { id: 'auditoria', label: 'Auditoria da plataforma', href: 'SaasAuditoria.dc.html', icon: 'M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM9 12l2 2 4-4' },
+            { id: 'config', label: 'Configurações', href: 'SaasConfig.dc.html', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.8 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.8-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 14H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 3V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.8 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 10h0a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z' }
+          ].map((it) => {
+            const on = it.id === active;
+            return Object.assign({}, it, {
+              bg: on ? '#12336E' : 'transparent', color: on ? '#FFFFFF' : '#E4E7EC', weight: on ? '600' : '500',
+              bar: on ? '#0A9B55' : 'transparent', current: on ? 'page' : 'false', hasBadge: !!it.badge
+            });
+          });
+          return { items };
+        }
+      }
+    </script>
+  </body>
+</html>

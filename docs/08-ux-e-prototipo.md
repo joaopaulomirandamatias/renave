@@ -1,7 +1,7 @@
 # 08 — UX, design system e protótipo
 
 > **Protótipo navegável (mockups):** https://claude.ai/artifact/HdnUJ7n2pbz9pZY9hD71gN
-> Canvas "Seu Renave — Mockups": 34 telas + componentes compartilhados (Sidebar, Topbar, SidebarSaas), em 6 páginas. Use **Play** nas telas marcadas como interativas para navegar pelo menu lateral.
+> Canvas "Seu Renave — Mockups": 33 telas + 3 componentes compartilhados (Sidebar, Topbar, SidebarSaas), em 6 páginas. Use **Play** nas telas marcadas como interativas para navegar pelo menu lateral.
 > O link é privado por padrão; compartilhe pelo menu *Share* da página.
 
 ## 8.1 Princípios de UX
@@ -30,7 +30,7 @@
 | `border` | `#E4E7EC` | Divisores |
 | `text/primary` | `#101828` | Texto principal |
 | `text/secondary` | `#475467` | Texto de apoio (≥ 4,5:1) |
-| `accent` | `#0F766E` (hover `#115E59`, suave `#E6F4F1`) | Ação primária, foco, item ativo |
+| `accent` | `#067A45` (hover `#05663A`, suave `#E7F6EE`) | Ação primária, foco, item ativo |
 | `status/success` | texto `#067647` / fundo `#ECFDF3` | Confirmado, ok |
 | `status/warning` | texto `#B54708` / fundo `#FFFAEB` | Aguardando, incerto, a vencer |
 | `status/error` | texto `#B42318` / fundo `#FEF3F2` | Recusado, divergente, impeditivo |
@@ -95,16 +95,15 @@ PWA do pátio (consulta rápida + identificação prévia/vistoria)
 
 ## 8.5 Padrões de interação-chave
 
-### Assistente "Dar entrada" (6 passos)
+### Assistente "Dar entrada" — solicitação e acompanhamento
 
 1. **Veículo:** placa ou chassi → busca e normalização → confirmação visual (marca/modelo/ano/cor).
 2. **Aptidão:** checklist do RENAVE (ok / atenção / impeditivo); impeditivo trava o avanço, com explicação.
 3. **Vendedor e valores:** CPF/CNPJ (validado), nome, e-mail, valor, data de compra, hodômetro e data da medição, título do negócio.
 4. **Identificação prévia:** escolha entre identificação eletrônica e vistoria; fotos (com data/hora e GPS), chassi e hodômetro.
-5. **Documentos:** ATPV-e (status da assinatura do vendedor; escolha do formato de assinatura); NF-e de entrada (chave ou XML ou ERP) com validação de coerência.
-6. **Revisão e envio:** resumo; aviso de idempotência; "Enviar ao RENAVE".
+5. **Revisão e solicitação:** resumo; aviso de idempotência; "Solicitar entrada no RENAVE". ATPV-e e NF-e não bloqueiam esta etapa.
 
-A tela de acompanhamento mostra o estado em tempo real (Enviado → Aguardando DETRAN → Confirmado).
+A tela de acompanhamento assume a jornada depois do `201`, com checklist e próxima ação: **Entrada solicitada** → **Assinar/enviar ATPV-e** → **Transferido — aguardando novo CRV** → **Em estoque/CONFIRMADO** → **Emitir e informar NF-e** → **Documentação concluída/CRLV disponível**. Cada etapa mostra o ator responsável (estabelecimento, vendedor/CDT, RENAVE ou DETRAN) e nunca sugere repetir a solicitação inicial.
 
 ### Resultado incerto
 

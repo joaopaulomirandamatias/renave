@@ -1,0 +1,30 @@
+# Banco local do Seu Renave. Somente desenvolvimento e testes de integração:
+# a porta fica presa ao loopback e o banco é descartável.
+#
+# A senha do superusuário abaixo é um valor-padrão local e não secreto, sem uso
+# fora desta máquina. Sobrescreva com RENAVE_DB_SUPERUSER_PASSWORD se quiser.
+# Os papéis da aplicação (renave_migrator e renave_app) NÃO são criados aqui:
+# nascem no passo `pnpm db:bootstrap` com senhas fornecidas por variável de ambiente.
+name: seu-renave
+
+services:
+  postgres:
+    image: postgres:17.12-alpine@sha256:f9cf3e1f0066f0eb0c48707d864f0ac5941e9ff454a072077d97a4d278d07d73
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${RENAVE_DB_SUPERUSER_PASSWORD:-renave_local_dev}
+      POSTGRES_DB: renave
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8 --auth-host=scram-sha-256"
+    ports:
+      - "127.0.0.1:${RENAVE_DB_PORT:-54317}:5432"
+    volumes:
+      - renave-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d renave"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  renave-pgdata:

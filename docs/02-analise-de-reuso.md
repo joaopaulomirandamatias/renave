@@ -19,7 +19,7 @@
 
 ### Lacunas: o que **nenhum** projeto tem (construir do zero)
 
-1. **Cliente mTLS com certificado e-CNPJ ICP-Brasil**, um por estabelecimento, com chave em KMS/HSM.
+1. **Cliente mTLS dual-mode para o RENAVE-WS**: por padrão, e-CNPJ não exportável da integradora em HSM + cabeçalho `CNPJ-Estabelecimento` validado contra `cliente-autenticado`; certificado por estabelecimento somente no modo legado desligado por padrão.
 2. **Idempotência durável**: hoje ela é só em memória.
 3. **Fila durável** para envio e reconciliação (BullMQ ou pg-boss com `SKIP LOCKED`).
 4. **SHA-256 de documentos** no upload (NF-e XML, ATPV-e PDF, termos).

@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Equipe da plataforma — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="equipe"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Equipe da plataforma
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Pessoas da equipe do Seu Renave com acesso ao backoffice · MFA
+                  obrigatório para todos · revisão de acessos trimestral
+                </p>
+              </div>
+              <button
+                type="button"
+                style="
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 0;
+                  border-radius: 8px;
+                  background: #067a45;
+                  color: #ffffff;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Adicionar pessoa
+              </button>
+            </div>
+
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow-x: auto;
+              "
+            >
+              <table
+                style="width: 100%; border-collapse: collapse; min-width: 900px"
+              >
+                <thead>
+                  <tr>
+                    <th>Pessoa</th>
+                    <th>Papel</th>
+                    <th>MFA</th>
+                    <th>Último acesso</th>
+                    <th>Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{people}}" as="p" hint-placeholder-count="7">
+                    <tr>
+                      <td>
+                        <span style="display: flex; flex-direction: column"
+                          ><strong style="font-weight: 600">{{p.nome}}</strong
+                          ><span style="font-size: 12px; color: #475467"
+                            >{{p.email}}</span
+                          ></span
+                        >
+                      </td>
+                      <td>{{p.papel}}</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #ecfdf3;
+                            color: #067647;
+                          "
+                          >{{p.mfa}}</span
+                        >
+                      </td>
+                      <td style="color: #344054">{{p.last}}</td>
+                      <td style="font-weight: 600; color: #067647">Ativo</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+              "
+            >
+              <h2 style="margin: 0; font-size: 18px; font-weight: 600">
+                Permissões de plataforma
+              </h2>
+              <div
+                role="tablist"
+                aria-label="Papéis"
+                style="display: flex; flex-wrap: wrap; gap: 8px"
+              >
+                <sc-for list="{{roles}}" as="r" hint-placeholder-count="7">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected="{{r.on}}"
+                    onClick="{{r.pick}}"
+                    style="height: 36px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid {{r.border}}; background: {{r.bg}}; color: {{r.color}}"
+                  >
+                    {{r.label}}
+                  </button>
+                </sc-for>
+              </div>
+              <div
+                style="
+                  overflow-x: auto;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 720px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Recurso</th>
+                      <th style="text-align: center">Ver</th>
+                      <th style="text-align: center">Alterar</th>
+                      <th style="text-align: center">Aprovar</th>
+                      <th style="text-align: center">Exportar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{matrix}}" as="m" hint-placeholder-count="7">
+                      <tr>
+                        <td style="font-weight: 500">{{m.res}}</td>
+                        <sc-for
+                          list="{{m.cells}}"
+                          as="c"
+                          hint-placeholder-count="4"
+                          ><td style="text-align: center">
+                            <span
+                              style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: {{c.bg}}; color: {{c.color}}"
+                              >{{c.label}}</span
+                            >
+                          </td></sc-for
+                        >
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <h2
+                style="
+                  margin: 0;
+                  padding: 16px 20px;
+                  font-size: 17px;
+                  font-weight: 600;
+                  border-bottom: 1px solid #e4e7ec;
+                "
+              >
+                Acessos temporários de suporte
+              </h2>
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 820px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Pessoa</th>
+                      <th>Cliente</th>
+                      <th>Modo</th>
+                      <th>Motivo</th>
+                      <th>Expira</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Joana Mendes</td>
+                      <td>Auto Prime Veículos</td>
+                      <td>Somente leitura</td>
+                      <td>CH-4471</td>
+                      <td style="color: #b54708; font-weight: 600">
+                        em 12 min
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          style="
+                            height: 32px;
+                            padding: 0 10px;
+                            border: 1px solid #fda29b;
+                            border-radius: 8px;
+                            background: #ffffff;
+                            color: #b42318;
+                            font-size: 13px;
+                            font-weight: 600;
+                            cursor: pointer;
+                          "
+                        >
+                          Revogar
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Diego Faria</td>
+                      <td>Garagem Bandeirantes</td>
+                      <td>Leitura e escrita (aprovado por N2)</td>
+                      <td>CH-4474</td>
+                      <td style="color: #b54708; font-weight: 600">
+                        em 48 min
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          style="
+                            height: 32px;
+                            padding: 0 10px;
+                            border: 1px solid #fda29b;
+                            border-radius: 8px;
+                            background: #ffffff;
+                            color: #b42318;
+                            font-size: 13px;
+                            font-weight: 600;
+                            cursor: pointer;
+                          "
+                        >
+                          Revogar
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1300}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { role: 0 }; }
+        renderVals() {
+          const Y = { label: 'Sim', bg: '#ECFDF3', color: '#067647' }, N = { label: 'Não', bg: '#F2F4F7', color: '#475467' }, J = { label: 'Com justificativa', bg: '#FFFAEB', color: '#B54708' };
+          const c = (v) => v === 1 ? Y : (v === 2 ? J : N);
+          const res = ['Clientes e assinaturas', 'Impersonação (acessar como)', 'Tabela de valor por registro', 'Faturamento e cobrança', 'Operação técnica / conector', 'Dados pessoais de clientes', 'Equipe e permissões'];
+          const roles = [
+            ['Super admin', [[1,1,1,1],[1,2,1,0],[1,1,1,1],[1,1,1,1],[1,1,1,1],[2,0,0,2],[1,1,1,1]]],
+            ['Operações / NOC', [[1,0,0,0],[1,2,0,0],[1,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]]],
+            ['Suporte N1', [[1,0,0,0],[1,2,0,0],[1,0,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,0,0]]],
+            ['Suporte N2', [[1,0,0,0],[1,2,1,0],[1,0,0,0],[0,0,0,0],[1,1,0,0],[2,0,0,0],[0,0,0,0]]],
+            ['Financeiro', [[1,1,0,1],[0,0,0,0],[1,0,0,1],[1,1,1,1],[0,0,0,0],[0,0,0,0],[0,0,0,0]]],
+            ['Comercial / CS', [[1,1,0,1],[1,2,0,0],[1,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]],
+            ['Compliance / DPO', [[1,0,0,1],[1,0,1,1],[1,0,0,1],[1,0,0,1],[1,0,0,1],[2,0,1,2],[1,0,1,1]]]
+          ];
+          const sel = this.state.role;
+          return {
+            people: [
+              { nome: 'Joana Mendes', email: 'joana@viaauto.com.br', papel: 'Super admin', mfa: 'Chave de segurança', last: 'Agora' },
+              { nome: 'Diego Faria', email: 'diego@viaauto.com.br', papel: 'Suporte N2', mfa: 'Aplicativo', last: 'Há 5 min' },
+              { nome: 'Larissa Gomes', email: 'larissa@viaauto.com.br', papel: 'Suporte N1', mfa: 'Aplicativo', last: 'Há 20 min' },
+              { nome: 'Henrique Sato', email: 'henrique@viaauto.com.br', papel: 'Operações / NOC', mfa: 'Chave de segurança', last: 'Há 1 h' },
+              { nome: 'Patrícia Lopes', email: 'financeiro@viaauto.com.br', papel: 'Financeiro', mfa: 'Aplicativo', last: 'Hoje 09:10' },
+              { nome: 'Carla Dias', email: 'carla@viaauto.com.br', papel: 'Comercial / CS', mfa: 'Aplicativo', last: 'Hoje 11:42' },
+              { nome: 'Marcos Vieira', email: 'dpo@viaauto.com.br', papel: 'Compliance / DPO', mfa: 'Chave de segurança', last: 'Ontem' }
+            ],
+            roles: roles.map((r, i) => ({ label: r[0], on: i === sel ? 'true' : 'false', bg: i === sel ? '#101828' : '#FFFFFF', color: i === sel ? '#FFFFFF' : '#344054', border: i === sel ? '#101828' : '#D0D5DD', pick: () => this.setState({ role: i }) })),
+            matrix: res.map((name, i) => ({ res: name, cells: roles[sel][1][i].map(c) }))
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

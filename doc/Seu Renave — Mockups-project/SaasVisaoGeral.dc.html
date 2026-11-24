@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Visão geral — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="visao"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.02em;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+            <label
+              style="
+                flex: 1 1 280px;
+                max-width: 460px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                height: 40px;
+                padding: 0 12px;
+                border: 1px solid #d0d5dd;
+                border-radius: 8px;
+              "
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#667085"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <span
+                style="
+                  position: absolute;
+                  width: 1px;
+                  height: 1px;
+                  overflow: hidden;
+                  clip: rect(0 0 0 0);
+                "
+                >Buscar</span
+              >
+              <input
+                placeholder="Buscar cliente, CNPJ ou chamado"
+                style="
+                  flex: 1;
+                  min-width: 0;
+                  border: 0;
+                  outline: none;
+                  font: inherit;
+                  font-size: 14px;
+                "
+              />
+            </label>
+            <span
+              style="
+                margin-left: auto;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-radius: 999px;
+                background: #ecfdf3;
+                color: #067647;
+              "
+              >PRODUÇÃO</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Visão geral da plataforma
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Novembro de 2026 · valores financeiros são
+                  <strong style="font-weight: 600">dados de exemplo</strong>
+                </p>
+              </div>
+              <a
+                href="SaasNovoCliente.dc.html"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  height: 44px;
+                  padding: 0 16px;
+                  border-radius: 8px;
+                  background: #067a45;
+                  color: #ffffff;
+                  font-size: 14px;
+                  font-weight: 600;
+                "
+                >Novo cliente</a
+              >
+            </div>
+
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap: 12px;
+              "
+            >
+              <sc-for list="{{kpis}}" as="k" hint-placeholder-count="9">
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    padding: 16px;
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                  "
+                >
+                  <span
+                    style="font-size: 13px; font-weight: 500; color: #475467"
+                    >{{k.label}}</span
+                  >
+                  <span
+                    style="
+                      font-size: 24px;
+                      font-weight: 600;
+                      letter-spacing: -0.02em;
+                    "
+                    >{{k.value}}</span
+                  >
+                  <span
+                    style="font-size: 12px; font-weight: 500; color: {{k.noteColor}}"
+                    >{{k.note}}</span
+                  >
+                </div>
+              </sc-for>
+            </div>
+
+            <section
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 12px;
+              "
+            >
+              <sc-for list="{{alerts}}" as="a" hint-placeholder-count="4">
+                <div
+                  style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 10px; background: {{a.bg}}; border: 1px solid {{a.border}}"
+                >
+                  <span
+                    style="flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #FFFFFF; color: {{a.color}}"
+                    >{{a.tag}}</span
+                  >
+                  <span
+                    style="
+                      flex: 1;
+                      display: flex;
+                      flex-direction: column;
+                      gap: 2px;
+                    "
+                    ><strong style="font-size: 14px; color: #101828"
+                      >{{a.title}}</strong
+                    ><span style="font-size: 13px; color: #475467"
+                      >{{a.desc}}</span
+                    ></span
+                  >
+                  <a
+                    href="{{a.href}}"
+                    style="font-size: 13px; font-weight: 600; white-space: nowrap; color: {{a.color}}"
+                    >{{a.action}}</a
+                  >
+                </div>
+              </sc-for>
+            </section>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <section
+                style="
+                  flex: 1 1 420px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 16px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: baseline;
+                  "
+                >
+                  <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                    Registros confirmados por tipo — novembro
+                  </h2>
+                  <span style="font-size: 13px; color: #475467"
+                    >18.940 no mês</span
+                  >
+                </div>
+                <sc-for list="{{tipos}}" as="t" hint-placeholder-count="7">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 13px;
+                      "
+                    >
+                      <span style="font-weight: 500; color: #344054"
+                        >{{t.label}}</span
+                      ><span style="color: #475467">{{t.n}}</span>
+                    </div>
+                    <div
+                      style="
+                        height: 10px;
+                        border-radius: 999px;
+                        background: #f2f4f7;
+                        overflow: hidden;
+                      "
+                    >
+                      <div
+                        style="height: 10px; border-radius: 999px; background: #067A45; width: {{t.pct}}"
+                      ></div>
+                    </div>
+                  </div>
+                </sc-for>
+                <span style="font-size: 12px; color: #475467"
+                  >Só registros confirmados no RENAVE geram receita. Rejeições,
+                  erros, resultados incertos, consultas e homologação não são
+                  cobrados.</span
+                >
+              </section>
+
+              <section
+                style="
+                  flex: 1 1 380px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Funil de onboarding
+                </h2>
+                <sc-for list="{{funnel}}" as="f" hint-placeholder-count="5">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 13px;
+                      "
+                    >
+                      <span style="font-weight: 500; color: #344054"
+                        >{{f.label}}</span
+                      ><span style="color: #475467"
+                        >{{f.n}} estabelecimentos</span
+                      >
+                    </div>
+                    <div
+                      style="
+                        height: 28px;
+                        border-radius: 6px;
+                        background: #f2f4f7;
+                        overflow: hidden;
+                      "
+                    >
+                      <div
+                        style="height: 28px; border-radius: 6px; background: #067A45; width: {{f.pct}}"
+                      ></div>
+                    </div>
+                  </div>
+                </sc-for>
+                <span style="font-size: 13px; color: #475467"
+                  >Tempo médio do cadastro à produção: 19 dias. Maior espera:
+                  análise no Credencia (até 30 dias).</span
+                >
+              </section>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 16px 20px;
+                  border-bottom: 1px solid #e4e7ec;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Maiores clientes por volume
+                </h2>
+                <a
+                  href="SaasClientes.dc.html"
+                  style="font-size: 14px; font-weight: 600"
+                  >Ver todos os clientes</a
+                >
+              </div>
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Tipo</th>
+                      <th>Registros no mês</th>
+                      <th>Faturado no mês (exemplo)</th>
+                      <th>Saúde</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{top}}" as="t" hint-placeholder-count="5">
+                      <tr>
+                        <td>
+                          <a
+                            href="SaasClienteDetalhe.dc.html"
+                            style="font-weight: 600; color: #101828"
+                            >{{t.nome}}</a
+                          >
+                        </td>
+                        <td style="color: #344054">{{t.tipo}}</td>
+                        <td>{{t.ops}}</td>
+                        <td>{{t.mrr}}</td>
+                        <td>
+                          <span
+                            style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{t.hBg}}; color: {{t.hColor}}"
+                            >{{t.saude}}</span
+                          >
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1500}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const ok = '#067647', warn = '#B54708', err = '#B42318', neu = '#475467';
+          const A = { warn: ['#FFFAEB', '#FEDF89', '#B54708'], err: ['#FEF3F2', '#FECDCA', '#B42318'], info: ['#EFF8FF', '#B2DDFF', '#175CD3'] };
+          const al = (k, tag, title, desc, action, href) => ({ tag, title, desc, action, href, bg: A[k][0], border: A[k][1], color: A[k][2] });
+          const H = (s) => s >= 80 ? ['#ECFDF3', ok] : (s >= 60 ? ['#FFFAEB', warn] : ['#FEF3F2', err]);
+          const top = (nome, tipo, plano, ops, mrr, s) => ({ nome, tipo, plano, ops, mrr, saude: s + ' / 100', hBg: H(s)[0], hColor: H(s)[1] });
+          const raw = [[18, 30, 36, 20], [19, 33, 38, 22], [21, 35, 40, 24], [22, 38, 44, 28], [24, 40, 47, 30], [25, 43, 50, 33]];
+          return {
+            kpis: [
+              { label: 'Registros confirmados no mês', value: '18.940', note: '+6,2% vs. outubro', noteColor: ok },
+              { label: 'Receita de registros do mês', value: 'R$ 46,2 mil', note: 'Dados de exemplo · registros × valor oficial', noteColor: neu },
+              { label: 'Clientes ativos', value: '37', note: '64 estabelecimentos', noteColor: neu },
+              { label: 'Em homologação', value: '9', note: '4 entram em produção este mês', noteColor: neu },
+              { label: 'Inadimplentes', value: '3', note: 'R$ 4,1 mil em aberto · exemplo', noteColor: warn },
+              { label: 'Suspensos', value: '1', note: 'Novas operações bloqueadas', noteColor: err },
+              { label: 'Estabelecimentos ativos', value: '64', note: '+5 no mês', noteColor: ok },
+              { label: 'Rejeitados pelo RENAVE', value: '1,9%', note: 'Não cobrados', noteColor: neu },
+              { label: 'Resultado incerto', value: '3', note: 'Não cobrados até confirmar', noteColor: err }
+            ],
+            alerts: [
+              al('warn', 'Financeiro', '3 clientes inadimplentes', 'Revenda Bom Negócio entra em suspensão de novas operações em 2 dias (D+15).', 'Ver cobranças', 'SaasFaturamento.dc.html'),
+              al('warn', 'Certificados', '9 certificados de clientes vencem em 30 dias', '2 em menos de 7 dias: Garagem Bandeirantes (Matriz) e Litoral Norte (Ubatuba).', 'Ver lista', 'SaasClientes.dc.html'),
+              al('err', 'Incidente', '3 operações com resultado incerto no conector', 'Mais antiga há 93 min. Runbook de reconciliação em execução.', 'Operação técnica', 'Console.dc.html'),
+              al('info', 'Compliance', 'ISO/IEC 27001 da integradora até 27/03/2027', 'Auditoria de certificação agendada; 2 controles pendentes no plano de tratamento.', 'Ver plano', 'SaasConfig.dc.html')
+            ],
+            tipos: [
+              { label: 'Entrada de usado', n: '7.102', pct: '100%' }, { label: 'Saída de usado', n: '6.488', pct: '91%' },
+              { label: 'Entrada 0 km', n: '2.240', pct: '32%' }, { label: 'Saída 0 km', n: '1.905', pct: '27%' },
+              { label: 'Transferência', n: '701', pct: '10%' }, { label: 'Consignação', n: '392', pct: '6%' }, { label: 'Retomado', n: '112', pct: '2%' }
+            ],
+            funnel: [
+              { label: 'Cadastrado', n: 23, pct: '100%' }, { label: 'Credencia (SENATRAN)', n: 17, pct: '74%' },
+              { label: 'Certificado configurado', n: 14, pct: '61%' }, { label: 'Homologação', n: 11, pct: '48%' }, { label: 'Produção', n: 8, pct: '35%' }
+            ],
+            top: [
+              top('Concessionária Litoral Norte S.A.', 'Concessionária', 'Grupo', '4.212', 'R$ 7.900 (ex.)', 91),
+              top('Auto Prime Veículos Ltda', 'Grupo · 3 estab.', 'Grupo', '3.604', 'R$ 6.300 (ex.)', 74),
+              top('Montadora Exemplo do Brasil', 'Montadora (homologação)', '—', '0', 'Sem cobrança', 88),
+              top('Financeira Crédito Fácil', 'Instituição credora', 'Enterprise / API', '1.120', 'R$ 3.200 (ex.)', 95),
+              top('Revenda Bom Negócio ME', 'Revenda', 'Essencial', '96', 'R$ 390 (ex.)', 41)
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

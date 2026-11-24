@@ -1,0 +1,29 @@
+{
+  "observedAt": "2026-11-23",
+  "group": "Estabelecimento (Concessionária ou Revenda)",
+  "swaggerVersion": "2.0",
+  "environments": {
+    "production": {
+      "source": "https://renave.estaleiro.serpro.gov.br/renave-ws/v2/api-docs?group=Estabelecimento%20(Concession%C3%A1ria%20ou%20Revenda)",
+      "pathCount": 46,
+      "operationCount": 47,
+      "operationsSecuredByCnpjEstabelecimento": 0,
+      "sha256": "2c199136497a6d1b9a4032869301ed9ced92e194429cb08b5d978e7ef3b113c9"
+    },
+    "homologation": {
+      "source": "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/v2/api-docs?group=Estabelecimento%20(Concession%C3%A1ria%20ou%20Revenda)",
+      "pathCount": 48,
+      "operationCount": 49,
+      "operationsSecuredByCnpjEstabelecimento": 49,
+      "authenticatedClientFields": [
+        "cnpj",
+        "cnpjIntegradora",
+        "endereco",
+        "nome",
+        "nomeIntegradora"
+      ],
+      "sha256": "f506d4f05fa0b711c5f818242d66e132ca13d1a266e76abe8cd47940d770f524"
+    }
+  },
+  "productionIntegratorMode": "blocked_until_contract_is_published"
+}

@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Usuários e Perfis — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="usuarios"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Usuários & Perfis
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  9 usuários · verificação em duas etapas obrigatória para quem
+                  opera no RENAVE
+                </p>
+              </div>
+              <button
+                type="button"
+                style="
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 0;
+                  border-radius: 8px;
+                  background: #067a45;
+                  color: #ffffff;
+                  font: inherit;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Convidar usuário
+              </button>
+            </div>
+
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow-x: auto;
+              "
+            >
+              <table
+                style="width: 100%; border-collapse: collapse; min-width: 940px"
+              >
+                <thead>
+                  <tr>
+                    <th>Usuário</th>
+                    <th>Perfil</th>
+                    <th>Estabelecimentos</th>
+                    <th>Verificação em 2 etapas</th>
+                    <th>Último acesso</th>
+                    <th>Situação</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{users}}" as="u" hint-placeholder-count="6">
+                    <tr>
+                      <td>
+                        <span
+                          style="display: flex; align-items: center; gap: 10px"
+                          ><span
+                            style="
+                              display: inline-flex;
+                              width: 32px;
+                              height: 32px;
+                              border-radius: 999px;
+                              background: #e7f6ee;
+                              color: #067a45;
+                              font-size: 12px;
+                              font-weight: 700;
+                              align-items: center;
+                              justify-content: center;
+                            "
+                            >{{u.ini}}</span
+                          ><span style="display: flex; flex-direction: column"
+                            ><strong style="font-size: 14px; font-weight: 600"
+                              >{{u.nome}}</strong
+                            ><span style="font-size: 12px; color: #475467"
+                              >{{u.email}}</span
+                            ></span
+                          ></span
+                        >
+                      </td>
+                      <td>{{u.perfil}}</td>
+                      <td style="color: #344054">{{u.estab}}</td>
+                      <td>
+                        <span
+                          style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{u.mfaBg}}; color: {{u.mfaColor}}"
+                          >{{u.mfa}}</span
+                        >
+                      </td>
+                      <td style="color: #344054">{{u.last}}</td>
+                      <td
+                        style="font-size: 13px; font-weight: 600; color: {{u.stColor}}"
+                      >
+                        {{u.status}}
+                      </td>
+                      <td>
+                        <a
+                          href="#editar"
+                          style="font-size: 13px; font-weight: 600"
+                          >Editar</a
+                        >
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 12px;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 2px">
+                  <h2 style="margin: 0; font-size: 18px; font-weight: 600">
+                    Permissões por perfil
+                  </h2>
+                  <span style="font-size: 13px; color: #475467"
+                    >Aplicadas no servidor, por estabelecimento. Perfis padrão
+                    não podem ser apagados.</span
+                  >
+                </div>
+              </div>
+              <div
+                role="tablist"
+                aria-label="Perfis"
+                style="display: flex; flex-wrap: wrap; gap: 8px"
+              >
+                <sc-for list="{{roles}}" as="r" hint-placeholder-count="5">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected="{{r.on}}"
+                    onClick="{{r.pick}}"
+                    style="height: 40px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid {{r.border}}; background: {{r.bg}}; color: {{r.color}}"
+                  >
+                    {{r.label}}
+                  </button>
+                </sc-for>
+              </div>
+              <p style="margin: 0; font-size: 14px; color: #344054">
+                {{roleDesc}}
+              </p>
+              <div
+                style="
+                  overflow-x: auto;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 720px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Recurso</th>
+                      <th style="text-align: center">Ver</th>
+                      <th style="text-align: center">Criar / enviar</th>
+                      <th style="text-align: center">Cancelar</th>
+                      <th style="text-align: center">Exportar</th>
+                      <th style="text-align: center">
+                        Ver dados pessoais completos
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{matrix}}" as="m" hint-placeholder-count="7">
+                      <tr>
+                        <td style="font-weight: 500">{{m.res}}</td>
+                        <sc-for
+                          list="{{m.cells}}"
+                          as="c"
+                          hint-placeholder-count="5"
+                        >
+                          <td style="text-align: center">
+                            <span
+                              style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: {{c.bg}}; color: {{c.color}}"
+                              >{{c.label}}</span
+                            >
+                          </td>
+                        </sc-for>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1300}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { role: 1 }; }
+        renderVals() {
+          const ON = { label: 'Sim', bg: '#ECFDF3', color: '#067647' }, OFF = { label: 'Não', bg: '#F2F4F7', color: '#475467' }, MASK = { label: 'Mascarado', bg: '#FFFAEB', color: '#B54708' };
+          const res = ['Estoque e veículos', 'Entradas e saídas', 'Transferências e consignação', 'Documentos e NF-e', 'Auditoria', 'Certificados', 'Usuários e integrações'];
+          const roles = [
+            { label: 'Administrador da empresa', desc: 'Gerencia usuários, filiais, certificados e integrações. Pode operar no RENAVE.',
+              m: [[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1],[1,0,0,1,1],[1,1,1,0,0],[1,1,1,1,0]] },
+            { label: 'Operador RENAVE', desc: 'Registra entradas, saídas, transferências e resolve pendências do dia a dia. Vê CPF/CNPJ mascarados.',
+              m: [[1,1,0,0,2],[1,1,1,0,2],[1,1,1,0,2],[1,1,0,0,2],[0,0,0,0,0],[1,0,0,0,0],[0,0,0,0,0]] },
+            { label: 'Financeiro / Fiscal', desc: 'Cuida de NF-e, valores e relatórios. Não registra movimentações.',
+              m: [[1,0,0,1,2],[1,0,0,1,2],[1,0,0,1,2],[1,1,0,1,1],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]] },
+            { label: 'Compliance / Auditoria', desc: 'Leitura completa com exportação de evidências mediante justificativa registrada.',
+              m: [[1,0,0,1,1],[1,0,0,1,1],[1,0,0,1,1],[1,0,0,1,1],[1,0,0,1,1],[1,0,0,0,0],[1,0,0,0,0]] },
+            { label: 'Consulta', desc: 'Somente leitura com dados pessoais minimizados.',
+              m: [[1,0,0,0,2],[1,0,0,0,2],[1,0,0,0,2],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]] }
+          ];
+          const sel = this.state.role;
+          const cell = (v) => v === 1 ? ON : (v === 2 ? MASK : OFF);
+          const u = (ini, nome, email, perfil, estab, mfa, last, status) => ({ ini, nome, email, perfil, estab, mfa: mfa ? 'Ativa' : 'Pendente', mfaBg: mfa ? '#ECFDF3' : '#FEF3F2', mfaColor: mfa ? '#067647' : '#B42318', last, status, stColor: status === 'Ativo' ? '#067647' : '#B54708' });
+          return {
+            users: [
+              u('RA', 'Ricardo Almeida', 'ricardo@autoprime.com.br', 'Administrador da empresa', 'Todos', true, 'Hoje 09:02', 'Ativo'),
+              u('MC', 'Marina Costa', 'marina.costa@autoprime.com.br', 'Operador RENAVE', 'Matriz São Paulo', true, 'Agora', 'Ativo'),
+              u('RL', 'Rafael Lima', 'rafael.lima@autoprime.com.br', 'Operador RENAVE', 'Filial Campinas', true, 'Hoje 10:02', 'Ativo'),
+              u('TS', 'Tatiane Souza', 'fiscal@autoprime.com.br', 'Financeiro / Fiscal', 'Todos', true, 'Ontem 17:45', 'Ativo'),
+              u('GB', 'Gustavo Brito', 'gustavo.b@autoprime.com.br', 'Compliance / Auditoria', 'Todos', true, '20/11/2026', 'Ativo'),
+              u('LN', 'Lucas Nogueira', 'lucas.n@autoprime.com.br', 'Operador RENAVE', 'Filial Santos', false, 'Nunca', 'Convite enviado')
+            ],
+            roles: roles.map((r, i) => ({ label: r.label, on: i === sel ? 'true' : 'false', bg: i === sel ? '#101828' : '#FFFFFF', color: i === sel ? '#FFFFFF' : '#344054', border: i === sel ? '#101828' : '#D0D5DD', pick: () => this.setState({ role: i }) })),
+            roleDesc: roles[sel].desc,
+            matrix: res.map((name, i) => ({ res: name, cells: roles[sel].m[i].map(cell) }))
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

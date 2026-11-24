@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Zero km — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="zerokm"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Zero km
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Veículos novos faturados para 12.345.678/0001-90 pela
+                  montadora ou importadora
+                </p>
+              </div>
+              <button
+                type="button"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 1px solid #d0d5dd;
+                  border-radius: 8px;
+                  background: #ffffff;
+                  color: #344054;
+                  font: inherit;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg
+                >Buscar novos faturamentos
+              </button>
+            </div>
+
+            <div
+              role="tablist"
+              aria-label="Zero km"
+              style="
+                display: flex;
+                gap: 4px;
+                border-bottom: 1px solid #e4e7ec;
+                overflow-x: auto;
+              "
+            >
+              <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected="{{t.on}}"
+                  onClick="{{t.pick}}"
+                  style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border: 0; background: transparent; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; font-weight: {{t.weight}}; color: {{t.color}}; border-bottom: 2px solid {{t.line}}"
+                >
+                  {{t.label}}
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 1px 8px;
+                      border-radius: 999px;
+                      background: #f2f4f7;
+                      color: #344054;
+                    "
+                    >{{t.n}}</span
+                  >
+                </button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{pend}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; flex-direction: column; gap: 16px">
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    padding: 14px 16px;
+                    border-radius: 10px;
+                    background: #eff8ff;
+                    color: #175cd3;
+                    font-size: 14px;
+                    line-height: 1.5;
+                  "
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    style="flex-shrink: 0; margin-top: 2px"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 11v5M12 8h.01" />
+                  </svg>
+                  <span
+                    >Veículos novos não podem ser emplacados sem a entrada no
+                    RENAVE. Cada entrada precisa da identificação prévia (ou
+                    vistoria) e da NF-e de compra.</span
+                  >
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 12px;
+                    align-items: center;
+                    padding: 10px 16px;
+                    border-radius: 10px;
+                    background: #101828;
+                    color: #ffffff;
+                  "
+                >
+                  <strong style="font-size: 14px; font-weight: 600"
+                    >3 de 6 selecionados · todos com identificação prévia
+                    aprovada</strong
+                  >
+                  <span style="flex: 1"></span>
+                  <button
+                    type="button"
+                    style="
+                      height: 40px;
+                      padding: 0 16px;
+                      border: 0;
+                      border-radius: 8px;
+                      background: #ffffff;
+                      color: #101828;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Dar entrada em lote (3)
+                  </button>
+                </div>
+                <div
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    overflow-x: auto;
+                  "
+                >
+                  <table
+                    style="
+                      width: 100%;
+                      border-collapse: collapse;
+                      min-width: 1040px;
+                    "
+                  >
+                    <thead>
+                      <tr>
+                        <th>
+                          <input
+                            type="checkbox"
+                            aria-label="Selecionar todos"
+                            style="
+                              width: 16px;
+                              height: 16px;
+                              accent-color: #067a45;
+                            "
+                          />
+                        </th>
+                        <th>Chassi</th>
+                        <th>Modelo</th>
+                        <th>Faturado em</th>
+                        <th>NF-e de compra</th>
+                        <th>Identificação prévia</th>
+                        <th>Observação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for
+                        list="{{pendentes}}"
+                        as="r"
+                        hint-placeholder-count="6"
+                      >
+                        <tr>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked="{{r.sel}}"
+                              aria-label="Selecionar {{r.chassi}}"
+                              style="
+                                width: 16px;
+                                height: 16px;
+                                accent-color: #067a45;
+                              "
+                            />
+                          </td>
+                          <td
+                            style="
+                              font-family: ui-monospace, Menlo, monospace;
+                              font-size: 13px;
+                            "
+                          >
+                            {{r.chassi}}
+                          </td>
+                          <td>{{r.modelo}}</td>
+                          <td style="color: #344054">{{r.fat}}</td>
+                          <td
+                            style="font-size: 13px; color: {{r.nfColor}}; font-weight: 500"
+                          >
+                            {{r.nf}}
+                          </td>
+                          <td>
+                            <span
+                              style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{r.idBg}}; color: {{r.idColor}}"
+                              >{{r.id}}</span
+                            >
+                          </td>
+                          <td style="font-size: 13px; color: #475467">
+                            {{r.obs}}
+                          </td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{est}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 900px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Chassi</th>
+                      <th>Modelo</th>
+                      <th>Entrada</th>
+                      <th>Dias</th>
+                      <th>Situação</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                        "
+                      >
+                        9BWZZZ37ZTT••••81
+                      </td>
+                      <td>VW Nivus Highline 2027</td>
+                      <td>04/11/2026</td>
+                      <td>19</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #ecfdf3;
+                            color: #067647;
+                          "
+                          >Em estoque</span
+                        >
+                      </td>
+                      <td>
+                        <a href="Saida.dc.html" style="font-weight: 600"
+                          >Registrar saída</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                        "
+                      >
+                        9BWZZZ37ZTT••••96
+                      </td>
+                      <td>VW Nivus Comfortline 2027</td>
+                      <td>04/11/2026</td>
+                      <td>19</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #ecfdf3;
+                            color: #067647;
+                          "
+                          >Em estoque</span
+                        >
+                      </td>
+                      <td>
+                        <a href="Saida.dc.html" style="font-weight: 600"
+                          >Registrar saída</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                        "
+                      >
+                        9BWZZZ37ZTS••••12
+                      </td>
+                      <td>VW Polo Track 2027</td>
+                      <td>28/10/2026</td>
+                      <td>26</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #fffaeb;
+                            color: #b54708;
+                          "
+                          >Venda aguardando NF-e</span
+                        >
+                      </td>
+                      <td>
+                        <a href="Saida.dc.html" style="font-weight: 600"
+                          >Concluir</a
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ent}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                  gap: 16px;
+                "
+              >
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                    "
+                  >
+                    <strong style="font-size: 15px"
+                      >VW T-Cross Comfortline 2027</strong
+                    ><span
+                      style="
+                        font-size: 12px;
+                        font-weight: 600;
+                        padding: 3px 10px;
+                        border-radius: 999px;
+                        background: #fffaeb;
+                        color: #b54708;
+                      "
+                      >Entrega agendada</span
+                    >
+                  </div>
+                  <span style="font-size: 13px; color: #475467"
+                    >Comprador: Carlos Nunes · ***.112.334-** · entrega
+                    25/11/2026 10:00</span
+                  >
+                  <span style="font-size: 13px; color: #475467"
+                    >Saída confirmada no RENAVE em 21/11/2026. Emplacamento a
+                    cargo do comprador no DETRAN-SP.</span
+                  >
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                    <button
+                      type="button"
+                      style="
+                        height: 40px;
+                        padding: 0 14px;
+                        border: 0;
+                        border-radius: 8px;
+                        background: #067a45;
+                        color: #ffffff;
+                        font: inherit;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                      "
+                    >
+                      Registrar entrega</button
+                    ><button
+                      type="button"
+                      style="
+                        height: 40px;
+                        padding: 0 14px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        background: #ffffff;
+                        color: #344054;
+                        font: inherit;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                      "
+                    >
+                      Reagendar
+                    </button>
+                  </div>
+                </section>
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                    "
+                  >
+                    <strong style="font-size: 15px"
+                      >VW Virtus Exclusive 2027</strong
+                    ><span
+                      style="
+                        font-size: 12px;
+                        font-weight: 600;
+                        padding: 3px 10px;
+                        border-radius: 999px;
+                        background: #ecfdf3;
+                        color: #067647;
+                      "
+                      >Entregue</span
+                    >
+                  </div>
+                  <span style="font-size: 13px; color: #475467"
+                    >Venda direta da montadora · concessionária indicada como
+                    entregadora</span
+                  >
+                  <span style="font-size: 13px; color: #475467"
+                    >Entrega registrada em 18/11/2026 16:20. Cancelamento
+                    possível até 25/11/2026, se previsto no fluxo.</span
+                  >
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                    <button
+                      type="button"
+                      style="
+                        height: 40px;
+                        padding: 0 14px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        background: #ffffff;
+                        color: #344054;
+                        font: inherit;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                      "
+                    >
+                      Ver termo de entrega
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </sc-if>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1200}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { tab: 'pend' }; }
+        renderVals() {
+          const tab = this.state.tab;
+          const tabs = [['pend','Pendentes de entrada','6'],['est','Em estoque','38'],['ent','Entregas','2']].map(([id, label, n]) => ({
+            label, n, on: tab === id ? 'true' : 'false', weight: tab === id ? '600' : '500',
+            color: tab === id ? '#067A45' : '#475467', line: tab === id ? '#067A45' : 'transparent', pick: () => this.setState({ tab: id })
+          }));
+          const ID = { ok: ['Aprovada', '#ECFDF3', '#067647'], pend: ['Pendente', '#FFFAEB', '#B54708'], vist: ['Vistoria anexada', '#EFF8FF', '#175CD3'] };
+          const r = (sel, chassi, modelo, fat, nf, id, obs) => ({ sel, chassi, modelo, fat, nf: nf || 'Aguardando NF-e da montadora', nfColor: nf ? '#344054' : '#B54708',
+            id: ID[id][0], idBg: ID[id][1], idColor: ID[id][2], obs: obs || '—' });
+          return {
+            tabs, pend: tab === 'pend', est: tab === 'est', ent: tab === 'ent',
+            pendentes: [
+              r(true, '9BWZZZ37ZTT102341', 'VW Nivus Highline 2027 · Cinza', '20/11/2026', 'nº 884.120', 'ok', ''),
+              r(true, '9BWZZZ37ZTT102356', 'VW Nivus Highline 2027 · Branco', '20/11/2026', 'nº 884.121', 'ok', ''),
+              r(true, '9BWZZZ37ZTS208874', 'VW Polo Highline 2027 · Azul', '21/11/2026', 'nº 884.402', 'ok', ''),
+              r(false, '9BWZZZ37ZTT102399', 'VW T-Cross Highline 2027 · Preto', '22/11/2026', 'nº 884.877', 'pend', 'Agende a identificação prévia no pátio'),
+              r(false, '9BWZZZ5UZTP660012', 'VW Amarok V6 2027 · Prata', '22/11/2026', '', 'vist', 'Venda direta da montadora — entrega pela concessionária'),
+              r(false, '9BWZZZ2HZTA015530', 'VW Delivery 11.180 (inacabado)', '18/11/2026', 'nº 883.990', 'pend', 'Veículo inacabado: transferir para ITE (implementadora) antes da venda')
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

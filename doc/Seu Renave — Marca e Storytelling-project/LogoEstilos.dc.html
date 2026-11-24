@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Estilos e expressões — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Nunito:wght@800;900&amp;display=swap"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          width: 1600px;
+          height: 1000px;
+          box-sizing: border-box;
+          padding: 52px 72px;
+          background: #f7f8fa;
+          font-family: Inter, system-ui, sans-serif;
+          color: #0b2550;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 24px;
+          "
+        >
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div
+              style="
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #067a45;
+              "
+            >
+              04 · Expressões
+            </div>
+            <h1
+              style="
+                margin: 0;
+                font-family: Nunito, Inter, sans-serif;
+                font-size: 44px;
+                font-weight: 900;
+              "
+            >
+              Estilos do símbolo
+            </h1>
+          </div>
+          <p
+            style="
+              margin: 0;
+              font-size: 16px;
+              line-height: 1.55;
+              color: #475467;
+              max-width: 560px;
+            "
+          >
+            O sólido colorido é a assinatura oficial. As demais expressões
+            servem a ilustração, impressão, selo para clientes e motion.
+          </p>
+        </div>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+          "
+        >
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 22px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 14px;
+            "
+          >
+            <dc-import
+              name="Logo"
+              size="{{ 150 }}"
+              variant="cor"
+              lockup="simbolo"
+              hint-size="150px,150px"
+            ></dc-import>
+            <div style="text-align: center">
+              <div style="font-weight: 600">Sólido (oficial)</div>
+              <div style="font-size: 14px; color: #475467">
+                Todos os pontos de contato
+              </div>
+            </div>
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 22px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 14px;
+            "
+          >
+            <svg
+              width="150"
+              height="150"
+              viewBox="0 0 64 64"
+              role="img"
+              aria-label="Estilo linear"
+            >
+              <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M22 6H38L48 16V45A4 4 0 0 1 44 49H22A4 4 0 0 1 18 45V10A4 4 0 0 1 22 6Z"
+                  stroke="#0B2550"
+                  stroke-width="1.75"
+                ></path>
+                <path
+                  d="M38 6V14A2 2 0 0 0 40 16H48"
+                  stroke="#0A9B55"
+                  stroke-width="1.75"
+                ></path>
+                <path
+                  d="M24 16H33M24 23H32"
+                  stroke="#0B2550"
+                  stroke-width="1.75"
+                ></path>
+                <path
+                  d="M14 40L17.5 33.5C18.3 32 19.6 31 21.3 31H32.7C34.4 31 35.7 32 36.5 33.5L40 40C41.7 40.6 43 42.2 43 44V49A2 2 0 0 1 41 51H13A2 2 0 0 1 11 49V44C11 42.2 12.3 40.6 14 40Z"
+                  stroke="#0B2550"
+                  stroke-width="1.75"
+                  fill="#FFFFFF"
+                ></path>
+                <path
+                  d="M14 44H19M35 44H40M19.5 39H34.5"
+                  stroke="#0B2550"
+                  stroke-width="1.75"
+                ></path>
+                <path
+                  d="M3 60C15 58.5 29 56.5 37 52.5C42 50 45 48.5 49 46.5"
+                  stroke="#0A9B55"
+                  stroke-width="1.75"
+                ></path>
+                <circle
+                  cx="48"
+                  cy="29"
+                  r="8"
+                  stroke="#0A9B55"
+                  stroke-width="1.75"
+                  fill="#FFFFFF"
+                ></circle>
+                <path
+                  d="M44 29.2L47 32.2L52.2 26.4"
+                  stroke="#0A9B55"
+                  stroke-width="1.75"
+                ></path>
+              </g>
+            </svg>
+            <div style="text-align: center">
+              <div style="font-weight: 600">Linear</div>
+              <div style="font-size: 14px; color: #475467">
+                Ilustrações e materiais de apoio; ≥ 64 px
+              </div>
+            </div>
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 22px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 14px;
+            "
+          >
+            <dc-import
+              name="Logo"
+              size="{{ 150 }}"
+              variant="mono"
+              lockup="simbolo"
+              hint-size="150px,150px"
+            ></dc-import>
+            <div style="text-align: center">
+              <div style="font-weight: 600">Monocromático</div>
+              <div style="font-size: 14px; color: #475467">
+                Impressão de uma cor e documentos
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+            gap: 20px;
+            flex-grow: 1;
+          "
+        >
+          <div
+            style="
+              background: #0b2550;
+              border-radius: 14px;
+              padding: 24px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              gap: 14px;
+              color: #ffffff;
+            "
+          >
+            <div style="position: relative; width: 220px; height: 220px">
+              <svg
+                width="220"
+                height="220"
+                viewBox="0 0 200 200"
+                role="img"
+                aria-label="Selo Registrado com Seu Renave"
+              >
+                <defs>
+                  <path
+                    id="srSeloArco2"
+                    d="M100 100m-75 0a75 75 0 1 1 150 0a75 75 0 1 1 -150 0"
+                  ></path>
+                </defs>
+                <circle cx="100" cy="100" r="96" fill="#FFFFFF"></circle>
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="88"
+                  fill="none"
+                  stroke="#0A9B55"
+                  stroke-width="2"
+                ></circle>
+                <text
+                  font-family="Nunito, Inter, sans-serif"
+                  font-size="15"
+                  font-weight="900"
+                  letter-spacing="3"
+                  fill="#0B2550"
+                >
+                  <textPath href="#srSeloArco2">
+                    REGISTRADO COM SEU RENAVE · PLATAFORMA PRIVADA ·
+                  </textPath>
+                </text>
+                <circle cx="100" cy="100" r="58" fill="#E7F6EE"></circle>
+              </svg>
+              <div style="position: absolute; left: 50px; top: 50px">
+                <dc-import
+                  name="Logo"
+                  size="{{ 120 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  simples="{{ true }}"
+                  hint-size="120px,120px"
+                ></dc-import>
+              </div>
+            </div>
+            <div style="text-align: center">
+              <div style="font-weight: 600">
+                Selo “Registrado com Seu Renave”
+              </div>
+              <div style="font-size: 13px; color: #cbd5e1; max-width: 320px">
+                Para lojas usarem em sites e propostas, com link de verificação.
+              </div>
+            </div>
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 24px;
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+              "
+            >
+              <h2 style="margin: 0; font-size: 18px; font-weight: 600">
+                Animação — o registro se completa
+              </h2>
+              <span style="font-size: 14px; color: #475467"
+                >1,2 s · ease-out · splash e confirmação</span
+              >
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 14px;
+                flex-grow: 1;
+              "
+            >
+              <div
+                style="
+                  border-radius: 12px;
+                  background: #f7f8fa;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 10px;
+                "
+              >
+                <svg
+                  width="120"
+                  height="120"
+                  viewBox="0 0 64 64"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M22 6H38L48 16V45A4 4 0 0 1 44 49H22A4 4 0 0 1 18 45V10A4 4 0 0 1 22 6Z"
+                    fill="#FFFFFF"
+                    stroke="#0B2550"
+                    stroke-width="5"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M38 6L48 16H40A2 2 0 0 1 38 14Z"
+                    fill="#0A9B55"
+                    stroke="#0B2550"
+                    stroke-width="3"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M24 16H33M24 23H32"
+                    stroke="#0B2550"
+                    stroke-width="4"
+                    stroke-linecap="round"
+                  ></path>
+                </svg>
+                <span
+                  style="font-size: 13px; color: #475467; text-align: center"
+                  ><strong style="color: #0b2550">1 · 0–300 ms</strong><br />O
+                  documento aparece</span
+                >
+              </div>
+              <div
+                style="
+                  border-radius: 12px;
+                  background: #f7f8fa;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 10px;
+                "
+              >
+                <svg
+                  width="120"
+                  height="120"
+                  viewBox="0 0 64 64"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M22 6H38L48 16V45A4 4 0 0 1 44 49H22A4 4 0 0 1 18 45V10A4 4 0 0 1 22 6Z"
+                    fill="#FFFFFF"
+                    stroke="#0B2550"
+                    stroke-width="5"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M38 6L48 16H40A2 2 0 0 1 38 14Z"
+                    fill="#0A9B55"
+                    stroke="#0B2550"
+                    stroke-width="3"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M24 16H33M24 23H32"
+                    stroke="#0B2550"
+                    stroke-width="4"
+                    stroke-linecap="round"
+                  ></path>
+                  <circle cx="48" cy="29" r="10.5" fill="#FFFFFF"></circle>
+                  <circle cx="48" cy="29" r="8" fill="#0A9B55"></circle>
+                  <path
+                    d="M44 29.2L47 32.2L52.2 26.4"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    stroke-width="2.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ></path>
+                </svg>
+                <span
+                  style="font-size: 13px; color: #475467; text-align: center"
+                  ><strong style="color: #0b2550">2 · 300–550 ms</strong><br />O
+                  check aparece (pop)</span
+                >
+              </div>
+              <div
+                style="
+                  border-radius: 12px;
+                  background: #f7f8fa;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 10px;
+                "
+              >
+                <svg
+                  width="120"
+                  height="120"
+                  viewBox="0 0 64 64"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M22 6H38L48 16V45A4 4 0 0 1 44 49H22A4 4 0 0 1 18 45V10A4 4 0 0 1 22 6Z"
+                    fill="#FFFFFF"
+                    stroke="#0B2550"
+                    stroke-width="5"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M38 6L48 16H40A2 2 0 0 1 38 14Z"
+                    fill="#0A9B55"
+                    stroke="#0B2550"
+                    stroke-width="3"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M24 16H33M24 23H32"
+                    stroke="#0B2550"
+                    stroke-width="4"
+                    stroke-linecap="round"
+                  ></path>
+                  <path
+                    d="M3 60C15 58.5 29 56.5 37 52.5C42 50 45 48.5 49 46.5"
+                    fill="none"
+                    stroke="#0A9B55"
+                    stroke-width="7"
+                    stroke-linecap="round"
+                  ></path>
+                  <path
+                    d="M3 60C15 58.5 29 56.5 37 52.5"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    stroke-width="1.2"
+                    stroke-dasharray="3 2.5"
+                  ></path>
+                  <g transform="translate(-14 6) scale(0.8)" opacity="0.7">
+                    <path
+                      d="M14 40L17.5 33.5C18.3 32 19.6 31 21.3 31H32.7C34.4 31 35.7 32 36.5 33.5L40 40C41.7 40.6 43 42.2 43 44V49A2 2 0 0 1 41 51H13A2 2 0 0 1 11 49V44C11 42.2 12.3 40.6 14 40Z"
+                      fill="#0B2550"
+                    ></path>
+                  </g>
+                  <circle cx="48" cy="29" r="10.5" fill="#FFFFFF"></circle>
+                  <circle cx="48" cy="29" r="8" fill="#0A9B55"></circle>
+                  <path
+                    d="M44 29.2L47 32.2L52.2 26.4"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    stroke-width="2.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ></path>
+                </svg>
+                <span
+                  style="font-size: 13px; color: #475467; text-align: center"
+                  ><strong style="color: #0b2550">3 · 550–950 ms</strong><br />O
+                  carro entra pela estrada</span
+                >
+              </div>
+              <div
+                style="
+                  border-radius: 12px;
+                  background: #e7f6ee;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 10px;
+                "
+              >
+                <dc-import
+                  name="Logo"
+                  size="{{ 120 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  hint-size="120px,120px"
+                ></dc-import>
+                <span
+                  style="font-size: 13px; color: #067a45; text-align: center"
+                  ><strong>4 · 1,2 s</strong><br />Logo completo</span
+                >
+              </div>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: #475467">
+              Com
+              <strong style="color: #0b2550">prefers-reduced-motion</strong>,
+              exibir direto o quadro 4.
+            </p>
+          </div>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1600,"height":1000}}'
+    >
+      class Component extends DCLogic {
+        renderVals() { return {}; }
+      }
+    </script>
+  </body>
+</html>

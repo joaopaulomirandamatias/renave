@@ -1,0 +1,230 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Capa da marca",
+      "page": "logo"
+    },
+    {
+      "file": "Conceitos.dc.html",
+      "x": 1680,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Logo oficial — anatomia",
+      "page": "logo"
+    },
+    {
+      "file": "LogoVersoes.dc.html",
+      "x": 3360,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Versões do logo",
+      "page": "logo"
+    },
+    {
+      "file": "LogoUso.dc.html",
+      "x": 0,
+      "y": 1120,
+      "w": 1600,
+      "h": 1000,
+      "title": "Uso do logo",
+      "page": "logo"
+    },
+    {
+      "file": "LogoEstilos.dc.html",
+      "x": 1680,
+      "y": 1120,
+      "w": 1600,
+      "h": 1000,
+      "title": "Estilos e expressões",
+      "page": "logo"
+    },
+    {
+      "file": "Logo.dc.html",
+      "x": 3360,
+      "y": 1120,
+      "w": 760,
+      "h": 160,
+      "title": "Componente — Logo",
+      "page": "logo"
+    },
+    {
+      "file": "Cores.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Cores",
+      "page": "sistema"
+    },
+    {
+      "file": "Tipografia.dc.html",
+      "x": 1680,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Tipografia",
+      "page": "sistema"
+    },
+    {
+      "file": "Iconografia.dc.html",
+      "x": 3360,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Iconografia e grafismos",
+      "page": "sistema"
+    },
+    {
+      "file": "Manifesto.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Manifesto e propósito",
+      "page": "story"
+    },
+    {
+      "file": "Narrativa.dc.html",
+      "x": 1680,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Narrativa — storyboard",
+      "page": "story"
+    },
+    {
+      "file": "Voz.dc.html",
+      "x": 0,
+      "y": 1120,
+      "w": 1600,
+      "h": 1000,
+      "title": "Tom de voz e taglines",
+      "page": "story"
+    },
+    {
+      "file": "Pilares.dc.html",
+      "x": 1680,
+      "y": 1120,
+      "w": 1600,
+      "h": 1000,
+      "title": "Pilares de valor",
+      "page": "story"
+    },
+    {
+      "file": "AppIcon.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Ícone de app, splash e login",
+      "page": "aplic"
+    },
+    {
+      "file": "Landing.dc.html",
+      "x": 1680,
+      "y": 0,
+      "w": 1440,
+      "h": 2200,
+      "title": "Landing page",
+      "page": "aplic"
+    },
+    {
+      "file": "Papelaria.dc.html",
+      "x": 3200,
+      "y": 0,
+      "w": 1600,
+      "h": 1000,
+      "title": "Papelaria",
+      "page": "aplic"
+    },
+    {
+      "file": "Social.dc.html",
+      "x": 3200,
+      "y": 1120,
+      "w": 1600,
+      "h": 1000,
+      "title": "Redes sociais",
+      "page": "aplic"
+    },
+    {
+      "file": "Slide.dc.html",
+      "x": 0,
+      "y": 1120,
+      "w": 1600,
+      "h": 1000,
+      "title": "Pitch deck",
+      "page": "aplic"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "tLogo",
+      "x": 0,
+      "y": -300,
+      "w": 240,
+      "maxW": 4960,
+      "text": "Logo — Seu Renave",
+      "kind": "title1",
+      "page": "logo"
+    },
+    {
+      "id": "tSistema",
+      "x": 0,
+      "y": -300,
+      "w": 240,
+      "maxW": 4960,
+      "text": "Sistema visual",
+      "kind": "title1",
+      "page": "sistema"
+    },
+    {
+      "id": "tStory",
+      "x": 0,
+      "y": -300,
+      "w": 240,
+      "maxW": 3280,
+      "text": "Storytelling da marca",
+      "kind": "title1",
+      "page": "story"
+    },
+    {
+      "id": "tAplic",
+      "x": 0,
+      "y": -300,
+      "w": 240,
+      "maxW": 4800,
+      "text": "Aplicações da marca",
+      "kind": "title1",
+      "page": "aplic"
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "logo"
+  },
+  "pages": [
+    {
+      "id": "logo",
+      "name": "Logo"
+    },
+    {
+      "id": "sistema",
+      "name": "Sistema visual"
+    },
+    {
+      "id": "story",
+      "name": "Storytelling"
+    },
+    {
+      "id": "aplic",
+      "name": "Aplicações"
+    }
+  ]
+}

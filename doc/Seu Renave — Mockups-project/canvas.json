@@ -1,0 +1,537 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1500,
+      "title": "Painel operacional",
+      "expand": "fill",
+      "page": "acesso",
+      "is_interactive": true
+    },
+    {
+      "file": "Login.dc.html",
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Login + MFA",
+      "expand": "fill",
+      "page": "acesso",
+      "is_interactive": true
+    },
+    {
+      "file": "Onboarding.dc.html",
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1300,
+      "title": "Adesão ao RENAVE (onboarding)",
+      "expand": "fill",
+      "page": "acesso",
+      "is_interactive": true
+    },
+    {
+      "file": "Estoque.dc.html",
+      "x": 0,
+      "y": 2000,
+      "w": 1440,
+      "h": 1200,
+      "title": "Estoque RENAVE",
+      "expand": "fill",
+      "page": "operacao",
+      "is_interactive": true
+    },
+    {
+      "file": "Veiculo.dc.html",
+      "x": 1520,
+      "y": 2000,
+      "w": 1440,
+      "h": 1500,
+      "title": "Registro do veículo no RENAVE",
+      "expand": "fill",
+      "page": "operacao",
+      "is_interactive": true
+    },
+    {
+      "file": "Entrada.dc.html",
+      "x": 3040,
+      "y": 2000,
+      "w": 1440,
+      "h": 1300,
+      "title": "Dar entrada — veículo usado",
+      "expand": "fill",
+      "page": "operacao",
+      "is_interactive": true
+    },
+    {
+      "file": "Saida.dc.html",
+      "x": 4560,
+      "y": 2000,
+      "w": 1440,
+      "h": 1350,
+      "title": "Registrar saída (venda)",
+      "expand": "fill",
+      "page": "operacao",
+      "is_interactive": true
+    },
+    {
+      "file": "ZeroKm.dc.html",
+      "x": 0,
+      "y": 3900,
+      "w": 1440,
+      "h": 1200,
+      "title": "Zero km",
+      "expand": "fill",
+      "page": "operacao",
+      "is_interactive": true
+    },
+    {
+      "file": "Transferencias.dc.html",
+      "x": 1520,
+      "y": 3900,
+      "w": 1440,
+      "h": 1200,
+      "title": "Transferências",
+      "expand": "fill",
+      "page": "operacao",
+      "is_interactive": true
+    },
+    {
+      "file": "Consignacao.dc.html",
+      "x": 3040,
+      "y": 3900,
+      "w": 1440,
+      "h": 1250,
+      "title": "Consignação",
+      "expand": "fill",
+      "page": "operacao",
+      "is_interactive": true
+    },
+    {
+      "file": "Pendencias.dc.html",
+      "x": 0,
+      "y": 5700,
+      "w": 1440,
+      "h": 1400,
+      "title": "Fila de pendências",
+      "expand": "fill",
+      "page": "compliance",
+      "is_interactive": true
+    },
+    {
+      "file": "Operacao.dc.html",
+      "x": 1520,
+      "y": 5700,
+      "w": 1440,
+      "h": 1450,
+      "title": "Detalhe da operação",
+      "expand": "fill",
+      "page": "compliance",
+      "is_interactive": true
+    },
+    {
+      "file": "Documentos.dc.html",
+      "x": 3040,
+      "y": 5700,
+      "w": 1440,
+      "h": 1150,
+      "title": "Documentos",
+      "expand": "fill",
+      "page": "compliance",
+      "is_interactive": true
+    },
+    {
+      "file": "Auditoria.dc.html",
+      "x": 4560,
+      "y": 5700,
+      "w": 1440,
+      "h": 1300,
+      "title": "Auditoria",
+      "expand": "fill",
+      "page": "compliance",
+      "is_interactive": true
+    },
+    {
+      "file": "Estabelecimentos.dc.html",
+      "x": 0,
+      "y": 7600,
+      "w": 1440,
+      "h": 1300,
+      "title": "Estabelecimentos & Certificados",
+      "expand": "fill",
+      "page": "compliance",
+      "is_interactive": true
+    },
+    {
+      "file": "Integracoes.dc.html",
+      "x": 1520,
+      "y": 7600,
+      "w": 1440,
+      "h": 1300,
+      "title": "Integrações (API/Webhooks)",
+      "expand": "fill",
+      "page": "compliance",
+      "is_interactive": true
+    },
+    {
+      "file": "Usuarios.dc.html",
+      "x": 3040,
+      "y": 7600,
+      "w": 1440,
+      "h": 1300,
+      "title": "Usuários & Perfis",
+      "expand": "fill",
+      "page": "compliance",
+      "is_interactive": true
+    },
+    {
+      "file": "Console.dc.html",
+      "x": 0,
+      "y": 9500,
+      "w": 1440,
+      "h": 1450,
+      "title": "Console da integradora",
+      "expand": "fill",
+      "page": "integradora",
+      "is_interactive": true
+    },
+    {
+      "file": "MobileConsulta.dc.html",
+      "x": 1520,
+      "y": 9500,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile — Consulta por placa",
+      "page": "integradora",
+      "is_interactive": true,
+      "radius": 32
+    },
+    {
+      "file": "MobileVistoria.dc.html",
+      "x": 1990,
+      "y": 9500,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile — Identificação prévia",
+      "page": "integradora",
+      "is_interactive": true,
+      "radius": 32
+    },
+    {
+      "file": "Sidebar.dc.html",
+      "x": 0,
+      "y": 11300,
+      "w": 248,
+      "h": 900,
+      "title": "Componente — Sidebar",
+      "page": "integradora",
+      "is_interactive": true
+    },
+    {
+      "file": "Topbar.dc.html",
+      "x": 328,
+      "y": 11300,
+      "w": 1192,
+      "h": 64,
+      "title": "Componente — Topbar",
+      "page": "integradora"
+    },
+    {
+      "file": "SaasVisaoGeral.dc.html",
+      "x": 0,
+      "y": 12700,
+      "w": 1440,
+      "h": 1500,
+      "title": "Backoffice — Visão geral",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasClientes.dc.html",
+      "x": 1520,
+      "y": 12700,
+      "w": 1440,
+      "h": 1200,
+      "title": "Backoffice — Clientes (tenants)",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasClienteDetalhe.dc.html",
+      "x": 3040,
+      "y": 12700,
+      "w": 1440,
+      "h": 1400,
+      "title": "Backoffice — Detalhe do cliente",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasNovoCliente.dc.html",
+      "x": 4560,
+      "y": 12700,
+      "w": 1440,
+      "h": 1250,
+      "title": "Backoffice — Novo cliente",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasPlanos.dc.html",
+      "x": 0,
+      "y": 14720,
+      "w": 1440,
+      "h": 1350,
+      "title": "Backoffice — Preço por registro",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasFaturamento.dc.html",
+      "x": 1520,
+      "y": 14720,
+      "w": 1440,
+      "h": 1450,
+      "title": "Backoffice — Faturamento",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasParceiros.dc.html",
+      "x": 3040,
+      "y": 14720,
+      "w": 1440,
+      "h": 1200,
+      "title": "Backoffice — Parceiros",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasSuporte.dc.html",
+      "x": 4560,
+      "y": 14720,
+      "w": 1440,
+      "h": 1250,
+      "title": "Backoffice — Suporte",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasEquipe.dc.html",
+      "x": 0,
+      "y": 16690,
+      "w": 1440,
+      "h": 1300,
+      "title": "Backoffice — Equipe da plataforma",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasAuditoria.dc.html",
+      "x": 1520,
+      "y": 16690,
+      "w": 1440,
+      "h": 1250,
+      "title": "Backoffice — Auditoria da plataforma",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SaasConfig.dc.html",
+      "x": 3040,
+      "y": 16690,
+      "w": 1440,
+      "h": 1500,
+      "title": "Backoffice — Configurações",
+      "expand": "fill",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "SidebarSaas.dc.html",
+      "x": 4560,
+      "y": 16690,
+      "w": 248,
+      "h": 900,
+      "title": "Componente — Sidebar do backoffice",
+      "page": "saas",
+      "is_interactive": true
+    },
+    {
+      "file": "MinhaAssinatura.dc.html",
+      "x": 0,
+      "y": 18710,
+      "w": 1440,
+      "h": 1350,
+      "title": "Consumo e faturas",
+      "expand": "fill",
+      "page": "conta",
+      "is_interactive": true
+    },
+    {
+      "file": "Cadastro.dc.html",
+      "x": 1520,
+      "y": 18710,
+      "w": 1440,
+      "h": 1000,
+      "title": "Criar conta da empresa (self-service)",
+      "expand": "fill",
+      "page": "conta",
+      "is_interactive": true
+    }
+  ],
+  "annotations": [
+    {
+      "id": "t_acesso",
+      "x": 0,
+      "y": -300,
+      "w": 240,
+      "maxW": 4480,
+      "text": "Acesso e Painel",
+      "kind": "title1",
+      "page": "acesso"
+    },
+    {
+      "id": "t_op1",
+      "x": 0,
+      "y": 1700,
+      "w": 240,
+      "maxW": 6000,
+      "text": "Operação de estoque — usados",
+      "kind": "title1",
+      "page": "operacao"
+    },
+    {
+      "id": "t_op2",
+      "x": 0,
+      "y": 3600,
+      "w": 240,
+      "maxW": 4480,
+      "text": "Zero km, transferências e consignação",
+      "kind": "title1",
+      "page": "operacao"
+    },
+    {
+      "id": "t_comp1",
+      "x": 0,
+      "y": 5400,
+      "w": 240,
+      "maxW": 6000,
+      "text": "Compliance: pendências, operações, documentos e auditoria",
+      "kind": "title1",
+      "page": "compliance"
+    },
+    {
+      "id": "t_comp2",
+      "x": 0,
+      "y": 7300,
+      "w": 240,
+      "maxW": 4480,
+      "text": "Configuração: estabelecimentos, integrações e acessos",
+      "kind": "title1",
+      "page": "compliance"
+    },
+    {
+      "id": "t_int",
+      "x": 0,
+      "y": 9200,
+      "w": 240,
+      "maxW": 2380,
+      "text": "Integradora (backoffice) e mobile do pátio",
+      "kind": "title1",
+      "page": "integradora"
+    },
+    {
+      "id": "t_comp",
+      "x": 0,
+      "y": 11000,
+      "w": 240,
+      "maxW": 1520,
+      "text": "Componentes compartilhados",
+      "kind": "title1",
+      "page": "integradora"
+    },
+    {
+      "id": "t_saas1",
+      "x": 0,
+      "y": 12400,
+      "w": 240,
+      "maxW": 6000,
+      "text": "Backoffice: visão geral, clientes e provisionamento",
+      "kind": "title1",
+      "page": "saas"
+    },
+    {
+      "id": "t_saas2",
+      "x": 0,
+      "y": 14420,
+      "w": 240,
+      "maxW": 6000,
+      "text": "Backoffice: preço por registro, faturamento, parceiros e suporte",
+      "kind": "title1",
+      "page": "saas"
+    },
+    {
+      "id": "t_saas3",
+      "x": 0,
+      "y": 16390,
+      "w": 240,
+      "maxW": 4808,
+      "text": "Backoffice: equipe, auditoria e configurações",
+      "kind": "title1",
+      "page": "saas"
+    },
+    {
+      "id": "t_conta",
+      "x": 0,
+      "y": 18410,
+      "w": 240,
+      "maxW": 2960,
+      "text": "Conta do cliente: consumo e cadastro",
+      "kind": "title1",
+      "page": "conta"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [
+    {
+      "id": "acesso",
+      "name": "Acesso e Painel"
+    },
+    {
+      "id": "operacao",
+      "name": "Operação de estoque"
+    },
+    {
+      "id": "compliance",
+      "name": "Compliance e Configuração"
+    },
+    {
+      "id": "integradora",
+      "name": "Integradora e Mobile"
+    },
+    {
+      "id": "saas",
+      "name": "Gestão do SaaS (Backoffice)"
+    },
+    {
+      "id": "conta",
+      "name": "Conta do cliente"
+    }
+  ]
+}

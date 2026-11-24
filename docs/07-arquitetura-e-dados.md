@@ -51,7 +51,7 @@ flowchart LR
 | **BFF** | Sessão OIDC (cookie httpOnly), proxy, CSRF, agregação para a UI | Fastify |
 | **API de domínio** | Bounded contexts, regras, autorização, outbox | Fastify 5 + Prisma + SQL |
 | **Workers** | Envio ao RENAVE, reconciliação, webhooks, alertas, relatórios, verificação de cadeia de hash | Node + BullMQ/pg-boss |
-| **Conector RENAVE** (pacote) | mTLS por estabelecimento, serialização, timeouts, classificação de erro, catálogo de endpoints | `undici` + adapters versionados |
+| **Conector RENAVE** (pacote) | mTLS com e-CNPJ da integradora + `CNPJ-Estabelecimento` no modo padrão; fallback legado por estabelecimento; verificação de identidade, serialização, timeouts, classificação de erro e catálogo de endpoints | `undici` + adapters versionados |
 | **Identity** | OIDC, MFA, SSO federado | Keycloak |
 | **Dados** | Postgres (RLS), Redis, S3 (object lock), KMS/HSM | Região Brasil |
 | **Observabilidade** | Logs, métricas, traces, alertas, status page | OpenTelemetry, Grafana, Loki, Tempo, Prometheus |
@@ -84,7 +84,7 @@ stateDiagram-v2
   PRE_VALIDACAO --> RASCUNHO: regra falhou (pendência)
   PRE_VALIDACAO --> PRONTA: regras OK
   PRONTA --> ENVIADA: outbox persistido + envio
-  ENVIADA --> CONFIRMADA: 2xx + estado RENAVE coerente
+  ENVIADA --> CONFIRMADA: 2xx + estado RENAVE terminal/coerente para a etapa
   ENVIADA --> AGUARDANDO_DEPENDENCIA: SOLICITADO / DETRAN / assinatura / NF-e
   AGUARDANDO_DEPENDENCIA --> CONFIRMADA: dependência satisfeita (polling/reconciliação)
   ENVIADA --> REJEITADA: 422 (negócio)
@@ -113,7 +113,7 @@ stateDiagram-v2
 | DIVERGENTE | Divergência | Erro |
 | CANCELADA | Cancelada | Neutro |
 
-**Posição de estoque** (`stock_position.state`): `EM_ENTRADA` (RENAVE `SOLICITADO`) → `EM_ESTOQUE` (`CONFIRMADO`) → `VINCULADO` (restrição superveniente) → `EM_TRANSFERENCIA` → `BAIXADO` (`FINALIZADO`) / `TRANSFERIDO` (`TRANSFERIDO`) / `CONSIGNADO`.
+**Posição de estoque** (`stock_position.state`) na entrada comprada: `EM_ENTRADA` (RENAVE `SOLICITADO`) → `EM_TRANSFERENCIA` (RENAVE `TRANSFERIDO`, aguardando novo CRV) → `EM_ESTOQUE` (RENAVE `CONFIRMADO`) → `VINCULADO` (restrição superveniente) → `BAIXADO` (RENAVE `FINALIZADO`) / `CONSIGNADO`. Transferência entre estabelecimentos é uma operação de domínio separada; não deve ser inferida apenas do nome do estado RENAVE `TRANSFERIDO`.
 
 ## 7.5 Sequência — entrada de usado com idempotência e reconciliação
 
@@ -132,10 +132,10 @@ sequenceDiagram
   API->>DB: TX: operation(PRONTA) + outbox + audit_event
   API-->>UI: 202 Accepted (operation_id)
   W->>DB: lock outbox (SKIP LOCKED) → ENVIADA
-  W->>C: solicitarEntrada(payload canônico, cert do estabelecimento)
+  W->>C: solicitarEntrada(payload canônico, cert integradora + CNPJ da loja)
   C->>R: POST /api/solicitacoes-entrada-estoque (timeout 120 s)
   alt 201 Created
-    R-->>C: EstoqueJson (estado SOLICITADO/CONFIRMADO)
+    R-->>C: EstoqueJson (compra usada inicia em SOLICITADO)
     C-->>W: ok(hash request/response)
     W->>DB: TX: evento + estado + stock_position + audit + webhook outbox
   else 422
@@ -150,6 +150,8 @@ sequenceDiagram
   end
   UI-->>Op: tela acompanha o estado (SSE / polling)
 ```
+
+Após o `201`, o acompanhamento oficial da entrada comprada prossegue fora do payload inicial: ATPV disponível → assinatura do vendedor → DETRAN consome a intenção e o estoque fica `TRANSFERIDO` → emissão do CRV leva a `CONFIRMADO` → estabelecimento emite/informa NF-e → RENAVE valida no SPED e libera a obtenção do CRLV. `SOLICITADO` e `TRANSFERIDO` mapeiam para `AGUARDANDO_DEPENDENCIA`; só o estado RENAVE `CONFIRMADO` confirma a posição de estoque, e a conclusão fiscal/documental permanece separada. Essas transições são eventos reconciliáveis da mesma jornada, não reenvios do POST inicial.
 
 ## 7.6 Catálogo RENAVE-WS × ações de negócio
 
@@ -167,11 +169,11 @@ sequenceDiagram
 |---|---|---|
 | Testar conexão / certificado | `GET /api/cliente-autenticado` | Primeiro teste após habilitar o certificado no Credencia |
 | Consultar aptidão (entrada ou saída) | `GET /api/aptidao-veiculo-estoque?placa&renavam&tipoCrv&numeroCrv` | Diagnóstico com motivos, débitos, boletos do DETRAN e `comunicacaoComDetranFalhou` |
-| Dar entrada — usado comprado | `POST /api/solicitacoes-entrada-estoque` | 201 → EstoqueJson |
-| Dar entrada — veículo próprio | `POST /api/solicitacoes-entrada-estoque-veiculo-proprio` | Sem assinatura do vendedor |
-| Enviar assinatura do vendedor (ATPV) | `POST /api/atpv-assinatura-vendedor` | Um tipo por envio; sobrescreve |
+| Dar entrada — usado comprado | `POST /api/solicitacoes-entrada-estoque` | 201 → `EstoqueJson`, normalmente `SOLICITADO`; inicia a jornada, não a conclui |
+| Dar entrada — veículo próprio | `POST /api/solicitacoes-entrada-estoque-veiculo-proprio` | Sem assinatura do vendedor; NF-e de entrada enviada na etapa seguinte |
+| Enviar assinatura do vendedor (ATPV) | `POST /api/atpv-assinatura-vendedor` | Depois da solicitação que cria/reaproveita a intenção; um tipo por envio; sobrescreve |
 | Consultar assinatura do ATPV | `GET /api/atpv-assinaturas/{placa}/{renavam}/ultimo` | Tipos: próprio punho, P7S qualificado, avançada gov.br |
-| Vincular NF-e (compra/venda) | `POST /api/notas-fiscais` | `evento` COMPRA ou VENDA (em homologação também CONSIGNACAO e DEVOLUCAO) |
+| Vincular NF-e (compra/venda) | `POST /api/notas-fiscais` | Exige `idEstoque`, portanto é posterior à solicitação; `evento` COMPRA ou VENDA (em homologação também CONSIGNACAO e DEVOLUCAO) |
 | Vender veículo (saída de usado) | `POST /api/solicitacoes-saida-estoque` | Comprador com endereço e `codigoMunicipio` |
 | Cancelar entrada | `POST /api/solicitacoes-cancelamento-estoque` | Só com o estoque SOLICITADO |
 | Cancelar saída | `POST /api/solicitacoes-cancelamento-saida-estoque` | Só antes da transferência no DETRAN |
@@ -223,7 +225,7 @@ sequenceDiagram
 
 | Tema | Regra |
 |---|---|
-| Autenticação | **TLS mútuo** com o certificado do cliente cadastrado no Credencia (serial, CN, emissor); truststore com a AC SERPRO; não há cabeçalho de autenticação |
+| Autenticação | Modo padrão `INTEGRADORA`: **TLS mútuo** com o e-CNPJ da integradora e cabeçalho `CNPJ-Estabelecimento` derivado do contexto do servidor; antes de mutações, `cliente-autenticado` precisa confirmar o estabelecimento e a integradora. Modo legado `ESTABELECIMENTO`: certificado do cliente, atrás de feature flag desligada por padrão. Em ambos, truststore da AC SERPRO e verificação de hostname permanecem obrigatórios. |
 | Identidade do operador | `cpfOperadorResponsavel` no corpo, então todo usuário operador precisa de **CPF cadastrado** |
 | Datas | `AAAA-MM-DD` (date) e `AAAA-MM-DDTHH:MM:SS` (date-time) |
 | Respostas | 200/201 sucesso · 400 bug do integrador · 401/403 · 404 · **422 negócio** · 500 interno |

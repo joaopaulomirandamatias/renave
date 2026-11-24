@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Logo Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&amp;display=swap"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+        </style>
+      </helmet>
+      <div
+        style="display: inline-flex; flex-direction: {{dir}}; align-items: center; gap: {{gap}}px; line-height: 1; font-family: Nunito, 'Baloo 2', system-ui, sans-serif;"
+      >
+        <sc-if value="{{showFull}}" hint-placeholder-val="{{ true }}">
+          <svg
+            width="{{size}}"
+            height="{{size}}"
+            viewBox="0 0 64 64"
+            role="img"
+            aria-label="Símbolo Seu Renave"
+          >
+            <path
+              d="M22 6H38L48 16V45A4 4 0 0 1 44 49H22A4 4 0 0 1 18 45V10A4 4 0 0 1 22 6Z"
+              fill="{{c.paper}}"
+              stroke="{{c.doc}}"
+              stroke-width="5"
+              stroke-linejoin="round"
+            ></path>
+            <path
+              d="M38 6L48 16H40A2 2 0 0 1 38 14Z"
+              fill="{{c.fold}}"
+              stroke="{{c.doc}}"
+              stroke-width="3"
+              stroke-linejoin="round"
+            ></path>
+            <path
+              d="M24 16H33M24 23H32"
+              fill="none"
+              stroke="{{c.lines}}"
+              stroke-width="4"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M12 38.5H14.5M39.5 38.5H42"
+              fill="none"
+              stroke="{{c.car}}"
+              stroke-width="2.6"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M14 40L17.5 33.5C18.3 32 19.6 31 21.3 31H32.7C34.4 31 35.7 32 36.5 33.5L40 40C41.7 40.6 43 42.2 43 44V49A2 2 0 0 1 41 51H39V53A2 2 0 0 1 37 55H34A2 2 0 0 1 32 53V51H22V53A2 2 0 0 1 20 55H17A2 2 0 0 1 15 53V51H13A2 2 0 0 1 11 49V44C11 42.2 12.3 40.6 14 40Z"
+              fill="{{c.car}}"
+            ></path>
+            <path
+              d="M19.5 39L21.8 34.6C22.2 33.9 22.9 33.4 23.7 33.4H30.3C31.1 33.4 31.8 33.9 32.2 34.6L34.5 39Z"
+              fill="{{c.car}}"
+              stroke="{{c.det}}"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            ></path>
+            <path
+              d="M14 44H19M35 44H40"
+              fill="none"
+              stroke="{{c.det}}"
+              stroke-width="2.2"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M3 60C15 58.5 29 56.5 37 52.5C42 50 45 48.5 49 46.5"
+              fill="none"
+              stroke="{{c.road}}"
+              stroke-width="7"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M3 60C15 58.5 29 56.5 37 52.5C42 50 45 48.5 49 46.5"
+              fill="none"
+              stroke="{{c.dash}}"
+              stroke-width="1.2"
+              stroke-dasharray="3 2.5"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M5 63.4C17 61.9 31 59.9 39 55.9C44 53.4 47 51.9 51 49.9"
+              fill="none"
+              stroke="{{c.amber}}"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            ></path>
+            <circle cx="48" cy="29" r="10.5" fill="{{c.ring}}"></circle>
+            <circle cx="48" cy="29" r="8" fill="{{c.chk}}"></circle>
+            <path
+              d="M44 29.2L47 32.2L52.2 26.4"
+              fill="none"
+              stroke="{{c.mark}}"
+              stroke-width="2.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ></path>
+          </svg>
+        </sc-if>
+        <sc-if value="{{showSimple}}" hint-placeholder-val="{{ false }}">
+          <svg
+            width="{{size}}"
+            height="{{size}}"
+            viewBox="0 0 64 64"
+            role="img"
+            aria-label="Símbolo simplificado Seu Renave"
+          >
+            <path
+              d="M18 6H36L48 18V52A5 5 0 0 1 43 57H18A5 5 0 0 1 13 52V11A5 5 0 0 1 18 6Z"
+              fill="{{c.paper}}"
+              stroke="{{c.doc}}"
+              stroke-width="6"
+              stroke-linejoin="round"
+            ></path>
+            <path
+              d="M36 6L48 18H38A2 2 0 0 1 36 16Z"
+              fill="{{c.fold}}"
+              stroke="{{c.doc}}"
+              stroke-width="3.5"
+              stroke-linejoin="round"
+            ></path>
+            <path
+              d="M6 59C18 57.5 30 54 41 46"
+              fill="none"
+              stroke="{{c.road}}"
+              stroke-width="9"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M6 59C18 57.5 30 54 41 46"
+              fill="none"
+              stroke="{{c.dash}}"
+              stroke-width="1.8"
+              stroke-dasharray="4 3.5"
+              stroke-linecap="round"
+            ></path>
+            <circle cx="47" cy="31" r="13" fill="{{c.ring}}"></circle>
+            <circle cx="47" cy="31" r="10" fill="{{c.chk}}"></circle>
+            <path
+              d="M42 31.3L45.8 35.1L52.2 27.8"
+              fill="none"
+              stroke="{{c.mark}}"
+              stroke-width="3.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ></path>
+          </svg>
+        </sc-if>
+        <sc-if value="{{showWord}}" hint-placeholder-val="{{ true }}">
+          <span
+            style="font-size: {{fs}}px; font-weight: 900; letter-spacing: -0.01em; white-space: nowrap;"
+            ><span style="color: {{c.seu}};">Seu</span>
+            <span style="color: {{c.ren}};">Renave</span></span
+          >
+        </sc-if>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"size":{"editor":"int","default":120,"min":16,"max":600},"variant":{"editor":"enum","default":"cor","options":["cor","mono","preto","negativo","negverde","escuro"]},"lockup":{"editor":"enum","default":"h","options":["h","v","simbolo","wordmark"]},"simples":{"editor":"boolean","default":false},"$preview":{"width":760,"height":160}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const size = this.props.size ?? 120;
+          const v = this.props.variant ?? 'cor';
+          const lock = this.props.lockup ?? 'h';
+          const simple = this.props.simples ?? false;
+          const N = '#0B2550', G = '#0A9B55', A = '#F2A90C', W = '#FFFFFF', K = '#000000', D = '#07162F';
+          const pals = {
+            cor: { doc: N, paper: W, fold: G, lines: N, car: N, det: W, road: G, dash: W, amber: A, ring: W, chk: G, mark: W, seu: N, ren: G },
+            mono: { doc: N, paper: W, fold: N, lines: N, car: N, det: W, road: N, dash: W, amber: N, ring: W, chk: N, mark: W, seu: N, ren: N },
+            preto: { doc: K, paper: W, fold: K, lines: K, car: K, det: W, road: K, dash: W, amber: K, ring: W, chk: K, mark: W, seu: K, ren: K },
+            negativo: { doc: W, paper: 'none', fold: W, lines: W, car: W, det: N, road: W, dash: N, amber: W, ring: N, chk: W, mark: N, seu: W, ren: W },
+            negverde: { doc: W, paper: 'none', fold: W, lines: W, car: W, det: G, road: W, dash: G, amber: W, ring: G, chk: W, mark: G, seu: W, ren: W },
+            escuro: { doc: W, paper: 'none', fold: G, lines: W, car: W, det: D, road: G, dash: W, amber: A, ring: D, chk: G, mark: W, seu: W, ren: '#34D399' }
+          };
+          const c = pals[v] || pals.cor;
+          const showSym = lock !== 'wordmark';
+          return {
+            c,
+            size,
+            dir: lock === 'v' ? 'column' : 'row',
+            gap: Math.round(lock === 'v' ? size * 0.1 : size * 0.14),
+            fs: Math.round(lock === 'v' ? size * 0.42 : lock === 'wordmark' ? size : size * 0.8),
+            showFull: showSym && !simple,
+            showSimple: showSym && simple,
+            showWord: lock !== 'simbolo'
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

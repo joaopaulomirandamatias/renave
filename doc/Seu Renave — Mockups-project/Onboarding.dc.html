@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Adesão ao RENAVE — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="estabelecimentos"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import
+            name="Topbar"
+            env="homologacao"
+            hint-size="100%,64px"
+          ></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <a
+                href="Estabelecimentos.dc.html"
+                style="font-size: 14px; font-weight: 600"
+                >← Estabelecimentos</a
+              >
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 28px;
+                  font-weight: 600;
+                  letter-spacing: -0.01em;
+                "
+              >
+                Adesão ao RENAVE — Filial Santos
+              </h1>
+              <p style="margin: 0; font-size: 15px; color: #475467">
+                12.345.678/0003-52 · Auto Prime Veículos Ltda · Santos/SP
+              </p>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px 32px;
+                align-items: center;
+              "
+            >
+              <div
+                style="
+                  flex: 1 1 320px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 14px;
+                  "
+                >
+                  <strong style="font-weight: 600"
+                    >4 de 7 etapas concluídas</strong
+                  ><span style="color: #475467"
+                    >Previsão de produção: 12/12/2026</span
+                  >
+                </div>
+                <div
+                  style="
+                    height: 8px;
+                    border-radius: 999px;
+                    background: #f2f4f7;
+                    overflow: hidden;
+                  "
+                >
+                  <div
+                    style="
+                      width: 57%;
+                      height: 8px;
+                      background: #067a45;
+                      border-radius: 999px;
+                    "
+                  ></div>
+                </div>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  gap: 12px;
+                  align-items: center;
+                  padding: 12px 16px;
+                  border-radius: 10px;
+                  background: #e7f6ee;
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#067A45"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+                <span style="font-size: 14px; color: #05663a"
+                  ><strong>Próxima ação:</strong> enviar o certificado e-CNPJ A1
+                  da filial</span
+                >
+              </div>
+            </section>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <!-- Stepper vertical -->
+              <ol
+                style="
+                  flex: 1 1 300px;
+                  max-width: 380px;
+                  margin: 0;
+                  padding: 8px;
+                  list-style: none;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                "
+              >
+                <sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+                  <li>
+                    <button
+                      type="button"
+                      onClick="{{s.pick}}"
+                      style="width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 12px; border: 0; border-radius: 8px; cursor: pointer; font: inherit; background: {{s.rowBg}}"
+                    >
+                      <span
+                        style="flex-shrink: 0; display: inline-flex; width: 28px; height: 28px; border-radius: 999px; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: {{s.dotBg}}; color: {{s.dotColor}}"
+                        >{{s.mark}}</span
+                      >
+                      <span
+                        style="
+                          display: flex;
+                          flex-direction: column;
+                          gap: 3px;
+                          min-width: 0;
+                        "
+                      >
+                        <span
+                          style="
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #101828;
+                          "
+                          >{{s.title}}</span
+                        >
+                        <span
+                          style="font-size: 12px; font-weight: 600; color: {{s.statusColor}}"
+                          >{{s.status}}</span
+                        >
+                      </span>
+                    </button>
+                  </li>
+                </sc-for>
+              </ol>
+
+              <!-- Detalhe -->
+              <section
+                style="
+                  flex: 999 1 460px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 24px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 20px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 12px;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                  "
+                >
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <span
+                      style="font-size: 13px; font-weight: 600; color: #475467"
+                      >Etapa {{cur.n}} de 7</span
+                    >
+                    <h2
+                      style="
+                        margin: 0;
+                        font-size: 22px;
+                        font-weight: 600;
+                        letter-spacing: -0.01em;
+                      "
+                    >
+                      {{cur.title}}
+                    </h2>
+                  </div>
+                  <span
+                    style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: {{cur.badgeBg}}; color: {{cur.statusColor}}"
+                    >{{cur.status}}</span
+                  >
+                </div>
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 15px;
+                    line-height: 1.55;
+                    color: #344054;
+                  "
+                >
+                  {{cur.desc}}
+                </p>
+
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                  "
+                >
+                  <sc-for
+                    list="{{cur.items}}"
+                    as="it"
+                    hint-placeholder-count="4"
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        gap: 12px;
+                        align-items: flex-start;
+                        padding: 14px 16px;
+                        border-bottom: 1px solid #f2f4f7;
+                      "
+                    >
+                      <span
+                        style="flex-shrink: 0; margin-top: 1px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: {{it.bg}}; color: {{it.color}}"
+                        >{{it.tag}}</span
+                      >
+                      <span
+                        style="display: flex; flex-direction: column; gap: 2px"
+                      >
+                        <span style="font-size: 14px; font-weight: 600"
+                          >{{it.label}}</span
+                        >
+                        <span style="font-size: 13px; color: #475467"
+                          >{{it.hint}}</span
+                        >
+                      </span>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <sc-if value="{{isCert}}" hint-placeholder-val="{{ true }}">
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      gap: 8px;
+                      padding: 28px;
+                      border: 2px dashed #d0d5dd;
+                      border-radius: 10px;
+                      text-align: center;
+                    "
+                  >
+                    <svg
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#067A45"
+                      stroke-width="1.75"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
+                    </svg>
+                    <strong style="font-size: 15px"
+                      >Arraste o arquivo .pfx do e-CNPJ A1 ou use um
+                      token/HSM</strong
+                    >
+                    <span style="font-size: 13px; color: #475467"
+                      >A chave privada vai direto para o cofre (HSM/KMS). Nem a
+                      equipe da integradora tem acesso a ela.</span
+                    >
+                    <button
+                      type="button"
+                      style="
+                        margin-top: 6px;
+                        height: 44px;
+                        padding: 0 18px;
+                        border: 0;
+                        border-radius: 8px;
+                        background: #067a45;
+                        color: #ffffff;
+                        font: inherit;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                      "
+                    >
+                      Selecionar certificado
+                    </button>
+                  </div>
+                </sc-if>
+
+                <div
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 12px;
+                    justify-content: flex-end;
+                  "
+                >
+                  <button
+                    type="button"
+                    style="
+                      height: 44px;
+                      padding: 0 16px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      background: #ffffff;
+                      color: #344054;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Falar com o suporte
+                  </button>
+                  <button
+                    type="button"
+                    style="
+                      height: 44px;
+                      padding: 0 16px;
+                      border: 0;
+                      border-radius: 8px;
+                      background: #067a45;
+                      color: #ffffff;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    {{cur.cta}}
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 16px;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <span style="font-size: 13px; color: #475467"
+                  >CNAE principal</span
+                ><strong style="font-size: 14px"
+                  >45.11-1-02 · Comércio a varejo de automóveis usados</strong
+                ><span style="font-size: 12px; font-weight: 600; color: #067647"
+                  >Compatível com o RENAVE</span
+                >
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <span style="font-size: 13px; color: #475467"
+                  >Situação cadastral (Receita)</span
+                ><strong style="font-size: 14px">Ativa desde 14/03/2019</strong
+                ><span style="font-size: 12px; font-weight: 600; color: #067647"
+                  >Verificado em 02/11/2026</span
+                >
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <span style="font-size: 13px; color: #475467"
+                  >Tipo de estabelecimento</span
+                ><strong style="font-size: 14px"
+                  >Revenda de veículos usados</strong
+                ><span style="font-size: 12px; color: #475467"
+                  >Filial de 12.345.678/0001-90</span
+                >
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <span style="font-size: 13px; color: #475467"
+                  >Responsável legal</span
+                ><strong style="font-size: 14px">Ricardo Almeida</strong
+                ><span style="font-size: 12px; color: #475467"
+                  >CPF ***.456.789-** · Sócio-administrador</span
+                >
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1300}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { sel: 4 }; }
+        renderVals() {
+          const OK = { tag: 'OK', bg: '#ECFDF3', color: '#067647' };
+          const PEND = { tag: 'Pendente', bg: '#FFFAEB', color: '#B54708' };
+          const NEXT = { tag: 'Depois', bg: '#F2F4F7', color: '#344054' };
+          const it = (s, label, hint) => Object.assign({}, s, { label, hint });
+          const data = [
+            { title: 'Cadastro empresarial', status: 'Concluída em 02/11/2026', st: 'done', cta: 'Revisar dados',
+              desc: 'Dados da Receita Federal importados pelo CNPJ: razão social, endereço, CNAE principal e secundários, quadro societário e vínculo com a matriz.',
+              items: [it(OK, 'CNPJ e situação cadastral ativa', 'Consulta automática à base pública da Receita'), it(OK, 'Endereço e contatos do estabelecimento', 'Usados nas comunicações da SENATRAN'), it(OK, 'Responsável legal e responsável operacional', 'Ricardo Almeida e Marina Costa')] },
+            { title: 'Elegibilidade', status: 'Concluída em 02/11/2026', st: 'done', cta: 'Ver análise',
+              desc: 'Verificamos se o CNAE principal e o objeto social são compatíveis com compra e venda de veículos, condição para aderir ao RENAVE.',
+              items: [it(OK, 'CNAE principal compatível', '45.11-1-02 — automóveis usados'), it(OK, 'Objeto social menciona comércio de veículos', 'Contrato social, cláusula 3ª')] },
+            { title: 'Solicitação no Credencia (SENATRAN)', status: 'Aprovada em 18/11/2026', st: 'done', cta: 'Ver protocolo',
+              desc: 'Pedido de adesão cadastrado no sistema Credencia com o e-CNPJ do estabelecimento, indicando o Seu Renave como sistema de integração. Prazo de análise: até 30 dias.',
+              items: [it(OK, 'Protocolo SEI 50000.041287/2026-11', 'Aberto em 04/11/2026'), it(OK, 'Sem pendências apontadas pela SENATRAN', 'Aprovado em 14 dias')] },
+            { title: 'Contratação do serviço', status: 'Concluída em 19/11/2026', st: 'done', cta: 'Ver contrato',
+              desc: 'Contrato de integração assinado eletronicamente. Cobrança somente por registro confirmado no RENAVE, pelo valor da tabela oficial, sem mensalidade e sem outros serviços vinculados.',
+              items: [it(OK, 'Contrato assinado (e-CNPJ)', '19/11/2026 10:42'), it(OK, 'Valor por registro conforme tabela oficial', '[VALOR POR REGISTRO — tabela oficial] · Vigência: [ATO NORMATIVO]')] },
+            { title: 'Certificado e-CNPJ', status: 'Em andamento', st: 'cur', cta: 'Validar certificado',
+              desc: 'O certificado digital e-CNPJ (ICP-Brasil) autentica cada chamada ao RENAVE. Sem certificado válido o acesso é bloqueado automaticamente.',
+              items: [it(PEND, 'Enviar certificado A1 (.pfx) ou conectar A3/HSM', 'Deve pertencer ao CNPJ 12.345.678/0003-52'), it(NEXT, 'Validação da cadeia ICP-Brasil e da validade', 'Automática após o envio'), it(NEXT, 'Alertas de vencimento', 'Configurados para 60, 30, 15 e 7 dias')] },
+            { title: 'Homologação', status: 'Não iniciada', st: 'todo', cta: 'Iniciar homologação',
+              desc: 'Executamos os cenários obrigatórios no ambiente de homologação do RENAVE e guardamos as evidências de cada um.',
+              items: [it(NEXT, 'Entrada e saída de veículo usado', 'Inclui ATPV-e e NF-e'), it(NEXT, 'Cenários negativos', 'Restrição, certificado inválido, NF-e incoerente'), it(NEXT, 'Reconciliação após falta de resposta', 'Garante que nada é enviado em duplicidade')] },
+            { title: 'Produção', status: 'Não iniciada', st: 'todo', cta: 'Ativar produção',
+              desc: 'Ativação controlada: primeiras operações acompanhadas pelo time de suporte e monitoramento reforçado na primeira semana.',
+              items: [it(NEXT, 'Ativação do ambiente de produção', 'Requer homologação concluída'), it(NEXT, 'Treinamento da equipe da filial', '45 minutos, online')] }
+          ];
+          const sel = this.state.sel;
+          const steps = data.map((d, i) => {
+            const done = d.st === 'done', cur = d.st === 'cur';
+            return Object.assign({}, d, {
+              n: i + 1,
+              mark: done ? '✓' : String(i + 1),
+              dotBg: done ? '#067A45' : (cur ? '#E7F6EE' : '#F2F4F7'),
+              dotColor: done ? '#FFFFFF' : (cur ? '#067A45' : '#475467'),
+              statusColor: done ? '#067647' : (cur ? '#B54708' : '#475467'),
+              badgeBg: done ? '#ECFDF3' : (cur ? '#FFFAEB' : '#F2F4F7'),
+              rowBg: i === sel ? '#F2F4F7' : 'transparent',
+              pick: () => this.setState({ sel: i })
+            });
+          });
+          return { steps, cur: steps[sel], isCert: sel === 4 };
+        }
+      }
+    </script>
+  </body>
+</html>

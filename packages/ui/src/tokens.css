@@ -1,0 +1,78 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, "Segoe UI", Roboto, system-ui, sans-serif;
+
+  --sr-color-app: #f6f7f9;
+  --sr-color-surface: #ffffff;
+  --sr-color-surface-subtle: #f2f4f7;
+  --sr-color-border: #e4e7ec;
+  --sr-color-border-strong: #d0d5dd;
+  --sr-color-text: #101828;
+  --sr-color-text-muted: #475467;
+  --sr-color-navy: #0b2550;
+  --sr-color-navy-soft: #eef4ff;
+  --sr-color-navy-border: #c7d7fe;
+  --sr-color-brand: #067a45;
+  --sr-color-brand-hover: #05663a;
+  --sr-color-brand-soft: #e7f6ee;
+  --sr-color-brand-border: #a6dfc1;
+  --sr-color-logo-green: #0a9b55;
+  /* Decorativo apenas (faixa do logo e indicador pontual; nunca texto nem grandes areas) */
+  --sr-color-amber: #f2a90c;
+  --sr-color-info: #175cd3;
+  --sr-color-info-soft: #eff8ff;
+  --sr-color-info-border: #b2ddff;
+  --sr-color-warning-text: #8a3c00;
+  --sr-color-warning-soft: #fffaeb;
+  --sr-color-warning-border: #fedf89;
+  --sr-color-danger: #b42318;
+  --sr-color-danger-hover: #912018;
+  --sr-color-danger-soft: #fef3f2;
+  --sr-color-disabled-bg: #eaecf0;
+  --sr-color-disabled-text: #667085;
+  --sr-color-focus: #1570ef;
+
+  --sr-radius-control: 0.5rem;
+  --sr-radius-card: 0.75rem;
+  --sr-radius-pill: 999px;
+  --sr-shadow-card: 0 1px 2px rgb(16 24 40 / 6%);
+
+  --sr-touch-target-min: 2.75rem;
+  --sr-focus-ring-width: 3px;
+  --sr-focus-ring-offset: 3px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:focus-visible {
+  outline: var(--sr-focus-ring-width) solid var(--sr-color-focus);
+  outline-offset: var(--sr-focus-ring-offset);
+}
+
+body {
+  margin: 0;
+  background: var(--sr-color-app);
+  color: var(--sr-color-text);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

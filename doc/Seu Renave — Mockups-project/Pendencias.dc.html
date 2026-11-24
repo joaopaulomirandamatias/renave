@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pendências — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="pendencias"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 28px;
+                  font-weight: 600;
+                  letter-spacing: -0.01em;
+                "
+              >
+                O que precisa ser resolvido agora?
+              </h1>
+              <p style="margin: 0; font-size: 15px; color: #475467">
+                14 pendências abertas · 3 vencem hoje · ordenadas por risco e
+                prazo
+              </p>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 16px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <sc-for list="{{types}}" as="t" hint-placeholder-count="8">
+                  <button
+                    type="button"
+                    aria-pressed="{{t.on}}"
+                    style="display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid {{t.border}}; background: {{t.bg}}; color: {{t.color}}"
+                  >
+                    {{t.label}} <span style="font-weight: 500">{{t.n}}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                  gap: 12px;
+                "
+              >
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Estabelecimento<select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Todos</option>
+                    <option>Matriz São Paulo</option>
+                    <option>Filial Campinas</option>
+                    <option>Filial Santos</option>
+                  </select></label
+                >
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Responsável<select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Qualquer pessoa</option>
+                    <option>Atribuídas a mim</option>
+                    <option>Sem responsável</option>
+                  </select></label
+                >
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Prazo<select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Qualquer</option>
+                    <option>Vencidas</option>
+                    <option>Vencem hoje</option>
+                    <option>Próximos 7 dias</option>
+                  </select></label
+                >
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Risco<select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Todos</option>
+                    <option>Alto</option>
+                    <option>Médio</option>
+                    <option>Baixo</option>
+                  </select></label
+                >
+              </div>
+            </section>
+
+            <!-- Destaque: resultado incerto -->
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #fda29b;
+                border-radius: 10px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                box-shadow: 0 0 0 4px #fef3f2;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 12px;
+                  justify-content: space-between;
+                  align-items: flex-start;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 6px">
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 600;
+                        padding: 3px 10px;
+                        border-radius: 999px;
+                        background: #fef3f2;
+                        color: #b42318;
+                      "
+                      >Resultado incerto</span
+                    ><span
+                      style="
+                        font-size: 12px;
+                        font-weight: 600;
+                        padding: 3px 10px;
+                        border-radius: 999px;
+                        background: #fef3f2;
+                        color: #b42318;
+                      "
+                      >Risco alto</span
+                    >
+                  </div>
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    Saída de QTP4H82 enviada, mas o RENAVE não respondeu
+                  </h2>
+                  <span style="font-size: 14px; color: #475467"
+                    >Operação OP-2026-118431 · Matriz São Paulo · enviada às
+                    14:02:11 · tempo esgotado após 30 s</span
+                  >
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <a
+                    href="Operacao.dc.html"
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      height: 44px;
+                      padding: 0 16px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      color: #344054;
+                      font-size: 14px;
+                      font-weight: 600;
+                    "
+                    >Ver operação</a
+                  >
+                  <button
+                    type="button"
+                    style="
+                      height: 44px;
+                      padding: 0 18px;
+                      border: 0;
+                      border-radius: 8px;
+                      background: #067a45;
+                      color: #ffffff;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Verificar no RENAVE (reconciliar)
+                  </button>
+                </div>
+              </div>
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                  gap: 16px;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      color: #475467;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                    "
+                    >Por que não reenviar?</span
+                  ><span
+                    style="font-size: 14px; color: #344054; line-height: 1.5"
+                    >O RENAVE pode ter registrado a venda mesmo sem nos
+                    responder. Reenviar às cegas pode gerar registro duplicado
+                    ou conflito com a NF-e.</span
+                  >
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      color: #475467;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                    "
+                    >O que a verificação faz</span
+                  ><span
+                    style="font-size: 14px; color: #344054; line-height: 1.5"
+                    >Consulta a situação do veículo no RENAVE e atualiza a
+                    operação para Confirmada ou Não registrada. Só então o
+                    reenvio é liberado.</span
+                  >
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      color: #475467;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                    "
+                    >Impacto enquanto isso</span
+                  ><span
+                    style="font-size: 14px; color: #344054; line-height: 1.5"
+                    >Veículo bloqueado para novas operações. Verificação
+                    automática a cada 5 minutos (próxima às 15:35).</span
+                  >
+                </div>
+              </div>
+            </section>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <sc-for list="{{items}}" as="p" hint-placeholder-count="7">
+                <div
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 12px 20px;
+                    align-items: center;
+                    padding: 18px 20px;
+                    border-bottom: 1px solid #f2f4f7;
+                  "
+                >
+                  <div
+                    style="
+                      flex: 1 1 360px;
+                      display: flex;
+                      flex-direction: column;
+                      gap: 6px;
+                      min-width: 0;
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 8px;
+                        align-items: center;
+                      "
+                    >
+                      <span
+                        style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{p.tagBg}}; color: {{p.tagColor}}"
+                        >{{p.tag}}</span
+                      >
+                      <span
+                        style="font-size: 12px; font-weight: 600; color: {{p.riskColor}}"
+                        >Risco {{p.risk}}</span
+                      >
+                      <span style="font-size: 12px; color: #475467"
+                        >· {{p.estab}}</span
+                      >
+                    </div>
+                    <strong style="font-size: 15px; font-weight: 600"
+                      >{{p.title}}</strong
+                    >
+                    <span style="font-size: 13px; color: #475467"
+                      ><strong style="color: #344054; font-weight: 600"
+                        >Causa:</strong
+                      >
+                      {{p.cause}}</span
+                    >
+                    <span style="font-size: 13px; color: #475467"
+                      ><strong style="color: #344054; font-weight: 600"
+                        >Impacto:</strong
+                      >
+                      {{p.impact}}</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 4px;
+                      min-width: 150px;
+                    "
+                  >
+                    <span style="font-size: 12px; color: #475467">Prazo</span>
+                    <span
+                      style="font-size: 14px; font-weight: 600; color: {{p.dueColor}}"
+                      >{{p.due}}</span
+                    >
+                    <span style="font-size: 12px; color: #475467"
+                      >{{p.owner}}</span
+                    >
+                  </div>
+                  <a
+                    href="{{p.href}}"
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      height: 40px;
+                      padding: 0 14px;
+                      border-radius: 8px;
+                      background: #067a45;
+                      color: #ffffff;
+                      font-size: 14px;
+                      font-weight: 600;
+                      white-space: nowrap;
+                    "
+                    >{{p.action}}</a
+                  >
+                </div>
+              </sc-for>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1400}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const T = {
+            fiscal: ['Fiscal', '#FFFAEB', '#B54708'], doc: ['Documental', '#FFFAEB', '#B54708'], detran: ['DETRAN', '#EFF8FF', '#175CD3'],
+            restr: ['Restrição', '#FEF3F2', '#B42318'], cert: ['Certificado', '#FFFAEB', '#B54708'], div: ['Divergência', '#FEF3F2', '#B42318']
+          };
+          const R = { Alto: '#B42318', 'Médio': '#B54708', Baixo: '#475467' };
+          const p = (t, risk, estab, title, cause, impact, due, dueWarn, owner, action, href) => ({
+            tag: T[t][0], tagBg: T[t][1], tagColor: T[t][2], risk, riskColor: R[risk], estab, title, cause, impact, due,
+            dueColor: dueWarn ? '#B42318' : '#344054', owner, action, href
+          });
+          const typ = (label, n, on) => ({ label, n, on: on ? 'true' : 'false', bg: on ? '#101828' : '#FFFFFF', color: on ? '#FFFFFF' : '#344054', border: on ? '#101828' : '#D0D5DD' });
+          return {
+            types: [typ('Todas', '14', true), typ('Resultado incerto', '2'), typ('Fiscal', '3'), typ('Documental', '4'), typ('DETRAN', '1'), typ('Restrição', '1'), typ('Certificado', '1'), typ('Divergência', '2')],
+            items: [
+              p('div', 'Alto', 'Matriz São Paulo', 'Estoque local diferente do RENAVE — MXA4K78', 'Reconciliação noturna: o RENAVE mostra o veículo fora do estoque; aqui ele aparece em estoque.', 'Venda e transferência bloqueadas até confirmar a situação.', 'Hoje', true, 'Sem responsável', 'Analisar divergência', 'Operacao.dc.html'),
+              p('doc', 'Alto', 'Matriz São Paulo', 'ATPV-e de entrada sem assinatura do vendedor — RVA2C17', 'Convite enviado em 21/11 e ainda não aberto pelo vendedor.', 'A entrada não é concluída e o veículo não pode ser vendido.', 'Hoje, 18:00', true, 'Marina Costa', 'Reenviar convite', 'Entrada.dc.html'),
+              p('fiscal', 'Alto', 'Matriz São Paulo', 'NF-e de saída com emitente diferente — SGL8B03', 'A NF-e nº 2.118 foi emitida pela Filial Campinas, mas o veículo está no estoque da Matriz.', 'O RENAVE rejeita a saída. Cancele e reemita a nota pela Matriz.', 'Hoje', true, 'Equipe fiscal', 'Corrigir NF-e', 'Saida.dc.html'),
+              p('cert', 'Médio', 'Filial Santos', 'Certificado e-CNPJ vence em 12 dias', 'Validade até 05/12/2026.', 'Sem certificado válido o acesso da filial ao RENAVE é bloqueado.', '05/12/2026', false, 'Admin da empresa', 'Renovar certificado', 'Estabelecimentos.dc.html'),
+              p('restr', 'Médio', 'Filial Santos', 'Restrição judicial incluída após a entrada — KTR6A55', 'Bloqueio RENAJUD registrado em 19/11/2026. Veículo passou a "vinculado".', 'Venda e transferência bloqueadas até a baixa da restrição.', 'Sem prazo', false, 'Jurídico', 'Ver restrição', 'Veiculo.dc.html'),
+              p('detran', 'Médio', 'Filial Campinas', 'Retorno do DETRAN-SP pendente — entrada de FJK3D21', 'Consentimento estadual aguardado há 26 horas (média: 4 h).', 'A transferência para a Matriz fica parada.', '24/11/2026', false, 'Rafael Lima', 'Acompanhar', 'Transferencias.dc.html'),
+              p('doc', 'Baixo', 'Matriz São Paulo', 'Código de segurança do CRV não informado — QTP4H82', 'Campo obrigatório para registrar venda de usado.', 'O botão "Registrar saída" fica indisponível até o preenchimento.', 'Antes da venda', false, 'Marina Costa', 'Informar código', 'Veiculo.dc.html')
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

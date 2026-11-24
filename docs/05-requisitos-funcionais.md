@@ -82,12 +82,12 @@
 
 | ID | Requisito | Prio | Fase | RN |
 |---|---|---|---|---|
-| RF-M5-01 | Oferecer o assistente **"Dar entrada — usado"** em passos: Veículo → Aptidão → Vendedor e valores → Identificação prévia/vistoria → Documentos (ATPV-e, NF-e) → Revisão e envio. | M | F2 | ENT-01 |
+| RF-M5-01 | Oferecer o assistente **"Dar entrada — usado"** em duas fases: solicitação inicial (Veículo → Aptidão → Vendedor e valores → Identificação prévia/vistoria → Revisão e solicitação) e acompanhamento pós-solicitação (ATPV-e → transferência DETRAN → novo CRV/CONFIRMADO → NF-e → CRLV). | M | F2 | ENT-01, ENT-01f |
 | RF-M5-02 | Suportar os títulos: **compra de usado**, **entrada de veículo próprio**, **retomado** (via M10). | M | F2 | GER-03, ENT-03 |
 | RF-M5-03 | Fazer a **identificação prévia** eletrônica ou a **vistoria**, com captura de evidências (fotos com data/hora e geolocalização, hodômetro, chassi). | M | F2 | ENT-04 |
 | RF-M5-04 | Coletar os dados do **vendedor** (CPF/CNPJ, nome, e-mail, endereço quando exigido) e a **data/hora da assinatura** do vendedor ou o reconhecimento de firma. | M | F2 | ENT-01 |
-| RF-M5-05 | Registrar e assinar a **ATPV-e** e acompanhar o status das assinaturas. | M | F2 | ENT-02, DOC-06 |
-| RF-M5-06 | **Vincular a NF-e de entrada**: digitar a chave, enviar o XML ou importar do ERP, validar a chave, CNPJ, chassi e valor. | M | F2 | ENT-06, ENT-07, DOC-01 |
+| RF-M5-05 | Depois da solicitação inicial, obter a **ATPV-e** criada/reaproveitada, registrar a assinatura do vendedor, enviá-la ao RENAVE e acompanhar o status. A assinatura avançada via CDT também depende dessa intenção já existente. | M | F2 | ENT-01d, ENT-01f, ENT-02, DOC-06 |
+| RF-M5-06 | Depois da confirmação do novo CRV, **vincular a NF-e de entrada**: digitar a chave, enviar o XML ou importar do ERP, validar chave, CNPJ, chassi e valor. NF-e ausente ou inválida vira pendência fiscal e impede a conclusão documental/saída, mas não bloqueia o POST inicial. | M | F2 | ENT-01f, ENT-06, ENT-07, DOC-01 |
 | RF-M5-07 | **Solicitar a entrada** ao RENAVE com idempotência e acompanhar consentimentos/retornos estaduais. | M | F2 | REC-01, REC-02 |
 | RF-M5-08 | Consolidar o estado **"Em estoque"** somente após a confirmação, e guardar os **termos** retornados. | M | F2 | GER-05 |
 | RF-M5-09 | Salvar **rascunho** em qualquer passo e retomar depois. | M | F2 | — |
@@ -98,7 +98,7 @@
 
 | ID | Requisito | Prio | Fase | RN |
 |---|---|---|---|---|
-| RF-M5-20 | Oferecer o assistente **"Vender veículo"**: comprador → valor e data → CRV e código de segurança → NF-e de saída → revisão. | M | F2 | SAI-01 |
+| RF-M5-20 | Oferecer a jornada persistente **"Vender veículo"**: pré-validação e solicitação com comprador, valor/data, CRV e código de segurança → ATPV/termo e assinatura → NF-e de saída vinculada ao estoque existente → retorno DETRAN e finalização. A NF-e pode ser pré-coletada localmente, mas só é enviada ao RENAVE quando houver `idEstoque`. | M | F2 | SAI-01 |
 | RF-M5-21 | Mostrar um painel lateral de **pré-condições** e bloquear o envio se alguma estiver pendente. | M | F2 | SAI-02, SAI-03 |
 | RF-M5-22 | **Solicitar a saída**, acompanhar a assinatura da ATPV-e pelo comprador e o retorno do RENAVE/DETRAN. | M | F2 | SAI-05 |
 | RF-M5-23 | **Baixar o estoque** só após a confirmação; guardar termos e comprovantes. | M | F2 | SAI-06 |
@@ -132,8 +132,8 @@
 
 | ID | Requisito | Prio | Fase | RN |
 |---|---|---|---|---|
-| RF-M8-01 | **Solicitar a transferência** para outro estabelecimento aderido, com validação prévia da adesão do destino. | M | F3 | TRF-01, TRF-02 |
-| RF-M8-02 | Mostrar uma **caixa de entrada de transferências recebidas** com Aceitar ou Recusar, prazo e documentos. | M | F3 | TRF-03 |
+| RF-M8-01 | Na origem, **autorizar a transferência** para outro estabelecimento aderido, com validação prévia da adesão do destino e permissão própria para autorizar. | M | F3 | TRF-01, TRF-02, TRF-08 |
+| RF-M8-02 | No destino, mostrar uma **caixa de autorizações recebidas** para aceitar/consumir e solicitar a entrada, ou recusar, com prazo, documentos e permissão distinta da origem. | M | F3 | TRF-02, TRF-03, TRF-08 |
 | RF-M8-03 | **Cancelar a autorização** de transferência antes do aceite. | M | F3 | TRF-07 |
 | RF-M8-04 | Oferecer um fluxo simplificado de **transferência entre filiais**, com visão das duas pontas. | M | F3 | TRF-05 |
 | RF-M8-05 | Bloquear venda ou nova transferência durante "Em transferência". | M | F3 | TRF-03 |
@@ -309,11 +309,15 @@
 Cenário: Entrada concluída com sucesso
   Dado que o estabelecimento "Auto Prime — Matriz" tem certificado válido em Produção
   E o veículo de chassi "9BWZZZ377VT004251" está apto para entrada
-  Quando eu informo vendedor, valor, data de entrada, identificação prévia e NF-e de entrada válida
-  E a ATPV-e está assinada pelo vendedor
-  E eu confirmo o envio
-  Então a operação passa a "Enviado ao RENAVE" com chave de idempotência persistida
-  E ao receber a confirmação o veículo passa a "Em estoque"
+  Quando eu informo vendedor, valor, data de entrada e identificação prévia
+  E confirmo a solicitação inicial
+  Então a operação passa a "Entrada solicitada" com chave de idempotência persistida
+  E o sistema disponibiliza a etapa de assinatura da ATPV-e
+  Quando a assinatura é enviada e o DETRAN transfere a propriedade
+  Então o estoque passa por "Transferido — aguardando novo CRV"
+  E ao receber a confirmação do novo CRV o veículo passa a "Em estoque"
+  Quando a NF-e de entrada válida é emitida e informada
+  Então a pendência fiscal é concluída e o CRLV pode ser obtido
   E os termos retornados ficam disponíveis em Documentos com hash SHA-256
   E um evento "stock.entry.confirmed" é gravado na auditoria e enviado aos webhooks assinados
 
@@ -328,7 +332,8 @@ Cenário: NF-e incoerente
   Dado que a chave da NF-e informada tem CNPJ destinatário diferente do estabelecimento
   Quando eu valido a NF-e
   Então vejo "A NF-e não é destinada a Auto Prime — Matriz (CNPJ ***.***.***/0001-**)"
-  E não consigo enviar a operação
+  E a pendência fiscal permanece aberta
+  E não consigo concluir a documentação nem iniciar a saída do veículo
 
 Cenário: Timeout do RENAVE
   Dado que enviei a operação e a resposta não chegou dentro do timeout

@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Faturamento — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="faturamento"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Faturamento
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Competência novembro/2026 · fatura = registros confirmados ×
+                  [VALOR POR REGISTRO — tabela oficial] · valores em R$ são
+                  dados de exemplo
+                </p>
+              </div>
+              <button
+                type="button"
+                style="
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 0;
+                  border-radius: 8px;
+                  background: #067a45;
+                  color: #ffffff;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Fechar competência
+              </button>
+            </div>
+
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 12px;
+              "
+            >
+              <div
+                style="
+                  padding: 16px;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467"
+                  >Faturado no mês</span
+                ><strong style="font-size: 24px">R$ 46,2 mil</strong
+                ><span style="font-size: 12px; color: #475467"
+                  >exemplo · 18.940 registros · 41 faturas</span
+                >
+              </div>
+              <div
+                style="
+                  padding: 16px;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467">Recebido</span
+                ><strong style="font-size: 24px">R$ 39,8 mil</strong
+                ><span style="font-size: 12px; color: #067647; font-weight: 500"
+                  >86%</span
+                >
+              </div>
+              <div
+                style="
+                  padding: 16px;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467">Em atraso</span
+                ><strong style="font-size: 24px">R$ 4,1 mil</strong
+                ><span style="font-size: 12px; color: #b54708; font-weight: 500"
+                  >3 clientes</span
+                >
+              </div>
+              <div
+                style="
+                  padding: 16px;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span style="font-size: 13px; color: #475467"
+                  >NFS-e emitidas</span
+                ><strong style="font-size: 24px">38 de 41</strong
+                ><span style="font-size: 12px; color: #b54708; font-weight: 500"
+                  >3 aguardando pagamento</span
+                >
+              </div>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <h2
+                style="
+                  margin: 0;
+                  padding: 16px 20px;
+                  font-size: 17px;
+                  font-weight: 600;
+                  border-bottom: 1px solid #e4e7ec;
+                "
+              >
+                Faturas do mês
+              </h2>
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 980px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Fatura</th>
+                      <th>Cliente</th>
+                      <th>Registros confirmados</th>
+                      <th>Valor</th>
+                      <th>Forma</th>
+                      <th>Vencimento</th>
+                      <th>Situação</th>
+                      <th>NFS-e</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{inv}}" as="f" hint-placeholder-count="6">
+                      <tr>
+                        <td
+                          style="
+                            font-family: ui-monospace, Menlo, monospace;
+                            font-size: 13px;
+                          "
+                        >
+                          {{f.id}}
+                        </td>
+                        <td style="font-weight: 600">{{f.cli}}</td>
+                        <td>{{f.ops}}</td>
+                        <td>{{f.val}}</td>
+                        <td style="color: #344054">{{f.forma}}</td>
+                        <td style="color: #344054">{{f.venc}}</td>
+                        <td>
+                          <span
+                            style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{f.bg}}; color: {{f.color}}"
+                            >{{f.st}}</span
+                          >
+                        </td>
+                        <td style="color: #344054">{{f.nfse}}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <section
+                style="
+                  flex: 1 1 420px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  style="
+                    padding: 16px 20px;
+                    border-bottom: 1px solid #e4e7ec;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                  "
+                >
+                  <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                    Extrato da competência por tipo de registro
+                  </h2>
+                  <span style="font-size: 13px; color: #475467"
+                    >Todos os clientes · somente registros confirmados</span
+                  >
+                </div>
+                <div style="overflow-x: auto">
+                  <table
+                    style="
+                      width: 100%;
+                      border-collapse: collapse;
+                      min-width: 480px;
+                    "
+                  >
+                    <thead>
+                      <tr>
+                        <th>Tipo de registro</th>
+                        <th>Confirmados</th>
+                        <th>Valor unitário</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Entrada de usado</td>
+                        <td>7.102</td>
+                        <td>[VALOR POR REGISTRO]</td>
+                      </tr>
+                      <tr>
+                        <td>Saída de usado</td>
+                        <td>6.488</td>
+                        <td>[VALOR POR REGISTRO]</td>
+                      </tr>
+                      <tr>
+                        <td>Entrada 0 km</td>
+                        <td>2.240</td>
+                        <td>[VALOR POR REGISTRO]</td>
+                      </tr>
+                      <tr>
+                        <td>Saída 0 km</td>
+                        <td>1.905</td>
+                        <td>[VALOR POR REGISTRO]</td>
+                      </tr>
+                      <tr>
+                        <td>Transferência</td>
+                        <td>701</td>
+                        <td>[VALOR POR REGISTRO]</td>
+                      </tr>
+                      <tr>
+                        <td>Consignação</td>
+                        <td>392</td>
+                        <td>[VALOR POR REGISTRO]</td>
+                      </tr>
+                      <tr>
+                        <td>Retomado</td>
+                        <td>112</td>
+                        <td>[VALOR POR REGISTRO]</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+              <section
+                style="
+                  flex: 1 1 340px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 10px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Por estabelecimento (maiores)
+                </h2>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 14px;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #f2f4f7;
+                  "
+                >
+                  <span>Litoral Norte · Matriz Caraguatatuba</span
+                  ><strong>1.904</strong>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 14px;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #f2f4f7;
+                  "
+                >
+                  <span>Auto Prime · Matriz São Paulo</span
+                  ><strong>2.210</strong>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 14px;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #f2f4f7;
+                  "
+                >
+                  <span>Auto Prime · Filial Campinas</span
+                  ><strong>1.156</strong>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 14px;
+                    padding: 8px 0;
+                  "
+                >
+                  <span>Crédito Fácil · Sede</span><strong>1.120</strong>
+                </div>
+                <span style="font-size: 12px; color: #475467"
+                  >Não cobrados: rejeições, erros, resultados incertos não
+                  confirmados, consultas e homologação.</span
+                >
+              </section>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <section
+                style="
+                  flex: 1 1 340px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Aging da inadimplência
+                </h2>
+                <sc-for list="{{aging}}" as="a" hint-placeholder-count="4">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 13px;
+                      "
+                    >
+                      <span style="font-weight: 500">{{a.label}}</span
+                      ><span style="color: #475467">{{a.val}}</span>
+                    </div>
+                    <div
+                      style="
+                        height: 8px;
+                        border-radius: 999px;
+                        background: #f2f4f7;
+                      "
+                    >
+                      <div
+                        style="height: 8px; border-radius: 999px; width: {{a.pct}}; background: {{a.color}}"
+                      ></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </section>
+              <section
+                style="
+                  flex: 1 1 420px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Régua de cobrança
+                </h2>
+                <ol
+                  style="
+                    margin: 0;
+                    padding: 0;
+                    list-style: none;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                  "
+                >
+                  <li style="display: flex; gap: 12px; align-items: flex-start">
+                    <span
+                      style="
+                        flex-shrink: 0;
+                        font-size: 12px;
+                        font-weight: 700;
+                        padding: 3px 10px;
+                        border-radius: 999px;
+                        background: #eff8ff;
+                        color: #175cd3;
+                      "
+                      >D+1</span
+                    ><span style="font-size: 14px"
+                      >Lembrete por e-mail e WhatsApp com 2ª via e PIX.</span
+                    >
+                  </li>
+                  <li style="display: flex; gap: 12px; align-items: flex-start">
+                    <span
+                      style="
+                        flex-shrink: 0;
+                        font-size: 12px;
+                        font-weight: 700;
+                        padding: 3px 10px;
+                        border-radius: 999px;
+                        background: #fffaeb;
+                        color: #b54708;
+                      "
+                      >D+7</span
+                    ><span style="font-size: 14px"
+                      >Aviso formal ao administrador e financeiro do cliente;
+                      CSM notificado.</span
+                    >
+                  </li>
+                  <li style="display: flex; gap: 12px; align-items: flex-start">
+                    <span
+                      style="
+                        flex-shrink: 0;
+                        font-size: 12px;
+                        font-weight: 700;
+                        padding: 3px 10px;
+                        border-radius: 999px;
+                        background: #fef3f2;
+                        color: #b42318;
+                      "
+                      >D+15</span
+                    ><span style="font-size: 14px"
+                      >Suspensão de <strong>novas operações</strong>. Consultas,
+                      documentos e exportação de dados continuam disponíveis, e
+                      operações em andamento são concluídas.</span
+                    >
+                  </li>
+                </ol>
+                <span style="font-size: 13px; color: #475467"
+                  >Próximas ações: Revenda Bom Negócio ME entra em D+15 em
+                  25/11/2026.</span
+                >
+              </section>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  padding: 16px 20px;
+                  border-bottom: 1px solid #e4e7ec;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 2px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Conciliação: registros faturados × consumo SERPRO
+                </h2>
+                <span style="font-size: 13px; color: #475467"
+                  >Divergência acima de 1% abre investigação (operação faturada
+                  sem registro no RENAVE, ou o contrário).</span
+                >
+              </div>
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 820px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Registros faturados</th>
+                      <th>Consumo SERPRO (transações)</th>
+                      <th>Valor SERPRO</th>
+                      <th>Diferença</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Concessionária Litoral Norte S.A.</td>
+                      <td>4.212</td>
+                      <td>4.212</td>
+                      <td>[CUSTO SERPRO]</td>
+                      <td style="color: #067647; font-weight: 600">0</td>
+                    </tr>
+                    <tr>
+                      <td>Auto Prime Veículos Ltda</td>
+                      <td>3.604</td>
+                      <td>3.611</td>
+                      <td>[CUSTO SERPRO]</td>
+                      <td style="color: #b54708; font-weight: 600">
+                        −7 (consultas de reconciliação, não faturadas)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Financeira Crédito Fácil</td>
+                      <td>1.120</td>
+                      <td>1.120</td>
+                      <td>[CUSTO SERPRO]</td>
+                      <td style="color: #067647; font-weight: 600">0</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1450}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const S = { Paga: ['#ECFDF3', '#067647'], Aberta: ['#EFF8FF', '#175CD3'], Atrasada: ['#FFFAEB', '#B54708'], Suspenso: ['#FEF3F2', '#B42318'] };
+          const f = (id, cli, ops, val, forma, venc, st, nfse) => ({ id, cli, ops, val: ops + ' × [VALOR POR REGISTRO]', forma, venc, st, nfse, bg: S[st][0], color: S[st][1] });
+          return {
+            inv: [
+              f('FAT-2026-1201', 'Concessionária Litoral Norte S.A.', '4.212', 'R$ 7.900', 'PIX', '05/11/2026', 'Paga', 'Emitida'),
+              f('FAT-2026-1202', 'Auto Prime Veículos Ltda', '3.338', 'R$ 6.300', 'Boleto', '05/11/2026', 'Paga', 'Emitida'),
+              f('FAT-2026-1203', 'Financeira Crédito Fácil', '1.120', 'R$ 3.200', 'Boleto', '10/11/2026', 'Paga', 'Emitida'),
+              f('FAT-2026-1204', 'Revenda Bom Negócio ME', '102', 'R$ 390', 'Boleto', '10/11/2026', 'Atrasada', 'Após pagamento'),
+              f('FAT-2026-1205', 'Garagem Bandeirantes Ltda', '298', 'R$ 1.150', 'Cartão (recusado)', '25/10/2026', 'Suspenso', 'Após pagamento'),
+              f('FAT-2026-1206', 'Concessionária Vale Sul', '1.388', 'R$ 3.650', 'PIX', '15/11/2026', 'Aberta', '—')
+            ],
+            aging: [
+              { label: '1–7 dias', val: 'R$ 1.900 · 1 cliente', pct: '46%', color: '#F79009' },
+              { label: '8–15 dias', val: 'R$ 390 · 1 cliente', pct: '10%', color: '#F79009' },
+              { label: '16–30 dias', val: 'R$ 1.150 · 1 cliente', pct: '28%', color: '#D92D20' },
+              { label: 'Mais de 30 dias', val: 'R$ 650 · 1 cliente', pct: '16%', color: '#D92D20' }
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

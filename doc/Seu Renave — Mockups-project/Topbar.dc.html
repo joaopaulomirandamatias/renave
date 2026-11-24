@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Topbar — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+        </style>
+      </helmet>
+      <header
+        style="
+          box-sizing: border-box;
+          width: 100%;
+          min-height: 64px;
+          padding: 10px 32px;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px;
+          background: #ffffff;
+          border-bottom: 1px solid #e4e7ec;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+        "
+      >
+        <label
+          style="
+            flex: 1 1 320px;
+            max-width: 520px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 40px;
+            padding: 0 12px;
+            border: 1px solid #d0d5dd;
+            border-radius: 8px;
+            background: #ffffff;
+          "
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#667085"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <span
+            style="
+              position: absolute;
+              width: 1px;
+              height: 1px;
+              overflow: hidden;
+              clip: rect(0 0 0 0);
+            "
+            >Buscar veículo</span
+          >
+          <input
+            type="search"
+            placeholder="Buscar placa, chassi ou RENAVAM"
+            style="
+              flex: 1;
+              min-width: 0;
+              border: 0;
+              outline: none;
+              font: inherit;
+              font-size: 14px;
+              color: #101828;
+              background: transparent;
+            "
+          />
+          <kbd
+            style="
+              font-family: inherit;
+              font-size: 12px;
+              font-weight: 600;
+              color: #475467;
+              border: 1px solid #e4e7ec;
+              border-radius: 6px;
+              padding: 1px 7px;
+              background: #f9fafb;
+            "
+            >/</kbd
+          >
+        </label>
+
+        <div
+          style="
+            margin-left: auto;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+          "
+        >
+          <label
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              height: 40px;
+              padding: 0 10px;
+              border: 1px solid #d0d5dd;
+              border-radius: 8px;
+              font-size: 14px;
+              color: #344054;
+            "
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
+            </svg>
+            <span
+              style="
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip: rect(0 0 0 0);
+              "
+              >Estabelecimento</span
+            >
+            <select
+              style="
+                border: 0;
+                font: inherit;
+                font-size: 14px;
+                font-weight: 600;
+                color: #101828;
+                background: transparent;
+                outline: none;
+              "
+            >
+              <option>Matriz São Paulo · 12.345.678/0001-90</option>
+              <option>Filial Campinas · 12.345.678/0002-71</option>
+              <option>Filial Santos · 12.345.678/0003-52</option>
+              <option>Todos os estabelecimentos</option>
+            </select>
+          </label>
+          <span
+            title="Ambiente atual"
+            style="display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; background: {{envBg}}; color: {{envColor}}"
+          >
+            <span
+              style="width: 7px; height: 7px; border-radius: 999px; background: {{envColor}}"
+            ></span>
+            {{envLabel}}
+          </span>
+          <button
+            type="button"
+            aria-label="Notificações (5 novas)"
+            style="
+              position: relative;
+              display: inline-flex;
+              width: 40px;
+              height: 40px;
+              align-items: center;
+              justify-content: center;
+              border: 1px solid #e4e7ec;
+              border-radius: 8px;
+              background: #ffffff;
+              color: #344054;
+              cursor: pointer;
+            "
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"
+              />
+            </svg>
+            <span
+              style="
+                position: absolute;
+                top: 6px;
+                right: 7px;
+                width: 8px;
+                height: 8px;
+                border-radius: 999px;
+                background: #d92d20;
+                border: 2px solid #ffffff;
+              "
+            ></span>
+          </button>
+          <button
+            type="button"
+            aria-label="Ajuda"
+            style="
+              display: inline-flex;
+              width: 40px;
+              height: 40px;
+              align-items: center;
+              justify-content: center;
+              border: 1px solid #e4e7ec;
+              border-radius: 8px;
+              background: #ffffff;
+              color: #344054;
+              cursor: pointer;
+            "
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" />
+            </svg>
+          </button>
+        </div>
+      </header>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"env":{"editor":"enum","options":["producao","homologacao"],"default":"producao"},"$preview":{"width":1192,"height":64}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const hml = (this.props.env ?? 'producao') === 'homologacao';
+          return {
+            envLabel: hml ? 'HOMOLOGAÇÃO' : 'PRODUÇÃO',
+            envBg: hml ? '#FFFAEB' : '#ECFDF3',
+            envColor: hml ? '#B54708' : '#067647'
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

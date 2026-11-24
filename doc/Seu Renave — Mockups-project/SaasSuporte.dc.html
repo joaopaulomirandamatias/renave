@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Suporte — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="suporte"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+            <span style="margin-left: auto; font-size: 13px; color: #475467"
+              >Atendimento 8h–20h (dias úteis) · plantão 24×7 para S1</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 28px;
+                  font-weight: 600;
+                  letter-spacing: -0.01em;
+                "
+              >
+                Suporte
+              </h1>
+              <p style="margin: 0; font-size: 15px; color: #475467">
+                7 chamados abertos · 1 com SLA em risco
+              </p>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <section
+                style="
+                  flex: 999 1 520px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    padding: 12px 16px;
+                    border-bottom: 1px solid #e4e7ec;
+                  "
+                >
+                  <button
+                    type="button"
+                    style="
+                      height: 32px;
+                      padding: 0 12px;
+                      border-radius: 999px;
+                      border: 1px solid #101828;
+                      background: #101828;
+                      color: #ffffff;
+                      font-size: 13px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Abertos 7
+                  </button>
+                  <button
+                    type="button"
+                    style="
+                      height: 32px;
+                      padding: 0 12px;
+                      border-radius: 999px;
+                      border: 1px solid #d0d5dd;
+                      background: #ffffff;
+                      color: #344054;
+                      font-size: 13px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Meus 3
+                  </button>
+                  <button
+                    type="button"
+                    style="
+                      height: 32px;
+                      padding: 0 12px;
+                      border-radius: 999px;
+                      border: 1px solid #d0d5dd;
+                      background: #ffffff;
+                      color: #344054;
+                      font-size: 13px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Aguardando cliente 2
+                  </button>
+                </div>
+                <sc-for list="{{tickets}}" as="t" hint-placeholder-count="6">
+                  <button
+                    type="button"
+                    onClick="{{t.pick}}"
+                    style="width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; border: 0; border-bottom: 1px solid #F2F4F7; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; background: {{t.rowBg}}"
+                  >
+                    <span
+                      style="font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: {{t.sevBg}}; color: {{t.sevColor}}"
+                      >{{t.sev}}</span
+                    >
+                    <span
+                      style="
+                        flex: 1 1 260px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+                        min-width: 0;
+                      "
+                      ><strong style="font-size: 14px; font-weight: 600"
+                        >{{t.title}}</strong
+                      ><span style="font-size: 13px; color: #475467"
+                        >{{t.id}} · {{t.cli}}</span
+                      ></span
+                    >
+                    <span
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+                        min-width: 120px;
+                      "
+                      ><span style="font-size: 12px; color: #475467">SLA</span
+                      ><span
+                        style="font-size: 13px; font-weight: 600; color: {{t.slaColor}}"
+                        >{{t.sla}}</span
+                      ></span
+                    >
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 600;
+                        padding: 3px 9px;
+                        border-radius: 999px;
+                        background: #f2f4f7;
+                        color: #344054;
+                      "
+                      >{{t.status}}</span
+                    >
+                  </button>
+                </sc-for>
+              </section>
+
+              <aside
+                style="
+                  flex: 1 1 360px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 14px;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span style="font-size: 13px; color: #475467"
+                    >{{cur.id}} · {{cur.sev}}</span
+                  >
+                  <h2 style="margin: 0; font-size: 18px; font-weight: 600">
+                    {{cur.title}}
+                  </h2>
+                  <span style="font-size: 13px; color: #475467"
+                    >{{cur.cli}} · aberto por {{cur.by}}</span
+                  >
+                </div>
+                <div
+                  style="
+                    padding: 14px;
+                    border-radius: 10px;
+                    background: #f9fafb;
+                    border: 1px solid #e4e7ec;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                  "
+                >
+                  <strong style="font-size: 13px; color: #344054"
+                    >Contexto automático</strong
+                  >
+                  <dl
+                    style="
+                      margin: 0;
+                      display: grid;
+                      grid-template-columns: repeat(2, minmax(0, 1fr));
+                      gap: 8px;
+                      font-size: 13px;
+                    "
+                  >
+                    <div>
+                      <dt style="color: #475467">Operação</dt>
+                      <dd style="margin: 2px 0 0; font-weight: 600">
+                        {{cur.op}}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style="color: #475467">Veículo</dt>
+                      <dd style="margin: 2px 0 0; font-weight: 600">
+                        {{cur.veic}}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style="color: #475467">Correlation-id</dt>
+                      <dd
+                        style="
+                          margin: 2px 0 0;
+                          font-family: ui-monospace, Menlo, monospace;
+                        "
+                      >
+                        {{cur.corr}}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style="color: #475467">Estado</dt>
+                      <dd
+                        style="
+                          margin: 2px 0 0;
+                          font-weight: 600;
+                          color: #b42318;
+                        "
+                      >
+                        {{cur.estado}}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <p
+                  style="
+                    margin: 0;
+                    font-size: 14px;
+                    color: #344054;
+                    line-height: 1.5;
+                  "
+                >
+                  {{cur.msg}}
+                </p>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <a
+                    href="Operacao.dc.html"
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      height: 40px;
+                      padding: 0 14px;
+                      border-radius: 8px;
+                      background: #067a45;
+                      color: #ffffff;
+                      font-size: 14px;
+                      font-weight: 600;
+                    "
+                    >Abrir operação</a
+                  >
+                  <a
+                    href="SaasClienteDetalhe.dc.html"
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      height: 40px;
+                      padding: 0 14px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      color: #344054;
+                      font-size: 14px;
+                      font-weight: 600;
+                    "
+                    >Abrir cliente</a
+                  >
+                  <button
+                    type="button"
+                    style="
+                      height: 40px;
+                      padding: 0 14px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      background: #ffffff;
+                      color: #344054;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Escalar para N2
+                  </button>
+                </div>
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Responder ao cliente<textarea
+                    rows="3"
+                    style="
+                      box-sizing: border-box;
+                      padding: 10px 12px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      resize: vertical;
+                    "
+                  >
+Olá, Marina. Verificamos no RENAVE: a venda foi registrada às 14:02:19. Não é preciso reenviar.</textarea>
+                </label>
+              </aside>
+            </div>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1250}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { sel: 0 }; }
+        renderVals() {
+          const SV = { S1: ['#FEF3F2', '#B42318'], S2: ['#FFFAEB', '#B54708'], S3: ['#EFF8FF', '#175CD3'], S4: ['#F2F4F7', '#344054'] };
+          const data = [
+            { id: 'CH-4471', sev: 'S2', title: 'Venda sem resposta do RENAVE', cli: 'Auto Prime Veículos', by: 'Marina Costa', sla: '42 min restantes', risk: true, status: 'Em atendimento', op: 'OP-2026-118431', veic: 'QTP4H82', corr: 'c0a8-7e41', estado: 'Resultado incerto', msg: 'Cliente pergunta se pode reenviar a venda. Orientar a não reenviar e executar a reconciliação.' },
+            { id: 'CH-4474', sev: 'S1', title: 'Nenhuma operação sai — certificado bloqueado', cli: 'Garagem Bandeirantes', by: 'Paulo Reis', sla: '18 min restantes', risk: true, status: 'Plantão acionado', op: '—', veic: '—', corr: '8f2e-11aa', estado: 'Certificado expirado', msg: 'Certificado e-CNPJ da matriz expirou hoje; acesso bloqueado automaticamente. Orientar a renovação e a rotação.' },
+            { id: 'CH-4468', sev: 'S3', title: 'Dúvida sobre certificado da filial', cli: 'Auto Prime Veículos', by: 'Ricardo Almeida', sla: '1 dia útil', risk: false, status: 'Aguardando cliente', op: '—', veic: '—', corr: '—', estado: 'Onboarding etapa 5', msg: 'Cliente pergunta se pode usar certificado A3 em token. Resposta: sim, via HSM/conector local.' },
+            { id: 'CH-4462', sev: 'S3', title: 'Webhook do DMS recebendo 503', cli: 'Auto Prime Veículos', by: 'Equipe TI', sla: '1 dia útil', risk: false, status: 'Em atendimento', op: '—', veic: '—', corr: 'wh-77d1', estado: '7 entregas na fila', msg: 'Endpoint do DMS do cliente indisponível. Reentregas em backoff; nada se perde.' },
+            { id: 'CH-4459', sev: 'S4', title: 'Como exportar dossiê para fiscalização', cli: 'Financeira Crédito Fácil', by: 'Ana Prado', sla: '2 dias úteis', risk: false, status: 'Novo', op: '—', veic: '—', corr: '—', estado: '—', msg: 'Enviar artigo da base de conhecimento sobre exportação de dossiê.' }
+          ];
+          const sel = this.state.sel;
+          const tickets = data.map((d, i) => Object.assign({}, d, { sevBg: SV[d.sev][0], sevColor: SV[d.sev][1], slaColor: d.risk ? '#B42318' : '#344054', rowBg: i === sel ? '#F3FBF6' : '#FFFFFF', pick: () => this.setState({ sel: i }) }));
+          return { tickets, cur: tickets[sel] };
+        }
+      }
+    </script>
+  </body>
+</html>

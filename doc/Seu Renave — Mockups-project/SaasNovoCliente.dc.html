@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Novo cliente — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          input,
+          select {
+            font: inherit;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="novo"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 28px;
+                  font-weight: 600;
+                  letter-spacing: -0.01em;
+                "
+              >
+                Novo cliente
+              </h1>
+              <p style="margin: 0; font-size: 15px; color: #475467">
+                Provisionamento de tenant · o cliente sempre começa em
+                Homologação
+              </p>
+            </div>
+
+            <ol
+              aria-label="Etapas"
+              style="
+                margin: 0;
+                padding: 16px;
+                list-style: none;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+              "
+            >
+              <sc-for list="{{steps}}" as="s" hint-placeholder-count="6">
+                <li
+                  style="
+                    flex: 1 1 140px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                  "
+                >
+                  <span
+                    style="flex-shrink: 0; display: inline-flex; width: 28px; height: 28px; border-radius: 999px; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: {{s.bg}}; color: {{s.color}}"
+                    >{{s.mark}}</span
+                  >
+                  <span
+                    style="font-size: 13px; font-weight: {{s.weight}}; color: {{s.text}}"
+                    >{{s.label}}</span
+                  >
+                </li>
+              </sc-for>
+            </ol>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+              "
+            >
+              <sc-if value="{{s0}}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; flex-direction: column; gap: 16px">
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    Empresa
+                  </h2>
+                  <label
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 6px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      color: #344054;
+                      max-width: 360px;
+                    "
+                    >CNPJ da matriz<input
+                      value="56.789.012/0001-34"
+                      style="
+                        height: 44px;
+                        box-sizing: border-box;
+                        padding: 0 12px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        font-size: 15px;
+                      "
+                  /></label>
+                  <div
+                    style="
+                      padding: 16px;
+                      border: 1px solid #a7ddbf;
+                      border-radius: 10px;
+                      background: #f3fbf6;
+                      display: grid;
+                      grid-template-columns: repeat(
+                        auto-fit,
+                        minmax(220px, 1fr)
+                      );
+                      gap: 12px;
+                    "
+                  >
+                    <div>
+                      <span style="font-size: 12px; color: #475467"
+                        >Razão social (Receita)</span
+                      >
+                      <div style="font-size: 14px; font-weight: 600">
+                        Revenda Bom Negócio ME
+                      </div>
+                    </div>
+                    <div>
+                      <span style="font-size: 12px; color: #475467"
+                        >Situação cadastral</span
+                      >
+                      <div
+                        style="
+                          font-size: 14px;
+                          font-weight: 600;
+                          color: #067647;
+                        "
+                      >
+                        Ativa
+                      </div>
+                    </div>
+                    <div>
+                      <span style="font-size: 12px; color: #475467"
+                        >CNAE principal</span
+                      >
+                      <div style="font-size: 14px; font-weight: 600">
+                        45.11-1-02 · usados
+                      </div>
+                    </div>
+                    <div>
+                      <span style="font-size: 12px; color: #475467"
+                        >Elegível ao RENAVE?</span
+                      >
+                      <div
+                        style="
+                          font-size: 14px;
+                          font-weight: 600;
+                          color: #067647;
+                        "
+                      >
+                        Sim — compra e venda de veículos
+                      </div>
+                    </div>
+                  </div>
+                  <span style="font-size: 13px; color: #475467"
+                    >Dados sugeridos a partir da base pública da Receita; o
+                    cliente confirma no primeiro acesso.</span
+                  >
+                </div>
+              </sc-if>
+              <sc-if value="{{s1}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 16px">
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    Tipo e módulos
+                  </h2>
+                  <label
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 6px;
+                      font-size: 14px;
+                      font-weight: 500;
+                      color: #344054;
+                      max-width: 360px;
+                    "
+                    >Tipo de cliente<select
+                      style="
+                        height: 44px;
+                        padding: 0 10px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        font-size: 15px;
+                        background: #ffffff;
+                      "
+                    >
+                      <option>Revenda</option>
+                      <option>Concessionária</option>
+                      <option>Grupo</option>
+                      <option>Montadora</option>
+                      <option>ITE</option>
+                      <option>Instituição credora</option>
+                    </select></label
+                  >
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: repeat(
+                        auto-fit,
+                        minmax(220px, 1fr)
+                      );
+                      gap: 10px;
+                    "
+                  >
+                    <sc-for list="{{mods}}" as="m" hint-placeholder-count="7">
+                      <label
+                        style="
+                          display: flex;
+                          gap: 10px;
+                          align-items: flex-start;
+                          padding: 14px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 10px;
+                          cursor: pointer;
+                        "
+                        ><input
+                          type="checkbox"
+                          checked="{{m.on}}"
+                          style="
+                            width: 18px;
+                            height: 18px;
+                            margin-top: 1px;
+                            accent-color: #067a45;
+                          "
+                        /><span
+                          ><strong style="font-size: 14px">{{m.label}}</strong
+                          ><br /><span style="font-size: 12px; color: #475467"
+                            >{{m.hint}}</span
+                          ></span
+                        ></label
+                      >
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{s2}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 16px">
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    Dados de faturamento
+                  </h2>
+                  <div
+                    style="
+                      padding: 14px 16px;
+                      border-radius: 10px;
+                      background: #eff8ff;
+                      color: #175cd3;
+                      font-size: 14px;
+                      line-height: 1.5;
+                    "
+                  >
+                    Não há plano nem mensalidade: o cliente paga apenas por
+                    registro confirmado no RENAVE, pelo valor da tabela oficial.
+                    Homologação é gratuita.
+                  </div>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: repeat(
+                        auto-fit,
+                        minmax(220px, 1fr)
+                      );
+                      gap: 16px;
+                    "
+                  >
+                    <label
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #344054;
+                      "
+                      >Responsável financeiro<input
+                        value="Cláudia Ramos"
+                        style="
+                          height: 44px;
+                          box-sizing: border-box;
+                          padding: 0 12px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          font-size: 15px;
+                        "
+                    /></label>
+                    <label
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #344054;
+                      "
+                      >Forma de pagamento<select
+                        style="
+                          height: 44px;
+                          padding: 0 10px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          font-size: 15px;
+                          background: #ffffff;
+                        "
+                      >
+                        <option>Boleto / PIX</option>
+                        <option>Cartão de crédito</option>
+                      </select></label
+                    >
+                    <label
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #344054;
+                      "
+                      >Dia de vencimento<select
+                        style="
+                          height: 44px;
+                          padding: 0 10px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          font-size: 15px;
+                          background: #ffffff;
+                        "
+                      >
+                        <option>Dia 5</option>
+                        <option>Dia 10</option>
+                        <option>Dia 15</option>
+                      </select></label
+                    >
+                    <label
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #344054;
+                      "
+                      >E-mail de cobrança<input
+                        value="financeiro@bomnegocio.com.br"
+                        style="
+                          height: 44px;
+                          box-sizing: border-box;
+                          padding: 0 12px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          font-size: 15px;
+                        "
+                    /></label>
+                  </div>
+                  <span
+                    style="font-size: 13px; font-weight: 600; color: #067647"
+                    >[VALOR POR REGISTRO — tabela oficial] · Vigência: [ATO
+                    NORMATIVO] · cobrado só registro confirmado</span
+                  >
+                </div>
+              </sc-if>
+              <sc-if value="{{s3}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 16px">
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    Administrador do cliente
+                  </h2>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: repeat(
+                        auto-fit,
+                        minmax(220px, 1fr)
+                      );
+                      gap: 16px;
+                    "
+                  >
+                    <label
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #344054;
+                      "
+                      >Nome<input
+                        value="Sérgio Martins"
+                        style="
+                          height: 44px;
+                          box-sizing: border-box;
+                          padding: 0 12px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          font-size: 15px;
+                        "
+                    /></label>
+                    <label
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #344054;
+                      "
+                      >E-mail<input
+                        value="sergio@bomnegocio.com.br"
+                        style="
+                          height: 44px;
+                          box-sizing: border-box;
+                          padding: 0 12px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          font-size: 15px;
+                        "
+                    /></label>
+                    <label
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: #344054;
+                      "
+                      >CPF<input
+                        value="321.654.987-00"
+                        style="
+                          height: 44px;
+                          box-sizing: border-box;
+                          padding: 0 12px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          font-size: 15px;
+                        "
+                    /></label>
+                  </div>
+                  <div
+                    style="
+                      padding: 14px 16px;
+                      border-radius: 10px;
+                      background: #eff8ff;
+                      color: #175cd3;
+                      font-size: 14px;
+                    "
+                  >
+                    O convite expira em 72 horas. No primeiro acesso, a
+                    verificação em duas etapas é obrigatória.
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{s4}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 16px">
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    Ambiente
+                  </h2>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: repeat(
+                        auto-fit,
+                        minmax(240px, 1fr)
+                      );
+                      gap: 10px;
+                    "
+                  >
+                    <div
+                      style="
+                        padding: 16px;
+                        border: 2px solid #067a45;
+                        border-radius: 10px;
+                        background: #f3fbf6;
+                      "
+                    >
+                      <strong style="font-size: 14px">Homologação</strong>
+                      <div
+                        style="font-size: 13px; color: #475467; margin-top: 4px"
+                      >
+                        Ambiente inicial obrigatório. Usa o RENAVE de
+                        homologação e dados de teste.
+                      </div>
+                    </div>
+                    <div
+                      style="
+                        padding: 16px;
+                        border: 1px solid #e4e7ec;
+                        border-radius: 10px;
+                        background: #f9fafb;
+                        color: #475467;
+                      "
+                    >
+                      <strong style="font-size: 14px">Produção</strong>
+                      <div style="font-size: 13px; margin-top: 4px">
+                        Liberada só após Credencia aprovado, certificado válido
+                        e cenários homologados.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{s5}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 14px">
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    Revisão
+                  </h2>
+                  <dl
+                    style="
+                      margin: 0;
+                      display: grid;
+                      grid-template-columns: repeat(
+                        auto-fit,
+                        minmax(220px, 1fr)
+                      );
+                      gap: 12px 24px;
+                    "
+                  >
+                    <div>
+                      <dt style="font-size: 12px; color: #475467">Empresa</dt>
+                      <dd
+                        style="
+                          margin: 2px 0 0;
+                          font-size: 14px;
+                          font-weight: 600;
+                        "
+                      >
+                        Revenda Bom Negócio ME
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style="font-size: 12px; color: #475467">
+                        Tipo · módulos
+                      </dt>
+                      <dd
+                        style="
+                          margin: 2px 0 0;
+                          font-size: 14px;
+                          font-weight: 600;
+                        "
+                      >
+                        Revenda · usados, transferências
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style="font-size: 12px; color: #475467">Cobrança</dt>
+                      <dd
+                        style="
+                          margin: 2px 0 0;
+                          font-size: 14px;
+                          font-weight: 600;
+                        "
+                      >
+                        Por registro confirmado · boleto/PIX · dia 5
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style="font-size: 12px; color: #475467">
+                        Administrador
+                      </dt>
+                      <dd
+                        style="
+                          margin: 2px 0 0;
+                          font-size: 14px;
+                          font-weight: 600;
+                        "
+                      >
+                        sergio@bomnegocio.com.br
+                      </dd>
+                    </div>
+                    <div>
+                      <dt style="font-size: 12px; color: #475467">Ambiente</dt>
+                      <dd
+                        style="
+                          margin: 2px 0 0;
+                          font-size: 14px;
+                          font-weight: 600;
+                          color: #b54708;
+                        "
+                      >
+                        Homologação
+                      </dd>
+                    </div>
+                  </dl>
+                  <span style="font-size: 13px; color: #475467"
+                    >Ao criar: tenant isolado, convite enviado, evento
+                    registrado na auditoria da plataforma.</span
+                  >
+                </div>
+              </sc-if>
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 12px;
+                  justify-content: space-between;
+                  padding-top: 8px;
+                  border-top: 1px solid #e4e7ec;
+                "
+              >
+                <button
+                  type="button"
+                  onClick="{{back}}"
+                  style="
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #344054;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick="{{next}}"
+                  style="
+                    height: 44px;
+                    padding: 0 20px;
+                    border: 0;
+                    border-radius: 8px;
+                    background: #067a45;
+                    color: #ffffff;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  {{nextLabel}}
+                </button>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1250}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { step: 0 }; }
+        renderVals() {
+          const step = this.state.step;
+          const labels = ['Empresa', 'Tipo e módulos', 'Dados de faturamento', 'Administrador', 'Ambiente', 'Revisão'];
+          const v = {
+            steps: labels.map((label, i) => ({ label, mark: i < step ? '✓' : String(i + 1), bg: i < step ? '#067A45' : (i === step ? '#E7F6EE' : '#F2F4F7'), color: i < step ? '#FFFFFF' : (i === step ? '#067A45' : '#475467'), weight: i === step ? '600' : '500', text: i === step ? '#101828' : '#475467' })),
+            mods: [
+              { label: 'Veículos usados', hint: 'Entrada, saída, ATPV-e, NF-e', on: true },
+              { label: 'Zero km', hint: 'Pendentes, entrada, venda, entrega', on: false },
+              { label: 'ITE / inacabados', hint: 'Transformação e conclusão', on: false },
+              { label: 'Consignação', hint: 'Contrato eletrônico', on: false },
+              { label: 'Retomados', hint: 'Instituições credoras', on: false },
+              { label: 'API e webhooks', hint: 'Integração com ERP/DMS', on: false },
+              { label: 'SSO corporativo', hint: 'OIDC / SAML', on: false }
+            ],
+            nextLabel: step === 5 ? 'Criar cliente e enviar convite' : 'Continuar',
+            next: () => this.setState({ step: Math.min(5, step + 1) }),
+            back: () => this.setState({ step: Math.max(0, step - 1) })
+          };
+          labels.forEach((_, i) => { v['s' + i] = step === i; });
+          return v;
+        }
+      }
+    </script>
+  </body>
+</html>

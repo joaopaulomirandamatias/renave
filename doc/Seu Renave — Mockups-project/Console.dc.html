@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Console da integradora — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Nunito:wght@900&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+        "
+      >
+        <header style="background: #0b2550; color: #ffffff">
+          <div
+            style="
+              box-sizing: border-box;
+              max-width: 1440px;
+              margin: 0 auto;
+              padding: 12px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 16px 24px;
+            "
+          >
+            <span style="display: flex; align-items: center; gap: 10px">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 32 32"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 3.5h10.5l6 6V26a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 26V6A2.5 2.5 0 0 1 8 3.5z"
+                  fill="#0B2550"
+                  stroke="#FFFFFF"
+                  stroke-width="2.6"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M18.5 3.5v6h6z"
+                  fill="#0A9B55"
+                  stroke="#0A9B55"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                />
+                <circle
+                  cx="24.5"
+                  cy="17"
+                  r="6"
+                  fill="#0A9B55"
+                  stroke="#0B2550"
+                  stroke-width="1.6"
+                />
+                <path
+                  d="M21.8 17.1l1.9 1.9 3.5-3.7"
+                  fill="none"
+                  stroke="#FFFFFF"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <strong style="font-weight: 700"
+                ><span
+                  style="
+                    font-family: Nunito, Inter, sans-serif;
+                    font-weight: 900;
+                    font-size: 19px;
+                  "
+                  ><span style="color: #ffffff">Seu</span>
+                  <span style="color: #0a9b55">Renave</span></span
+                >
+                <span style="font-size: 15px"
+                  >· Console da integradora</span
+                ></strong
+              >
+            </span>
+            <nav
+              aria-label="Console"
+              style="display: flex; flex-wrap: wrap; gap: 4px"
+            >
+              <a
+                href="#saude"
+                aria-current="page"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  height: 36px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  background: #12336e;
+                  color: #ffffff;
+                  font-size: 14px;
+                  font-weight: 600;
+                  box-shadow: inset 0 -2px 0 #0a9b55;
+                "
+                >Saúde</a
+              >
+              <a
+                href="#clientes"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  height: 36px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  color: #d0d5dd;
+                  font-size: 14px;
+                  font-weight: 500;
+                "
+                >Clientes</a
+              >
+              <a
+                href="#suporte"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  height: 36px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  color: #d0d5dd;
+                  font-size: 14px;
+                  font-weight: 500;
+                "
+                >Suporte</a
+              >
+              <a
+                href="#homolog"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  height: 36px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  color: #d0d5dd;
+                  font-size: 14px;
+                  font-weight: 500;
+                "
+                >Homologação</a
+              >
+              <a
+                href="#regulatorio"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  height: 36px;
+                  padding: 0 12px;
+                  border-radius: 8px;
+                  color: #d0d5dd;
+                  font-size: 14px;
+                  font-weight: 500;
+                "
+                >Regulatory Watch</a
+              >
+            </nav>
+            <span style="margin-left: auto; font-size: 13px; color: #d0d5dd"
+              >Plantão: Equipe SRE · MFA + acesso com justificativa</span
+            >
+          </div>
+        </header>
+
+        <main
+          style="
+            box-sizing: border-box;
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              flex-wrap: wrap;
+              gap: 12px;
+              justify-content: space-between;
+              align-items: flex-end;
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 28px;
+                  font-weight: 600;
+                  letter-spacing: -0.01em;
+                "
+              >
+                Saúde da operação
+              </h1>
+              <p style="margin: 0; font-size: 15px; color: #475467">
+                Todos os clientes · produção · últimas 24 horas · atualizado às
+                15:35
+              </p>
+            </div>
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 32px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #ecfdf3;
+                color: #067647;
+                font-size: 13px;
+                font-weight: 600;
+              "
+              ><span
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 999px;
+                  background: #12b76a;
+                "
+              ></span
+              >Conector RENAVE operacional</span
+            >
+          </div>
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+              gap: 12px;
+            "
+          >
+            <sc-for list="{{kpis}}" as="k" hint-placeholder-count="6">
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  padding: 16px;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                "
+              >
+                <span style="font-size: 13px; font-weight: 500; color: #475467"
+                  >{{k.label}}</span
+                >
+                <span
+                  style="
+                    font-size: 26px;
+                    font-weight: 600;
+                    letter-spacing: -0.02em;
+                  "
+                  >{{k.value}}</span
+                >
+                <span
+                  style="font-size: 12px; font-weight: 500; color: {{k.noteColor}}"
+                  >{{k.note}}</span
+                >
+              </div>
+            </sc-for>
+          </div>
+
+          <div
+            style="
+              display: flex;
+              flex-wrap: wrap;
+              gap: 24px;
+              align-items: flex-start;
+            "
+          >
+            <section
+              style="
+                flex: 2 1 640px;
+                min-width: 0;
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <h2
+                style="
+                  margin: 0;
+                  padding: 16px 20px;
+                  font-size: 17px;
+                  font-weight: 600;
+                  border-bottom: 1px solid #e4e7ec;
+                "
+              >
+                Saúde por cliente
+              </h2>
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 820px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Estab.</th>
+                      <th>Operações 24 h</th>
+                      <th>Sucesso</th>
+                      <th>Incertas</th>
+                      <th>Divergências</th>
+                      <th>Certificados</th>
+                      <th>Saúde</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for
+                      list="{{tenants}}"
+                      as="t"
+                      hint-placeholder-count="5"
+                    >
+                      <tr>
+                        <td style="font-weight: 600">{{t.nome}}</td>
+                        <td>{{t.estab}}</td>
+                        <td>{{t.ops}}</td>
+                        <td>{{t.ok}}</td>
+                        <td style="font-weight: 600; color: {{t.incColor}}">
+                          {{t.inc}}
+                        </td>
+                        <td style="font-weight: 600; color: {{t.divColor}}">
+                          {{t.div}}
+                        </td>
+                        <td style="font-size: 13px; color: {{t.certColor}}">
+                          {{t.cert}}
+                        </td>
+                        <td>
+                          <span
+                            style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{t.hBg}}; color: {{t.hColor}}"
+                            >{{t.health}}</span
+                          >
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section
+              style="
+                flex: 1 1 340px;
+                min-width: 0;
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+              "
+            >
+              <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                Falhas por motivo (24 h)
+              </h2>
+              <sc-for list="{{errors}}" as="e" hint-placeholder-count="5">
+                <div style="display: flex; flex-direction: column; gap: 6px">
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 13px;
+                    "
+                  >
+                    <span style="color: #344054; font-weight: 500"
+                      >{{e.label}}</span
+                    ><span style="color: #475467">{{e.n}}</span>
+                  </div>
+                  <div
+                    style="
+                      height: 8px;
+                      border-radius: 999px;
+                      background: #f2f4f7;
+                      overflow: hidden;
+                    "
+                  >
+                    <div
+                      style="height: 8px; border-radius: 999px; width: {{e.pct}}; background: {{e.color}}"
+                    ></div>
+                  </div>
+                </div>
+              </sc-for>
+              <span style="font-size: 12px; color: #475467"
+                >Erro técnico (cor vermelha) conta contra o SLO; erro de negócio
+                (laranja) é orientado ao cliente.</span
+              >
+            </section>
+          </div>
+
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+              gap: 24px;
+            "
+          >
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <h2 style="margin: 0; font-size: 16px; font-weight: 600">
+                Operações com resultado incerto
+              </h2>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Auto Prime · OP-118431</span
+                ><span style="color: #b42318; font-weight: 600">93 min</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Auto Prime · OP-118436</span
+                ><span style="color: #b54708; font-weight: 600">41 min</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Vale Sul · OP-097220</span
+                ><span style="color: #b54708; font-weight: 600">12 min</span>
+              </div>
+              <a href="#runbook" style="font-size: 14px; font-weight: 600"
+                >Runbook: timeout com resultado desconhecido</a
+              >
+            </section>
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <h2 style="margin: 0; font-size: 16px; font-weight: 600">
+                Certificados a vencer (todos os clientes)
+              </h2>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Garagem Bandeirantes · Matriz</span
+                ><span style="color: #b42318; font-weight: 600">5 dias</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Auto Prime · Santos</span
+                ><span style="color: #b42318; font-weight: 600">12 dias</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Litoral Motors · Matriz</span
+                ><span style="color: #b54708; font-weight: 600">27 dias</span>
+              </div>
+              <a href="#certs" style="font-size: 14px; font-weight: 600"
+                >Ver os 9 certificados em janela de alerta</a
+              >
+            </section>
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <h2 style="margin: 0; font-size: 16px; font-weight: 600">
+                Webhooks com falha
+              </h2>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Auto Prime · DMS da loja</span
+                ><span style="color: #b42318; font-weight: 600"
+                  >7 na fila · HTTP 503</span
+                >
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 14px;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #f2f4f7;
+                "
+              >
+                <span>Vale Sul · ERP</span
+                ><span style="color: #b54708; font-weight: 600"
+                  >2 na fila · timeout</span
+                >
+              </div>
+              <a href="#webhooks" style="font-size: 14px; font-weight: 600"
+                >Abrir fila de reentrega</a
+              >
+            </section>
+          </div>
+
+          <section
+            id="regulatorio"
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 10px;
+              overflow: hidden;
+            "
+          >
+            <div
+              style="
+                padding: 16px 20px;
+                border-bottom: 1px solid #e4e7ec;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 2px">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Regulatory Watch
+                </h2>
+                <span style="font-size: 13px; color: #475467"
+                  >Mudanças normativas e técnicas, impacto no produto e
+                  prazos</span
+                >
+              </div>
+              <button
+                type="button"
+                style="
+                  height: 40px;
+                  padding: 0 14px;
+                  border: 1px solid #d0d5dd;
+                  border-radius: 8px;
+                  background: #ffffff;
+                  color: #344054;
+                  font: inherit;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Registrar mudança
+              </button>
+            </div>
+            <div style="overflow-x: auto">
+              <table
+                style="width: 100%; border-collapse: collapse; min-width: 980px"
+              >
+                <thead>
+                  <tr>
+                    <th>Mudança</th>
+                    <th>Fonte</th>
+                    <th>Vigência / prazo</th>
+                    <th>Impacto</th>
+                    <th>Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{watch}}" as="w" hint-placeholder-count="5">
+                    <tr>
+                      <td style="white-space: normal; min-width: 320px">
+                        <strong style="font-size: 14px; font-weight: 600"
+                          >{{w.title}}</strong
+                        >
+                        <div
+                          style="
+                            font-size: 13px;
+                            color: #475467;
+                            margin-top: 2px;
+                          "
+                        >
+                          {{w.desc}}
+                        </div>
+                      </td>
+                      <td style="color: #344054">{{w.src}}</td>
+                      <td style="font-weight: 600">{{w.when}}</td>
+                      <td>
+                        <span
+                          style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{w.iBg}}; color: {{w.iColor}}"
+                          >{{w.impact}}</span
+                        >
+                      </td>
+                      <td>
+                        <span
+                          style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{w.sBg}}; color: {{w.sColor}}"
+                          >{{w.status}}</span
+                        >
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1450}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const H = { ok: ['Saudável', '#ECFDF3', '#067647'], at: ['Atenção', '#FFFAEB', '#B54708'], cr: ['Crítico', '#FEF3F2', '#B42318'] };
+          const t = (nome, estab, ops, ok, inc, div, cert, h) => ({ nome, estab, ops, ok, inc, div, cert, health: H[h][0], hBg: H[h][1], hColor: H[h][2],
+            incColor: inc !== '0' ? '#B42318' : '#475467', divColor: div !== '0' ? '#B54708' : '#475467', certColor: cert.indexOf('dias') > -1 ? '#B54708' : '#475467' });
+          const I = { Alto: ['#FEF3F2', '#B42318'], 'Médio': ['#FFFAEB', '#B54708'], Baixo: ['#F2F4F7', '#344054'] };
+          const S = { 'Concluído': ['#ECFDF3', '#067647'], 'Em andamento': ['#EFF8FF', '#175CD3'], 'Aguardando ato': ['#F2F4F7', '#344054'], 'Em análise': ['#FFFAEB', '#B54708'] };
+          const w = (title, desc, src, when, impact, status) => ({ title, desc, src, when, impact, status, iBg: I[impact][0], iColor: I[impact][1], sBg: S[status][0], sColor: S[status][1] });
+          return {
+            kpis: [
+              { label: 'Disponibilidade do conector', value: '99,94%', note: 'Meta 99,9% · 30 dias', noteColor: '#067647' },
+              { label: 'Latência p50 / p95', value: '0,6 s / 1,4 s', note: 'Chamadas ao RENAVE', noteColor: '#475467' },
+              { label: 'Operações 24 h', value: '3.418', note: '98,1% concluídas', noteColor: '#067647' },
+              { label: 'Resultado incerto', value: '3', note: 'Mais antiga: 93 min', noteColor: '#B42318' },
+              { label: 'Divergências abertas', value: '6', note: 'Reconciliação 03:00', noteColor: '#B54708' },
+              { label: 'Clientes ativos', value: '5', note: '11 estabelecimentos', noteColor: '#475467' }
+            ],
+            tenants: [
+              t('Auto Prime Veículos', '3', '1.204', '97,9%', '2', '2', 'Santos: 12 dias', 'at'),
+              t('Concessionária Vale Sul', '4', '1.388', '98,7%', '1', '1', 'OK', 'ok'),
+              t('Litoral Motors', '1', '402', '99,0%', '0', '0', 'Matriz: 27 dias', 'ok'),
+              t('Garagem Bandeirantes', '2', '311', '96,5%', '0', '3', 'Matriz: 5 dias', 'cr'),
+              t('Crédito Norte (instituição credora)', '1', '113', '100%', '0', '0', 'OK', 'ok')
+            ],
+            errors: [
+              { label: 'Restrição ou débito impeditivo (negócio)', n: '28', pct: '70%', color: '#F79009' },
+              { label: 'NF-e incoerente com a operação (negócio)', n: '17', pct: '43%', color: '#F79009' },
+              { label: 'Dados do comprador inválidos (negócio)', n: '9', pct: '23%', color: '#F79009' },
+              { label: 'Timeout do RENAVE (técnico)', n: '6', pct: '15%', color: '#D92D20' },
+              { label: 'Certificado inválido ou expirado (técnico)', n: '2', pct: '5%', color: '#D92D20' }
+            ],
+            watch: [
+              w('Resolução CONTRAN nº 1.026/2026', 'Institui o RENAVE, altera a Res. 807/2020 e revoga as Res. 797/2020 e 818/2021. Prazo de adequação de 90 dias.', 'DOU 30/06/2026', 'Adequação até 28/09/2026', 'Alto', 'Concluído'),
+              w('Certificação ISO/IEC 27001 da integradora', 'Requisito do Anexo para integradoras autorizadas; 270 dias a partir da publicação.', 'Res. 1.026/2026 · Anexo', 'Até 27/03/2027', 'Alto', 'Em andamento'),
+              w('Faixa de preço público dos serviços de integração', 'SENATRAN definirá valores mínimo e máximo; tabela deve ser publicada aos clientes.', 'Res. 1.026/2026 · art. 32', 'A definir por ato próprio', 'Médio', 'Aguardando ato'),
+              w('Apontamento de financiamento exige veículo no estoque RENAVE', 'Alteração na Res. 807/2020: sem registro de entrada, a financeira não consegue apontar o gravame.', 'Res. 1.026/2026 · art. 34', 'Vigente', 'Alto', 'Concluído'),
+              w('Alteração no manual técnico RENAVE-WS', 'Nova versão publicada no portal; executar suíte de regressão em homologação.', 'Manual RENAVE-WS (SERPRO)', '[data de vigência]', 'Médio', 'Em análise')
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+name: Monitor SERPRO contract
+
+on:
+  schedule:
+    - cron: "17 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: serpro-contract
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26.13.0
+
+      - name: Compare official Swagger contracts
+        run: node scripts/check-serpro-contract.mjs
+
+      - name: Verify first-slice semantics
+        run: node scripts/check-serpro-first-slice.mjs

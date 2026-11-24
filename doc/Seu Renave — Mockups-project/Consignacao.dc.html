@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Consignação — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="consignacao"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Consignação
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Contratos eletrônicos registrados no RENAVE. Sem contrato
+                  registrado não é permitido vender veículo de terceiro.
+                </p>
+              </div>
+              <button
+                type="button"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 0;
+                  border-radius: 8px;
+                  background: #067a45;
+                  color: #ffffff;
+                  font: inherit;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" /></svg
+                >Novo contrato
+              </button>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <section
+                style="
+                  flex: 999 1 460px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 14px 20px;
+                    border-bottom: 1px solid #e4e7ec;
+                    font-size: 14px;
+                    color: #475467;
+                  "
+                >
+                  <span>12 contratos ativos</span
+                  ><span>Ordenado por prazo</span>
+                </div>
+                <sc-for list="{{list}}" as="c" hint-placeholder-count="5">
+                  <button
+                    type="button"
+                    onClick="{{c.pick}}"
+                    style="width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; border: 0; border-bottom: 1px solid #F2F4F7; padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; background: {{c.rowBg}}"
+                  >
+                    <span
+                      style="
+                        flex: 1 1 220px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 3px;
+                        min-width: 0;
+                      "
+                    >
+                      <strong style="font-size: 14px; font-weight: 600"
+                        >{{c.placa}} · {{c.modelo}}</strong
+                      >
+                      <span style="font-size: 13px; color: #475467"
+                        >{{c.consignante}}</span
+                      >
+                    </span>
+                    <span
+                      style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 3px;
+                        min-width: 150px;
+                      "
+                    >
+                      <span style="font-size: 12px; color: #475467"
+                        >Assinaturas</span
+                      >
+                      <span
+                        style="font-size: 13px; font-weight: 600; color: {{c.sigColor}}"
+                        >{{c.sig}}</span
+                      >
+                    </span>
+                    <span
+                      style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{c.stBg}}; color: {{c.stColor}}"
+                      >{{c.status}}</span
+                    >
+                  </button>
+                </sc-for>
+              </section>
+
+              <aside
+                style="
+                  flex: 1 1 360px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 24px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 18px;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span style="font-size: 13px; color: #475467"
+                    >Contrato {{cur.id}}</span
+                  >
+                  <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                    {{cur.placa}} · {{cur.modelo}}
+                  </h2>
+                  <span style="font-size: 14px; color: #475467"
+                    >{{cur.consignante}}</span
+                  >
+                </div>
+
+                <sc-if
+                  value="{{cur.hasCountdown}}"
+                  hint-placeholder-val="{{ true }}"
+                >
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 8px;
+                      padding: 16px;
+                      border-radius: 10px;
+                      background: #fffaeb;
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: baseline;
+                      "
+                    >
+                      <strong style="font-size: 14px; color: #93370d"
+                        >Prazo para o consignante assinar a ATPV-e</strong
+                      ><strong style="font-size: 22px; color: #b54708"
+                        >{{cur.days}} dias</strong
+                      >
+                    </div>
+                    <div
+                      style="
+                        height: 8px;
+                        border-radius: 999px;
+                        background: #fef0c7;
+                        overflow: hidden;
+                      "
+                    >
+                      <div
+                        style="height: 8px; border-radius: 999px; background: #F79009; width: {{cur.pct}}"
+                      ></div>
+                    </div>
+                    <span style="font-size: 13px; color: #475467"
+                      >Prazo legal de 30 dias após a venda. Se vencer, a venda é
+                      cancelada automaticamente no RENAVE.</span
+                    >
+                  </div>
+                </sc-if>
+
+                <dl
+                  style="
+                    margin: 0;
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 12px 16px;
+                  "
+                >
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">Vigência</dt>
+                    <dd style="margin: 2px 0 0; font-size: 14px">
+                      {{cur.vig}}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Valor de referência (contrato)
+                    </dt>
+                    <dd style="margin: 2px 0 0; font-size: 14px">
+                      {{cur.valor}}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Estabelecimento (e-CNPJ)
+                    </dt>
+                    <dd
+                      style="
+                        margin: 2px 0 0;
+                        font-size: 14px;
+                        color: #067647;
+                        font-weight: 600;
+                      "
+                    >
+                      Assinado
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">Consignante</dt>
+                    <dd
+                      style="margin: 2px 0 0; font-size: 14px; font-weight: 600; color: {{cur.sigColor}}"
+                    >
+                      {{cur.sigShort}}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <strong style="font-size: 14px">Eventos</strong>
+                  <sc-for
+                    list="{{cur.events}}"
+                    as="e"
+                    hint-placeholder-count="3"
+                  >
+                    <div style="display: flex; gap: 10px; font-size: 13px">
+                      <span
+                        style="
+                          flex-shrink: 0;
+                          width: 8px;
+                          height: 8px;
+                          margin-top: 6px;
+                          border-radius: 999px;
+                          background: #067a45;
+                        "
+                      ></span
+                      ><span
+                        ><span style="color: #101828">{{e.t}}</span><br /><span
+                          style="color: #475467"
+                          >{{e.w}}</span
+                        ></span
+                      >
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    padding: 14px;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                  "
+                >
+                  <strong style="font-size: 14px">Cancelar contrato</strong>
+                  <span
+                    style="font-size: 13px; color: #475467; line-height: 1.5"
+                    >Possível antes da assinatura da ATPV-e (e antes de um
+                    financiamento formalizado). Ao cancelar, emitiremos a NF-e
+                    de devolução de consignação e registraremos a saída do
+                    estoque, devolvendo a posse ao proprietário.</span
+                  >
+                  <button
+                    type="button"
+                    style="
+                      align-self: flex-start;
+                      height: 40px;
+                      padding: 0 14px;
+                      border: 1px solid #fda29b;
+                      border-radius: 8px;
+                      background: #ffffff;
+                      color: #b42318;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Cancelar contrato
+                  </button>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <button
+                    type="button"
+                    style="
+                      height: 44px;
+                      padding: 0 16px;
+                      border: 0;
+                      border-radius: 8px;
+                      background: #067a45;
+                      color: #ffffff;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Reenviar ao consignante
+                  </button>
+                  <a
+                    href="Documentos.dc.html"
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      height: 44px;
+                      padding: 0 16px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      color: #344054;
+                      font-size: 14px;
+                      font-weight: 600;
+                    "
+                    >Ver contrato (PDF)</a
+                  >
+                </div>
+              </aside>
+            </div>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1250}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { sel: 0 }; }
+        renderVals() {
+          const ST = { venda: ['Vendido · aguardando ATPV-e', '#FFFAEB', '#B54708'], ativo: ['Em estoque', '#ECFDF3', '#067647'], ass: ['Aguardando assinatura', '#EFF8FF', '#175CD3'], canc: ['Cancelado', '#F2F4F7', '#344054'] };
+          const data = [
+            { id: 'CSG-2026-00412', placa: 'HBX5J90', modelo: 'Honda HR-V EXL 2021', consignante: 'Fernanda Alves Souza · PF · CPF ***.231.874-**', st: 'venda', sig: 'Contrato assinado · ATPV-e pendente', sigShort: 'ATPV-e pendente', sigWarn: true, days: 6, vig: '05/11/2026 a 05/02/2027', valor: 'R$ 125.000,00',
+              events: [{ t: 'Venda registrada para comprador PF', w: '30/10/2026 → prazo até 29/11/2026' }, { t: 'Contrato assinado pelo consignante (assinatura avançada)', w: '05/11/2026 09:12' }, { t: 'Contrato assinado pelo estabelecimento (e-CNPJ)', w: '05/11/2026 08:47' }] },
+            { id: 'CSG-2026-00405', placa: 'JDR3K81', modelo: 'Toyota Hilux SRV 2020', consignante: 'Transportes Vale Verde Ltda · PJ · CNPJ 45.***.***/0001-**', st: 'ass', sig: 'Aguardando e-CNPJ do consignante', sigShort: 'Pendente (e-CNPJ)', sigWarn: true, days: 0, vig: '—', valor: 'R$ 189.000,00',
+              events: [{ t: 'Contrato assinado pelo estabelecimento (e-CNPJ)', w: '22/11/2026 17:30' }, { t: 'Convite enviado ao consignante', w: '22/11/2026 17:31' }] },
+            { id: 'CSG-2026-00398', placa: 'MKS9P27', modelo: 'Jeep Renegade Longitude 2021', consignante: 'André Lucas Pereira · PF · CPF ***.903.115-**', st: 'ativo', sig: 'Ambas as partes assinaram', sigShort: 'Assinado', sigWarn: false, days: 0, vig: '18/10/2026 a 18/01/2027', valor: 'R$ 98.500,00',
+              events: [{ t: 'Entrada em estoque como consignado', w: '18/10/2026 11:02' }, { t: 'Contrato assinado por ambas as partes', w: '18/10/2026 10:44' }] },
+            { id: 'CSG-2026-00371', placa: 'TQV4B58', modelo: 'Hyundai Creta Platinum 2022', consignante: 'Beatriz Rocha Lima · PF · CPF ***.552.640-**', st: 'canc', sig: 'Distrato antes da venda', sigShort: 'Cancelado', sigWarn: false, days: 0, vig: 'Encerrado em 14/11/2026', valor: 'R$ 132.000,00',
+              events: [{ t: 'Saída registrada e NF-e de devolução emitida', w: '14/11/2026 15:20' }, { t: 'Cancelamento solicitado pela consignante', w: '14/11/2026 10:05' }] }
+          ];
+          const sel = this.state.sel;
+          const list = data.map((d, i) => Object.assign({}, d, {
+            status: ST[d.st][0], stBg: ST[d.st][1], stColor: ST[d.st][2],
+            sigColor: d.sigWarn ? '#B54708' : (d.st === 'canc' ? '#475467' : '#067647'),
+            rowBg: i === sel ? '#F3FBF6' : '#FFFFFF',
+            hasCountdown: d.st === 'venda', pct: Math.round((30 - d.days) / 30 * 100) + '%',
+            pick: () => this.setState({ sel: i })
+          }));
+          return { list, cur: list[sel] };
+        }
+      }
+    </script>
+  </body>
+</html>

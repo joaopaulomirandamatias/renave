@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Auditoria — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 13px;
+            padding: 0;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="auditoria"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Auditoria
+                </h1>
+                <span
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    align-self: flex-start;
+                    height: 28px;
+                    padding: 0 12px;
+                    border-radius: 999px;
+                    background: #e7f6ee;
+                    color: #05663a;
+                    font-size: 13px;
+                    font-weight: 600;
+                  "
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="4" y="10" width="16" height="11" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                  </svg>
+                  Registro imutável · encadeado por hash · retenção de 5 anos
+                </span>
+              </div>
+              <button
+                type="button"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 1px solid #d0d5dd;
+                  border-radius: 8px;
+                  background: #ffffff;
+                  color: #344054;
+                  font: inherit;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 4v12M7 11l5 5 5-5M4 20h16" /></svg
+                >Exportar (requer justificativa)
+              </button>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 16px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+                gap: 12px;
+              "
+            >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Veículo ou operação<input
+                  value="QTP4H82"
+                  style="
+                    height: 40px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                  "
+              /></label>
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Usuário ou serviço<select
+                  style="
+                    height: 40px;
+                    padding: 0 10px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                    background: #ffffff;
+                  "
+                >
+                  <option>Todos</option>
+                  <option>Marina Costa</option>
+                  <option>Conector RENAVE</option>
+                  <option>API · ERP Linx</option>
+                </select></label
+              >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Resultado<select
+                  style="
+                    height: 40px;
+                    padding: 0 10px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                    background: #ffffff;
+                  "
+                >
+                  <option>Todos</option>
+                  <option>success</option>
+                  <option>business_error</option>
+                  <option>technical_error</option>
+                </select></label
+              >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Período<input
+                  value="01/11/2026 – 23/11/2026"
+                  style="
+                    height: 40px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                  "
+              /></label>
+            </section>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  flex: 999 1 560px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 820px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Data/hora (HLB)</th>
+                      <th>Usuário</th>
+                      <th>IP</th>
+                      <th>Estab.</th>
+                      <th>Ação</th>
+                      <th>Resultado</th>
+                      <th>Correlation-id</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+                      <tr style="background: {{r.bg}}">
+                        <td>
+                          <button
+                            type="button"
+                            onClick="{{r.pick}}"
+                            style="
+                              display: block;
+                              width: 100%;
+                              text-align: left;
+                              padding: 12px 14px;
+                              border: 0;
+                              background: transparent;
+                              font: inherit;
+                              font-size: 13px;
+                              color: #101828;
+                              cursor: pointer;
+                            "
+                          >
+                            {{r.t}}
+                          </button>
+                        </td>
+                        <td style="padding: 12px 14px">{{r.user}}</td>
+                        <td style="padding: 12px 14px; color: #475467">
+                          {{r.ip}}
+                        </td>
+                        <td style="padding: 12px 14px; color: #475467">
+                          {{r.estab}}
+                        </td>
+                        <td
+                          style="
+                            padding: 12px 14px;
+                            font-family: ui-monospace, Menlo, monospace;
+                            font-size: 12px;
+                          "
+                        >
+                          {{r.action}}
+                        </td>
+                        <td style="padding: 12px 14px">
+                          <span
+                            style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: {{r.resBg}}; color: {{r.resColor}}"
+                            >{{r.result}}</span
+                          >
+                        </td>
+                        <td
+                          style="
+                            padding: 12px 14px;
+                            font-family: ui-monospace, Menlo, monospace;
+                            font-size: 12px;
+                            color: #475467;
+                          "
+                        >
+                          {{r.corr}}
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+
+              <aside
+                style="
+                  flex: 1 1 320px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 14px;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span style="font-size: 12px; color: #475467"
+                    >Evento {{cur.id}}</span
+                  >
+                  <strong
+                    style="
+                      font-size: 16px;
+                      font-family: ui-monospace, Menlo, monospace;
+                      word-break: break-all;
+                    "
+                    >{{cur.action}}</strong
+                  >
+                  <span style="font-size: 13px; color: #475467"
+                    >{{cur.t}} · {{cur.user}}</span
+                  >
+                </div>
+                <dl
+                  style="
+                    margin: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                  "
+                >
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Operação · veículo
+                    </dt>
+                    <dd style="margin: 2px 0 0; font-size: 13px">{{cur.op}}</dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">Certificado</dt>
+                    <dd style="margin: 2px 0 0; font-size: 13px">
+                      {{cur.cert}}
+                    </dd>
+                  </div>
+                </dl>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 8px;
+                  "
+                >
+                  <div
+                    style="
+                      padding: 10px;
+                      border-radius: 8px;
+                      background: #f9fafb;
+                      border: 1px solid #e4e7ec;
+                    "
+                  >
+                    <span
+                      style="font-size: 11px; font-weight: 600; color: #475467"
+                      >ANTES</span
+                    >
+                    <div style="font-size: 13px; margin-top: 4px">
+                      {{cur.before}}
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      padding: 10px;
+                      border-radius: 8px;
+                      background: #f3fbf6;
+                      border: 1px solid #a7ddbf;
+                    "
+                  >
+                    <span
+                      style="font-size: 11px; font-weight: 600; color: #475467"
+                      >DEPOIS</span
+                    >
+                    <div style="font-size: 13px; margin-top: 4px">
+                      {{cur.after}}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    padding: 12px;
+                    border-radius: 8px;
+                    background: #f9fafb;
+                    border: 1px solid #e4e7ec;
+                    font-family: ui-monospace, Menlo, monospace;
+                    font-size: 12px;
+                    color: #344054;
+                  "
+                >
+                  <span>request_hash {{cur.req}}</span>
+                  <span>response_hash {{cur.res}}</span>
+                  <span>prev_hash {{cur.prev}}</span>
+                  <span>event_hash {{cur.hash}}</span>
+                </div>
+                <span style="font-size: 13px; font-weight: 600; color: #067647"
+                  >Cadeia verificada: nenhum registro alterado</span
+                >
+              </aside>
+            </div>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1300}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { sel: 1 }; }
+        renderVals() {
+          const R = { success: ['#ECFDF3', '#067647'], business_error: ['#FFFAEB', '#B54708'], technical_error: ['#FEF3F2', '#B42318'] };
+          const data = [
+            ['23/11/2026 15:34:02', 'Marina Costa', '189.**.**.12', 'Matriz', 'reconciliation.resolved', 'success', 'c0a8-7e41', 'OP-2026-118431 · QTP4H82', 'Resultado incerto', 'Confirmado'],
+            ['23/11/2026 14:02:41', 'Conector RENAVE', '10.0.4.21', 'Matriz', 'stock.exit.timeout', 'technical_error', 'c0a8-7e41', 'OP-2026-118431 · QTP4H82', 'Enviado ao RENAVE', 'Resultado incerto'],
+            ['23/11/2026 14:02:11', 'Marina Costa', '189.**.**.12', 'Matriz', 'stock.exit.requested', 'success', 'c0a8-7e41', 'OP-2026-118431 · QTP4H82', 'Pré-validação', 'Enviado ao RENAVE'],
+            ['23/11/2026 11:05:37', 'API · ERP Linx', '177.**.**.80', 'Matriz', 'invoice.nfe.linked', 'business_error', '5d1e-0b92', 'OP-2026-118398 · SGL8B03', 'NF-e ausente', 'NF-e rejeitada (emitente)'],
+            ['23/11/2026 10:02:18', 'Rafael Lima', '200.**.**.44', 'Campinas', 'transfer.authorized', 'success', 'a77f-21c0', 'TRF-2026-00931 · NBE1F36', 'Em estoque', 'Em transferência'],
+            ['23/11/2026 09:15:00', 'Marina Costa', '189.**.**.12', 'Matriz', 'document.downloaded', 'success', '9e02-c3d4', 'CRLV-e · MXA4K78', '—', 'Download registrado'],
+            ['22/11/2026 18:40:09', 'Admin · Ricardo A.', '189.**.**.10', 'Matriz', 'user.role.changed', 'success', '1b6a-77e0', 'Usuário Rafael Lima', 'Consulta', 'Operador RENAVE'],
+            ['22/11/2026 03:00:12', 'Reconciliação noturna', '10.0.4.30', 'Todos', 'reconciliation.divergence', 'business_error', 'f4c1-08ab', 'MXA4K78', 'Em estoque (local)', 'Fora do estoque (RENAVE)']
+          ];
+          const sel = this.state.sel;
+          const rows = data.map((d, i) => ({
+            id: 'evt_' + (918340 + i), t: d[0], user: d[1], ip: d[2], estab: d[3], action: d[4], result: d[5], resBg: R[d[5]][0], resColor: R[d[5]][1], corr: d[6],
+            op: d[7], before: d[8], after: d[9], cert: d[1].indexOf('Conector') === 0 || d[1].indexOf('Marina') === 0 ? 'cert-matriz-2026 (identificador)' : 'Não aplicável',
+            req: '3f9a1c…e0' + i + 'b', res: d[5] === 'technical_error' ? '(sem resposta)' : '8c21d4…a9' + i + 'f', prev: '71be0a…44' + i + 'c', hash: 'd2f7e3…0' + i + '9a',
+            bg: i === sel ? '#F3FBF6' : '#FFFFFF', pick: () => this.setState({ sel: i })
+          }));
+          return { rows, cur: rows[sel] };
+        }
+      }
+    </script>
+  </body>
+</html>

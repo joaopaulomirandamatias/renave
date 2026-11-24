@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Auditoria da plataforma — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 13px;
+            padding: 0;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="auditoria"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Auditoria da plataforma
+                </h1>
+                <span
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    align-self: flex-start;
+                    height: 28px;
+                    padding: 0 12px;
+                    border-radius: 999px;
+                    background: #e7f6ee;
+                    color: #05663a;
+                    font-size: 13px;
+                    font-weight: 600;
+                  "
+                  ><svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="4" y="10" width="16" height="11" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg
+                  >Imutável · encadeado por hash · retenção de 5 anos</span
+                >
+              </div>
+              <button
+                type="button"
+                style="
+                  height: 44px;
+                  padding: 0 16px;
+                  border: 1px solid #d0d5dd;
+                  border-radius: 8px;
+                  background: #ffffff;
+                  color: #344054;
+                  font-size: 14px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Exportar (Compliance / DPO)
+              </button>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 16px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+                gap: 12px;
+              "
+            >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Categoria<select
+                  style="
+                    height: 40px;
+                    padding: 0 10px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                    background: #ffffff;
+                  "
+                >
+                  <option>Todas</option>
+                  <option>Impersonação</option>
+                  <option>Módulos</option>
+                  <option>Suspensão</option>
+                  <option>Exportação de dados</option>
+                  <option>Tabela oficial</option>
+                  <option>Dados pessoais</option>
+                </select></label
+              >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Cliente<input
+                  placeholder="Todos"
+                  style="
+                    height: 40px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                  "
+              /></label>
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Pessoa da equipe<input
+                  placeholder="Todas"
+                  style="
+                    height: 40px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                  "
+              /></label>
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Período<input
+                  value="01/11/2026 – 23/11/2026"
+                  style="
+                    height: 40px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                  "
+              /></label>
+            </section>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  flex: 999 1 540px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Data/hora (HLB)</th>
+                      <th>Pessoa</th>
+                      <th>Categoria</th>
+                      <th>Cliente</th>
+                      <th>Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+                      <tr style="background: {{r.bg}}">
+                        <td>
+                          <button
+                            type="button"
+                            onClick="{{r.pick}}"
+                            style="
+                              display: block;
+                              width: 100%;
+                              text-align: left;
+                              padding: 12px 14px;
+                              border: 0;
+                              background: transparent;
+                              font: inherit;
+                              font-size: 13px;
+                              color: #101828;
+                              cursor: pointer;
+                            "
+                          >
+                            {{r.t}}
+                          </button>
+                        </td>
+                        <td style="padding: 12px 14px">{{r.who}}</td>
+                        <td style="padding: 12px 14px">
+                          <span
+                            style="font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: {{r.cBg}}; color: {{r.cColor}}"
+                            >{{r.cat}}</span
+                          >
+                        </td>
+                        <td style="padding: 12px 14px; color: #344054">
+                          {{r.cli}}
+                        </td>
+                        <td
+                          style="
+                            padding: 12px 14px;
+                            font-family: ui-monospace, Menlo, monospace;
+                            font-size: 12px;
+                          "
+                        >
+                          {{r.action}}
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+              <aside
+                style="
+                  flex: 1 1 320px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 14px;
+                "
+              >
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <span style="font-size: 12px; color: #475467">{{cur.id}}</span
+                  ><strong
+                    style="
+                      font-size: 15px;
+                      font-family: ui-monospace, Menlo, monospace;
+                      word-break: break-all;
+                    "
+                    >{{cur.action}}</strong
+                  ><span style="font-size: 13px; color: #475467"
+                    >{{cur.t}} · {{cur.who}} · IP {{cur.ip}}</span
+                  >
+                </div>
+                <div>
+                  <span style="font-size: 12px; color: #475467"
+                    >Justificativa</span
+                  >
+                  <div style="font-size: 14px; margin-top: 2px">
+                    {{cur.why}}
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 8px;
+                  "
+                >
+                  <div
+                    style="
+                      padding: 10px;
+                      border-radius: 8px;
+                      background: #f9fafb;
+                      border: 1px solid #e4e7ec;
+                    "
+                  >
+                    <span
+                      style="font-size: 11px; font-weight: 600; color: #475467"
+                      >ANTES</span
+                    >
+                    <div style="font-size: 13px; margin-top: 4px">
+                      {{cur.before}}
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      padding: 10px;
+                      border-radius: 8px;
+                      background: #f3fbf6;
+                      border: 1px solid #a7ddbf;
+                    "
+                  >
+                    <span
+                      style="font-size: 11px; font-weight: 600; color: #475467"
+                      >DEPOIS</span
+                    >
+                    <div style="font-size: 13px; margin-top: 4px">
+                      {{cur.after}}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    padding: 12px;
+                    border-radius: 8px;
+                    background: #f9fafb;
+                    border: 1px solid #e4e7ec;
+                    font-family: ui-monospace, Menlo, monospace;
+                    font-size: 12px;
+                    color: #344054;
+                  "
+                >
+                  <span>prev_hash {{cur.prev}}</span
+                  ><span>event_hash {{cur.hash}}</span>
+                </div>
+                <span style="font-size: 13px; font-weight: 600; color: #067647"
+                  >Cadeia verificada às 15:40: íntegra</span
+                >
+              </aside>
+            </div>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1250}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { sel: 0 }; }
+        renderVals() {
+          const C = { 'Impersonação': ['#FFFAEB', '#B54708'], 'Módulos': ['#EFF8FF', '#175CD3'], 'Suspensão': ['#FEF3F2', '#B42318'], 'Exportação': ['#F2F4F7', '#344054'], 'Tabela oficial': ['#EFF8FF', '#175CD3'], 'Dados pessoais': ['#FFFAEB', '#B54708'] };
+          const d = [
+            ['23/11/2026 15:40:11', 'Joana Mendes', 'Impersonação', 'Auto Prime Veículos', 'tenant.impersonation.started', 'CH-4471 — verificar operação com resultado incerto', '—', 'Somente leitura · 30 min · cliente notificado', '189.**.**.7'],
+            ['23/11/2026 11:02:45', 'Patrícia Lopes', 'Suspensão', 'Garagem Bandeirantes', 'tenant.suspended.new_operations', 'Régua de cobrança D+15', 'Ativo', 'Suspenso (consultas e exportação liberadas)', '200.**.**.3'],
+            ['22/11/2026 17:30:08', 'Marcos Vieira', 'Exportação', 'Multimarcas Horizonte', 'tenant.data.exported', 'Portabilidade após encerramento (Anexo Res. 1.026)', '—', 'Pacote 2,1 GB · SHA-256 9f1c…a4e2', '189.**.**.9'],
+            ['21/11/2026 09:15:00', 'Joana Mendes', 'Tabela oficial', 'Todos', 'platform.registro_price_table.updated', 'Nova tabela oficial publicada pela autoridade', '[tabela anterior]', '[VALOR POR REGISTRO — tabela oficial] · Vigência: [ATO NORMATIVO]', '189.**.**.7'],
+            ['19/11/2026 10:12:31', 'Carla Dias', 'Módulos', 'Auto Prime Veículos', 'tenant.modules.changed', 'Filial Campinas passou a receber consignados', 'Consignação: desabilitada', 'Consignação: habilitada', '177.**.**.21'],
+            ['18/11/2026 14:05:52', 'Diego Faria', 'Dados pessoais', 'Financeira Crédito Fácil', 'pii.unmasked.viewed', 'Titular solicitou correção de dados (LGPD)', 'Mascarado', 'Visualizado por 2 min', '200.**.**.44']
+          ];
+          const sel = this.state.sel;
+          const rows = d.map((x, i) => ({ id: 'pevt_' + (55120 + i), t: x[0], who: x[1], cat: x[2], cBg: C[x[2]][0], cColor: C[x[2]][1], cli: x[3], action: x[4], why: x[5], before: x[6], after: x[7], ip: x[8],
+            prev: '4a0c…' + i + '1e', hash: 'b7d2…' + i + '9c', bg: i === sel ? '#F3FBF6' : '#FFFFFF', pick: () => this.setState({ sel: i }) }));
+          return { rows, cur: rows[sel] };
+        }
+      }
+    </script>
+  </body>
+</html>

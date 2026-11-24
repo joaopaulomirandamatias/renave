@@ -1,0 +1,41 @@
+{
+  "name": "seu-renave",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=26.13 <27"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "api:test:integration": "pnpm db:up && pnpm --filter @seu-renave/api test:integration",
+    "check": "pnpm security:guards && pnpm typecheck && pnpm test && pnpm build",
+    "contract:serpro": "node scripts/check-serpro-contract.mjs && node scripts/check-serpro-first-slice.mjs && node scripts/check-serpro-guidance.mjs",
+    "db:bootstrap": "pnpm --filter @seu-renave/db bootstrap",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @seu-renave/db migrate",
+    "db:purge-identity": "pnpm --filter @seu-renave/db purge:identity",
+    "db:scan-evidence": "pnpm --filter @seu-renave/db scan:evidence",
+    "db:status-evidence": "pnpm --filter @seu-renave/db status:evidence",
+    "db:reset": "docker compose down -v && pnpm db:up && pnpm db:setup:local",
+    "db:setup:local": "pnpm --filter @seu-renave/db setup:local",
+    "db:test": "pnpm db:up && pnpm --filter @seu-renave/db test:integration",
+    "db:up": "docker compose up -d --wait postgres",
+    "dev": "pnpm --filter @seu-renave/db --filter @seu-renave/identity build && pnpm --parallel --filter @seu-renave/api --filter @seu-renave/web dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "security:guards": "node scripts/check-security-guards.mjs --self-test && node scripts/check-security-guards.mjs",
+    "smoke:serpro:hml": "node scripts/smoke-serpro-homologation.mjs",
+    "test": "pnpm -r test",
+    "test:integration": "pnpm db:up && pnpm --filter @seu-renave/db test:integration && pnpm --filter @seu-renave/api test:integration",
+    "test:foundation": "pnpm --filter @seu-renave/api test && pnpm --filter @seu-renave/web test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

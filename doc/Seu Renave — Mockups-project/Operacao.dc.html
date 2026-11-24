@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Operação OP-2026-118431 — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 10px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 13px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="pendencias"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <nav aria-label="Trilha" style="font-size: 14px; color: #475467">
+              <a href="Pendencias.dc.html" style="font-weight: 600"
+                >Pendências</a
+              >
+              / OP-2026-118431
+            </nav>
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: flex-start;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <span
+                    style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: {{stBg}}; color: {{stColor}}"
+                    >{{stLabel}}</span
+                  ><span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 4px 10px;
+                      border-radius: 999px;
+                      background: #f2f4f7;
+                      color: #344054;
+                    "
+                    >Saída de estoque · venda</span
+                  >
+                </div>
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 26px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Venda de QTP4H82 — Toyota Corolla XEi
+                </h1>
+                <p style="margin: 0; font-size: 14px; color: #475467">
+                  Matriz São Paulo · solicitada por Marina Costa em 23/11/2026
+                  14:02:09 (HLB)
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <a
+                  href="Veiculo.dc.html"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    color: #344054;
+                    font-size: 14px;
+                    font-weight: 600;
+                  "
+                  >Abrir veículo</a
+                >
+                <sc-if value="{{uncertain}}" hint-placeholder-val="{{ true }}">
+                  <button
+                    type="button"
+                    onClick="{{reconcile}}"
+                    style="
+                      height: 44px;
+                      padding: 0 18px;
+                      border: 0;
+                      border-radius: 8px;
+                      background: #067a45;
+                      color: #ffffff;
+                      font: inherit;
+                      font-size: 14px;
+                      font-weight: 600;
+                      cursor: pointer;
+                    "
+                  >
+                    Reconciliar com o RENAVE
+                  </button>
+                </sc-if>
+              </div>
+            </div>
+
+            <!-- Máquina de estados -->
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 18px;
+              "
+            >
+              <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                Andamento
+              </h2>
+              <div style="overflow-x: auto">
+                <ol
+                  style="
+                    list-style: none;
+                    margin: 0;
+                    padding: 0;
+                    display: flex;
+                    align-items: flex-start;
+                    min-width: 760px;
+                  "
+                >
+                  <sc-for list="{{flow}}" as="f" hint-placeholder-count="5">
+                    <li
+                      style="
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 8px;
+                      "
+                    >
+                      <div style="display: flex; align-items: center">
+                        <span
+                          style="flex-shrink: 0; display: inline-flex; width: 32px; height: 32px; border-radius: 999px; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: {{f.bg}}; color: {{f.color}}; box-shadow: 0 0 0 4px {{f.ring}}"
+                          >{{f.mark}}</span
+                        >
+                        <span
+                          style="flex: 1; height: 2px; margin: 0 8px; background: {{f.line}}"
+                        ></span>
+                      </div>
+                      <span
+                        style="font-size: 14px; font-weight: 600; color: {{f.text}}"
+                        >{{f.label}}</span
+                      >
+                      <span style="font-size: 12px; color: #475467"
+                        >{{f.when}}</span
+                      >
+                    </li>
+                  </sc-for>
+                </ol>
+              </div>
+              <sc-if value="{{uncertain}}" hint-placeholder-val="{{ true }}">
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    padding: 14px 16px;
+                    border-radius: 10px;
+                    background: #fef3f2;
+                    color: #912018;
+                    font-size: 14px;
+                    line-height: 1.5;
+                  "
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    style="flex-shrink: 0; margin-top: 2px"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" />
+                  </svg>
+                  <span
+                    >O pedido saiu daqui, mas a resposta não chegou em 30 s.
+                    <strong>Reenvio bloqueado</strong> até a reconciliação
+                    confirmar se o RENAVE registrou ou não a venda.</span
+                  >
+                </div>
+              </sc-if>
+              <sc-if value="{{confirmed}}" hint-placeholder-val="{{ false }}">
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    padding: 14px 16px;
+                    border-radius: 10px;
+                    background: #ecfdf3;
+                    color: #05603a;
+                    font-size: 14px;
+                    line-height: 1.5;
+                  "
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    style="flex-shrink: 0; margin-top: 2px"
+                  >
+                    <path d="M5 12l5 5L20 7" />
+                  </svg>
+                  <span
+                    >Reconciliado às 15:34:02: o RENAVE
+                    <strong>registrou</strong> a venda às 14:02:19. Nenhum
+                    reenvio foi necessário. Operação atualizada para Confirmada
+                    e aguardando a ATPV-e.</span
+                  >
+                </div>
+              </sc-if>
+            </section>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <section
+                style="
+                  flex: 1 1 420px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 24px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 14px;
+                "
+              >
+                <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                  Rastreabilidade
+                </h2>
+                <dl
+                  style="
+                    margin: 0;
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                    gap: 14px 20px;
+                  "
+                >
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      ID da operação
+                    </dt>
+                    <dd
+                      style="
+                        margin: 2px 0 0;
+                        font-size: 13px;
+                        font-family: ui-monospace, Menlo, monospace;
+                      "
+                    >
+                      OP-2026-118431
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Correlation-id
+                    </dt>
+                    <dd
+                      style="
+                        margin: 2px 0 0;
+                        font-size: 13px;
+                        font-family: ui-monospace, Menlo, monospace;
+                      "
+                    >
+                      c0a8-7e41-9b2d-4f17
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Chave de idempotência
+                    </dt>
+                    <dd
+                      style="
+                        margin: 2px 0 0;
+                        font-size: 13px;
+                        font-family: ui-monospace, Menlo, monospace;
+                      "
+                    >
+                      idem_01JD7K…X4Q9
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Certificado usado
+                    </dt>
+                    <dd style="margin: 2px 0 0; font-size: 13px">
+                      cert-matriz-2026 · série 4F:A2:…:9C
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Hash da requisição (SHA-256)
+                    </dt>
+                    <dd
+                      style="
+                        margin: 2px 0 0;
+                        font-size: 13px;
+                        font-family: ui-monospace, Menlo, monospace;
+                      "
+                    >
+                      3f9a1c…e07b
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Hash da resposta
+                    </dt>
+                    <dd
+                      style="margin: 2px 0 0; font-size: 13px; color: #475467"
+                    >
+                      {{respHash}}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">Origem</dt>
+                    <dd style="margin: 2px 0 0; font-size: 13px">
+                      Web · IP 189.**.**.12
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">Relógio</dt>
+                    <dd style="margin: 2px 0 0; font-size: 13px">
+                      Hora Legal Brasileira (NTP.br)
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section
+                style="
+                  flex: 1 1 420px;
+                  min-width: 0;
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow: hidden;
+                "
+              >
+                <h2
+                  style="
+                    margin: 0;
+                    padding: 18px 20px;
+                    font-size: 17px;
+                    font-weight: 600;
+                    border-bottom: 1px solid #e4e7ec;
+                  "
+                >
+                  Tentativas e verificações
+                </h2>
+                <div style="overflow-x: auto">
+                  <table
+                    style="
+                      width: 100%;
+                      border-collapse: collapse;
+                      min-width: 520px;
+                    "
+                  >
+                    <thead>
+                      <tr>
+                        <th>Horário</th>
+                        <th>Tipo</th>
+                        <th>Duração</th>
+                        <th>Resultado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for
+                        list="{{attempts}}"
+                        as="a"
+                        hint-placeholder-count="4"
+                      >
+                        <tr>
+                          <td>{{a.t}}</td>
+                          <td>{{a.kind}}</td>
+                          <td>{{a.d}}</td>
+                          <td style="font-weight: 600; color: {{a.color}}">
+                            {{a.r}}
+                          </td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+
+            <!-- Detalhes técnicos -->
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+              "
+            >
+              <button
+                type="button"
+                aria-expanded="{{techExpanded}}"
+                onClick="{{toggleTech}}"
+                style="
+                  width: 100%;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 18px 20px;
+                  border: 0;
+                  background: transparent;
+                  font: inherit;
+                  cursor: pointer;
+                  color: #101828;
+                "
+              >
+                <span
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                    text-align: left;
+                  "
+                  ><strong style="font-size: 16px; font-weight: 600"
+                    >Detalhes técnicos</strong
+                  ><span style="font-size: 13px; color: #475467"
+                    >Para suporte e auditoria. Códigos e mensagens originais do
+                    RENAVE.</span
+                  ></span
+                >
+                <span style="font-size: 14px; font-weight: 600; color: #067a45"
+                  >{{techLabel}}</span
+                >
+              </button>
+              <sc-if value="{{tech}}" hint-placeholder-val="{{ false }}">
+                <div
+                  style="
+                    padding: 0 20px 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                  "
+                >
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: repeat(
+                        auto-fit,
+                        minmax(260px, 1fr)
+                      );
+                      gap: 12px;
+                    "
+                  >
+                    <div
+                      style="
+                        padding: 14px;
+                        border-radius: 8px;
+                        background: #f9fafb;
+                        border: 1px solid #e4e7ec;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                      "
+                    >
+                      <span
+                        style="
+                          font-size: 12px;
+                          font-weight: 600;
+                          color: #475467;
+                        "
+                        >Retorno original</span
+                      >
+                      <code
+                        style="
+                          font-size: 13px;
+                          color: #101828;
+                          white-space: pre-wrap;
+                        "
+                        >HTTP — (sem resposta) timeout de leitura após 30000 ms
+                        endpoint: saída de estoque · veículo usado ambiente:
+                        produção</code
+                      >
+                    </div>
+                    <div
+                      style="
+                        padding: 14px;
+                        border-radius: 8px;
+                        background: #f9fafb;
+                        border: 1px solid #e4e7ec;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                      "
+                    >
+                      <span
+                        style="
+                          font-size: 12px;
+                          font-weight: 600;
+                          color: #475467;
+                        "
+                        >Tradução operacional</span
+                      >
+                      <span
+                        style="
+                          font-size: 14px;
+                          color: #344054;
+                          line-height: 1.5;
+                        "
+                        >"O RENAVE não respondeu a tempo. Não sabemos se a venda
+                        foi registrada. Verifique antes de tentar de
+                        novo."</span
+                      >
+                    </div>
+                  </div>
+                  <span style="font-size: 12px; color: #475467"
+                    >Payloads completos ficam no cofre de evidências e só podem
+                    ser exportados por perfis de Compliance, com registro na
+                    auditoria.</span
+                  >
+                </div>
+              </sc-if>
+            </section>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1450}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { done: false, tech: true }; }
+        renderVals() {
+          const done = this.state.done;
+          const step = (label, when, kind) => {
+            const K = {
+              ok: ['#067A45', '#FFFFFF', '#E7F6EE', '#067A45', '#101828', '✓'],
+              bad: ['#D92D20', '#FFFFFF', '#FEE4E2', '#D0D5DD', '#B42318', '?'],
+              wait: ['#F79009', '#FFFFFF', '#FEF0C7', '#D0D5DD', '#B54708', '…'],
+              todo: ['#F2F4F7', '#475467', 'transparent', '#E4E7EC', '#475467', '']
+            }[kind];
+            return { label, when, bg: K[0], color: K[1], ring: K[2], line: K[3], text: K[4], mark: K[5] };
+          };
+          const flow = done ? [
+            step('Rascunho', '14:01:40', 'ok'), step('Pré-validação', '14:02:05 · 6 de 6 checagens', 'ok'),
+            step('Enviado ao RENAVE', '14:02:11', 'ok'), step('Confirmado', 'Registrado 14:02:19 (reconciliado)', 'ok'),
+            step('Aguardando ATPV-e', 'Assinatura do comprador', 'wait')
+          ] : [
+            step('Rascunho', '14:01:40', 'ok'), step('Pré-validação', '14:02:05 · 6 de 6 checagens', 'ok'),
+            step('Enviado ao RENAVE', '14:02:11', 'ok'), step('Resultado incerto', 'Sem resposta após 30 s', 'bad'),
+            step('Confirmado', 'Depende da reconciliação', 'todo')
+          ];
+          const attempts = [
+            { t: '14:02:11', kind: 'Envio (único)', d: '30,0 s', r: 'Sem resposta', color: '#B42318' },
+            { t: '14:07:12', kind: 'Verificação automática', d: '—', r: 'RENAVE indisponível', color: '#B54708' },
+            { t: '15:30:04', kind: 'Verificação automática', d: '—', r: 'RENAVE indisponível', color: '#B54708' }
+          ];
+          if (done) attempts.push({ t: '15:34:02', kind: 'Reconciliação manual', d: '1,2 s', r: 'Venda encontrada', color: '#067647' });
+          return {
+            flow, attempts, uncertain: !done, confirmed: done,
+            stLabel: done ? 'Confirmado' : 'Resultado incerto', stBg: done ? '#ECFDF3' : '#FEF3F2', stColor: done ? '#067647' : '#B42318',
+            respHash: done ? '8c21d4…a91f (reconciliação)' : 'Sem resposta',
+            reconcile: () => this.setState({ done: true }),
+            tech: this.state.tech, techExpanded: this.state.tech ? 'true' : 'false', techLabel: this.state.tech ? 'Ocultar' : 'Mostrar',
+            toggleTech: () => this.setState({ tech: !this.state.tech })
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

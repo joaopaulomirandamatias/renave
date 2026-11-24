@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Registrar saída de estoque (venda) — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          input,
+          select {
+            font: inherit;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="saidas"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <nav aria-label="Trilha" style="font-size: 14px; color: #475467">
+                <a href="Veiculo.dc.html" style="font-weight: 600">QTP4H82</a> /
+                Registrar saída
+              </nav>
+              <h1
+                style="
+                  margin: 0;
+                  font-size: 28px;
+                  font-weight: 600;
+                  letter-spacing: -0.01em;
+                "
+              >
+                Registrar saída de estoque (venda)
+              </h1>
+              <p style="margin: 0; font-size: 15px; color: #475467">
+                Toyota Corolla XEi 2.0 · 2021/2022 · QTP4H82 · Matriz São Paulo
+              </p>
+            </div>
+
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  flex: 999 1 520px;
+                  min-width: 0;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 20px;
+                "
+              >
+                <sc-if value="{{editing}}" hint-placeholder-val="{{ true }}">
+                  <div style="display: flex; flex-direction: column; gap: 20px">
+                    <section
+                      style="
+                        background: #ffffff;
+                        border: 1px solid #e4e7ec;
+                        border-radius: 10px;
+                        padding: 24px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                      "
+                    >
+                      <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                        Comprador
+                      </h2>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: repeat(
+                            auto-fit,
+                            minmax(220px, 1fr)
+                          );
+                          gap: 16px;
+                        "
+                      >
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >CPF ou CNPJ<input
+                            value="987.654.321-00"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >Nome completo<input
+                            value="Juliana Ribeiro Matos"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >E-mail (recebe a ATPV-e para assinar)<input
+                            value="juliana.matos@email.com"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                      </div>
+                    </section>
+
+                    <section
+                      style="
+                        background: #ffffff;
+                        border: 1px solid #e4e7ec;
+                        border-radius: 10px;
+                        padding: 24px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                      "
+                    >
+                      <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                        Dados da saída
+                      </h2>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: repeat(
+                            auto-fit,
+                            minmax(200px, 1fr)
+                          );
+                          gap: 16px;
+                        "
+                      >
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >Valor da venda<input
+                            value="R$ 131.900,00"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >Data de saída<input
+                            value="23/11/2026"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >Hodômetro (km)<input
+                            value="38.590"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >Título do negócio<select
+                            style="
+                              height: 44px;
+                              padding: 0 10px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                              background: #ffffff;
+                            "
+                          >
+                            <option>Venda</option>
+                            <option>
+                              Transferência entre estabelecimentos
+                            </option>
+                          </select></label
+                        >
+                      </div>
+                    </section>
+
+                    <section
+                      style="
+                        background: #ffffff;
+                        border: 1px solid #e4e7ec;
+                        border-radius: 10px;
+                        padding: 24px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                      "
+                    >
+                      <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                        Documento do veículo (CRV)
+                      </h2>
+                      <div
+                        style="
+                          display: grid;
+                          grid-template-columns: repeat(
+                            auto-fit,
+                            minmax(220px, 1fr)
+                          );
+                          gap: 16px;
+                        "
+                      >
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >Número do CRV<input
+                            value="0298 4471 625"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                        <label
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 6px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #344054;
+                          "
+                          >Código de segurança<input
+                            value="5521 8834 0912"
+                            style="
+                              height: 44px;
+                              box-sizing: border-box;
+                              padding: 0 12px;
+                              border: 1px solid #d0d5dd;
+                              border-radius: 8px;
+                              font-size: 15px;
+                            "
+                        /></label>
+                      </div>
+                    </section>
+
+                    <section
+                      style="
+                        background: #ffffff;
+                        border: 1px solid #e4e7ec;
+                        border-radius: 10px;
+                        padding: 24px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                      "
+                    >
+                      <div
+                        style="
+                          display: flex;
+                          flex-wrap: wrap;
+                          gap: 8px;
+                          justify-content: space-between;
+                          align-items: center;
+                        "
+                      >
+                        <h2
+                          style="margin: 0; font-size: 17px; font-weight: 600"
+                        >
+                          NF-e de saída
+                        </h2>
+                        <div
+                          role="group"
+                          aria-label="Origem da NF-e"
+                          style="
+                            display: inline-flex;
+                            border: 1px solid #d0d5dd;
+                            border-radius: 8px;
+                            overflow: hidden;
+                          "
+                        >
+                          <button
+                            type="button"
+                            style="
+                              height: 36px;
+                              padding: 0 12px;
+                              border: 0;
+                              background: #e7f6ee;
+                              color: #067a45;
+                              font: inherit;
+                              font-size: 13px;
+                              font-weight: 600;
+                              cursor: pointer;
+                            "
+                          >
+                            Importar do ERP
+                          </button>
+                          <button
+                            type="button"
+                            style="
+                              height: 36px;
+                              padding: 0 12px;
+                              border: 0;
+                              border-left: 1px solid #d0d5dd;
+                              background: #ffffff;
+                              color: #344054;
+                              font: inherit;
+                              font-size: 13px;
+                              font-weight: 600;
+                              cursor: pointer;
+                            "
+                          >
+                            Digitar chave
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        style="
+                          display: flex;
+                          gap: 12px;
+                          align-items: center;
+                          padding: 14px 16px;
+                          border: 1px solid #a7ddbf;
+                          border-radius: 10px;
+                          background: #f3fbf6;
+                        "
+                      >
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#067647"
+                          stroke-width="1.75"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M5 12l5 5L20 7" />
+                        </svg>
+                        <span
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 2px;
+                            min-width: 0;
+                          "
+                          ><strong style="font-size: 14px"
+                            >NF-e nº 18.977 · emitida 23/11/2026 15:30 pelo
+                            ERP</strong
+                          ><span
+                            style="
+                              font-size: 12px;
+                              color: #475467;
+                              font-family: ui-monospace, Menlo, monospace;
+                              word-break: break-all;
+                            "
+                            >3526 1112 3456 7800 0190 5500 1000 0189 7710 6624
+                            9018</span
+                          ></span
+                        >
+                      </div>
+                      <span
+                        style="
+                          font-size: 13px;
+                          color: #067647;
+                          font-weight: 500;
+                        "
+                        >Emitente, destinatário, chassi e valor conferem com
+                        esta venda.</span
+                      >
+                    </section>
+
+                    <div
+                      style="
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 12px;
+                        justify-content: flex-end;
+                      "
+                    >
+                      <a
+                        href="Veiculo.dc.html"
+                        style="
+                          display: inline-flex;
+                          align-items: center;
+                          height: 44px;
+                          padding: 0 16px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          color: #344054;
+                          font-size: 14px;
+                          font-weight: 600;
+                        "
+                        >Cancelar</a
+                      >
+                      <button
+                        type="button"
+                        onClick="{{send}}"
+                        style="
+                          height: 44px;
+                          padding: 0 20px;
+                          border: 0;
+                          border-radius: 8px;
+                          background: #067a45;
+                          color: #ffffff;
+                          font: inherit;
+                          font-size: 14px;
+                          font-weight: 600;
+                          cursor: pointer;
+                        "
+                      >
+                        Registrar saída no RENAVE
+                      </button>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{sent}}" hint-placeholder-val="{{ false }}">
+                  <section
+                    style="
+                      background: #ffffff;
+                      border: 1px solid #e4e7ec;
+                      border-radius: 10px;
+                      padding: 24px;
+                      display: flex;
+                      flex-direction: column;
+                      gap: 20px;
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 12px;
+                        align-items: center;
+                        justify-content: space-between;
+                      "
+                    >
+                      <div
+                        style="display: flex; flex-direction: column; gap: 4px"
+                      >
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 4px 10px;
+                            border-radius: 999px;
+                            background: #fffaeb;
+                            color: #b54708;
+                            align-self: flex-start;
+                          "
+                          >Aguardando dependência</span
+                        >
+                        <h2
+                          style="
+                            margin: 4px 0 0;
+                            font-size: 20px;
+                            font-weight: 600;
+                          "
+                        >
+                          Aguardando assinatura da ATPV-e pelo comprador
+                        </h2>
+                        <span style="font-size: 14px; color: #475467"
+                          >Venda registrada no RENAVE. A saída do estoque será
+                          concluída quando Juliana assinar.</span
+                        >
+                      </div>
+                      <a
+                        href="Operacao.dc.html"
+                        style="font-size: 14px; font-weight: 600"
+                        >Ver operação OP-2026-118422</a
+                      >
+                    </div>
+                    <ol
+                      style="
+                        list-style: none;
+                        margin: 0;
+                        padding: 0;
+                        display: flex;
+                        flex-direction: column;
+                      "
+                    >
+                      <sc-for
+                        list="{{timeline}}"
+                        as="e"
+                        hint-placeholder-count="5"
+                      >
+                        <li style="display: flex; gap: 12px">
+                          <div
+                            style="
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                            "
+                          >
+                            <span
+                              style="width: 12px; height: 12px; margin-top: 4px; border-radius: 999px; background: {{e.dot}}"
+                            ></span
+                            ><span
+                              style="
+                                flex: 1;
+                                width: 2px;
+                                background: #e4e7ec;
+                                min-height: 24px;
+                              "
+                            ></span>
+                          </div>
+                          <div
+                            style="
+                              display: flex;
+                              flex-direction: column;
+                              gap: 2px;
+                              padding-bottom: 14px;
+                            "
+                          >
+                            <span
+                              style="font-size: 14px; font-weight: 600; color: {{e.text}}"
+                              >{{e.title}}</span
+                            ><span style="font-size: 13px; color: #475467"
+                              >{{e.when}}</span
+                            >
+                          </div>
+                        </li>
+                      </sc-for>
+                    </ol>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                      <button
+                        type="button"
+                        style="
+                          height: 40px;
+                          padding: 0 14px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          background: #ffffff;
+                          color: #344054;
+                          font: inherit;
+                          font-size: 14px;
+                          font-weight: 600;
+                          cursor: pointer;
+                        "
+                      >
+                        Reenviar convite ao comprador
+                      </button>
+                      <button
+                        type="button"
+                        style="
+                          height: 40px;
+                          padding: 0 14px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          background: #ffffff;
+                          color: #344054;
+                          font: inherit;
+                          font-size: 14px;
+                          font-weight: 600;
+                          cursor: pointer;
+                        "
+                      >
+                        Baixar ATPV-e (PDF)
+                      </button>
+                      <button
+                        type="button"
+                        onClick="{{edit}}"
+                        style="
+                          height: 40px;
+                          padding: 0 14px;
+                          border: 0;
+                          background: transparent;
+                          color: #067a45;
+                          font: inherit;
+                          font-size: 14px;
+                          font-weight: 600;
+                          cursor: pointer;
+                        "
+                      >
+                        Voltar ao formulário (protótipo)
+                      </button>
+                    </div>
+                  </section>
+                </sc-if>
+              </div>
+
+              <aside
+                style="
+                  flex: 1 1 300px;
+                  min-width: 0;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 16px;
+                "
+              >
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                  "
+                >
+                  <h2 style="margin: 0; font-size: 16px; font-weight: 600">
+                    Pré-condições
+                  </h2>
+                  <sc-for list="{{pre}}" as="p" hint-placeholder-count="6">
+                    <div
+                      style="display: flex; gap: 10px; align-items: flex-start"
+                    >
+                      <span
+                        style="
+                          flex-shrink: 0;
+                          display: inline-flex;
+                          width: 20px;
+                          height: 20px;
+                          border-radius: 999px;
+                          background: #ecfdf3;
+                          color: #067647;
+                          align-items: center;
+                          justify-content: center;
+                        "
+                        ><svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M5 12l5 5L20 7" /></svg
+                      ></span>
+                      <span style="font-size: 13px; color: #344054">{{p}}</span>
+                    </div>
+                  </sc-for>
+                </section>
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                  "
+                >
+                  <h2 style="margin: 0; font-size: 16px; font-weight: 600">
+                    Resumo do registro
+                  </h2>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 14px;
+                    "
+                  >
+                    <span style="color: #475467">Título do negócio</span
+                    ><span>Venda</span>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 14px;
+                    "
+                  >
+                    <span style="color: #475467">Valor informado</span
+                    ><strong>R$ 131.900,00</strong>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 14px;
+                    "
+                  >
+                    <span style="color: #475467">NF-e de saída</span
+                    ><span>nº 18.977</span>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 14px;
+                    "
+                  >
+                    <span style="color: #475467">Comprador</span
+                    ><span>***.654.321-**</span>
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1350}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { sent: false }; }
+        renderVals() {
+          const sent = this.state.sent;
+          return {
+            editing: !sent, sent,
+            send: () => this.setState({ sent: true }),
+            edit: () => this.setState({ sent: false }),
+            pre: [
+              'Veículo em estoque na Matriz São Paulo',
+              'Sem restrição ou débito impeditivo (15:08)',
+              'Documentos de entrada completos',
+              'CRV e código de segurança informados',
+              'NF-e de saída coerente com a venda',
+              'Certificado e-CNPJ válido'
+            ],
+            timeline: [
+              { title: 'Venda registrada no RENAVE', when: '23/11/2026 15:32 · Marina Costa', dot: '#067647', text: '#101828' },
+              { title: 'ATPV-e gerada e enviada ao comprador', when: '23/11/2026 15:32 · juliana.matos@email.com', dot: '#067A45', text: '#101828' },
+              { title: 'Assinatura do comprador', when: 'Pendente · lembrete automático amanhã às 9h', dot: '#F79009', text: '#B54708' },
+              { title: 'Saída confirmada e termo de saída emitido', when: 'Após a assinatura', dot: '#D0D5DD', text: '#475467' },
+              { title: 'Novo CRV em nome da compradora', when: 'Informado pelo RENAVE após a transferência no DETRAN', dot: '#D0D5DD', text: '#475467' }
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

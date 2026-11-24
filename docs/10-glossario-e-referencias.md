@@ -65,6 +65,9 @@
 | R12 | Lei nº 14.063/2020 (assinaturas eletrônicas) | — |
 | R13 | LGPD — Lei nº 13.709/2018 | — |
 | R14 | Guia "Sistema RENAVE — Integração, Operação, Compliance e Auditoria" v1.0 (25/09/2026) | Documento interno de referência |
+| R15 | Swagger UI RENAVE-WS (produção) | https://renave.estaleiro.serpro.gov.br/renave-ws/swagger-ui.html |
+| R16 | Diagramas oficiais de fluxos e estados | https://centraldeajuda.serpro.gov.br/renave/diagramas/ |
+| R17 | Central de Ajuda — Integradores | https://centraldeajuda.serpro.gov.br/renave/central-ajuda/dicas/ |
 
 **A obter na Fase 0:** Circular SENATRAN nº 2/2026; Res. CONTRAN nº 1.027/2026; ato da SENATRAN sobre o preço público (art. 32); procedimentos de homologação de integradora (art. 3º VI); modelo padrão do contrato de consignação (art. 20 §3º); especificação da identificação prévia (art. 3º X).
 

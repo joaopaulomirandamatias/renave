@@ -1,11 +1,15 @@
 # 14 — Integração com o SERPRO (RENAVE-WS) no modelo de integradora
 
-> Situação em 23/11/2026. Fontes: Swagger de produção e de homologação (baixados e comparados), manual RENAVE-WS, Central de Ajuda, Loja SERPRO, bundle público do Credencia, release SERPRO de 13/11/2026, Portaria SENATRAN 417/2026 e Res. CONTRAN 1.026/2026.
+> Situação em 23/11/2026. Fontes: Swagger de produção e de homologação (baixados e comparados), manual RENAVE-WS, nova Central de Ajuda e seus diagramas oficiais, Loja SERPRO, bundle público do Credencia, release SERPRO de 13/11/2026, Portaria SENATRAN 417/2026 e Res. CONTRAN 1.026/2026.
 > **Rótulos:** **[OF]** oficial · **[TESTE]** verificado por chamada real em homologação · **[INF]** inferência.
 
 ---
 
 ## 14.1 Modelo de acesso: integradora com certificado próprio + cabeçalho do estabelecimento
+
+### Precedência das fontes
+
+Quando houver divergência, usar: **(1)** `v2/api-docs` vivo para o contrato técnico; **(2)** manual e diagramas oficiais para sequência de negócio; **(3)** Central de Ajuda para orientação operacional; **(4)** resolução e atos vigentes para obrigação normativa. A página de integradores chama o contrato de “OpenAPI 3.0” e diz que homologação replica produção, mas o documento servido declara `swagger: "2.0"` e os baselines comprovam diferenças de paths, segurança por CNPJ e consignação. Frases introdutórias da Central não substituem o contrato executável.
 
 | Aspecto | Modelo **anterior** (manual de produção) | Modelo **novo** (homologação, Res. 1.026) |
 |---|---|---|
@@ -36,7 +40,7 @@ flowchart LR
   VC -- não --> P[Pendência: vínculo ausente<br/>bloqueia o envio]
   VC -- sim --> CX
   CX -- "CNPJ-Estabelecimento: X" --> R[RENAVE-WS]
-  CX -. "pré-checagem/cache:<br/>GET cliente-autenticado<br/>cnpj == X e cnpjIntegradora == nosso" .-> R
+  CX -. "pré-checagem em toda operação:<br/>GET cliente-autenticado<br/>cnpj == X e cnpjIntegradora == nosso" .-> R
 ```
 
 **Modos suportados** (feature flag por ambiente e estabelecimento):
@@ -55,11 +59,13 @@ flowchart LR
 |---|---|---|
 | RN-INT-SRP-01 | Toda chamada aos grupos Estabelecimento, ITE e Montadora leva o cabeçalho `CNPJ-Estabelecimento` com o CNPJ do estabelecimento da operação. Ele vem do contexto do servidor, nunca do cliente | 🔴 |
 | RN-INT-SRP-02 | Nenhuma operação é enviada sem **vínculo Credencia ativo e habilitado** para a natureza correspondente (Concessionário/Lojista, ITE, Montadora/Venda direta) | 🔴 |
-| RN-INT-SRP-03 | Antes da primeira operação do dia por estabelecimento (cache de 1h e invalidação em erro), chamar `GET /api/cliente-autenticado` e confirmar que **`cnpj` = estabelecimento** e **`cnpjIntegradora` = nosso CNPJ**. Divergência **bloqueia** as operações e abre incidente (proteção contra o "ignorado em silêncio") | 🔴 |
+| RN-INT-SRP-03 | Antes de **cada operação**, chamar `GET /api/cliente-autenticado` e confirmar que **`cnpj` = estabelecimento** e **`cnpjIntegradora` = nosso CNPJ**. Não usar cache enquanto o comportamento de vínculo/fallback não tiver garantia formal do SERPRO. Divergência **bloqueia** a operação e abre incidente (proteção contra o "ignorado em silêncio") | 🔴 |
 | RN-INT-SRP-04 | Os campos marcados como `required` no Swagger de homologação são obrigatórios na nossa validação: `cpfOperadorResponsavel` em todos os POST, `emailEstabelecimento` e `emailVendedor`, `chaveNotaFiscal` na entrada e saída de 0 km, nome, e-mail e endereço completo do comprador, placa | 🔴 |
 | RN-INT-SRP-05 | O certificado da integradora fica em HSM, com dois certificados válidos (rotação escalonada), alertas em 90/60/30/15/7 dias e teste diário de handshake | 🔴 |
 | RN-INT-SRP-06 | **Monitor diário** dos `swagger-resources` e dos `api-docs` de produção e homologação e das páginas do manual, com *diff* automático e alerta. O RENAVE-WS **não tem changelog** nem versionamento | 🔴 |
-| RN-INT-SRP-07 | Timeouts: POST 120 s, GET 60 s. Erro com `{titulo, dataHora, detalhe, mensagemParaUsuarioFinal, logIdRastreabilidade}` guardado integralmente; 500 → reconciliação + chamado SERPRO com o `logIdRastreabilidade` | 🔴 |
+| RN-INT-SRP-07 | Timeouts: POST 120 s, GET 60 s. Em log operacional, guardar somente status, hash e `logIdRastreabilidade` que passe por formato fechado; `detalhe` e `mensagemParaUsuarioFinal` podem conter dados pessoais e não entram no log comum. HTTP 5xx em mutação → desfecho incerto, reconciliação e chamado SERPRO com o identificador rastreável | 🔴 |
+| RN-INT-SRP-08 | Na entrada comprada, respeitar a sequência oficial: POST inicial sem ATPV/NF-e → ATPV e assinatura → `TRANSFERIDO` após transferência DETRAN → `CONFIRMADO` após novo CRV → NF-e/SPED → CRLV. Não criar dependência circular exigindo ATPV ou NF-e antes da solicitação que cria/reaproveita a intenção de venda | 🔴 |
+| RN-INT-SRP-09 | Monitorar semanticamente a Central de Ajuda e por hash os diagramas oficiais de entrada e estados, além do Swagger. Mudança interrompe o gate diário para revisão humana | 🔴 |
 
 ## 14.4 Diferenças entre produção e homologação (23/11/2026)
 
@@ -72,6 +78,22 @@ flowchart LR
 | **Consignação** | — | `POST /api/consignados/solicitacao-entrada` (201, estado sempre CONFIRMADO, com `consignante`) e `POST /api/consignados/cancelamento`; `EstoqueJson.estoqueConsignado`; NF-e com `evento` `CONSIGNACAO` e `DEVOLUCAO`; mocks TR 231, 233, 203/227/237 (mesma UF) e 204 (outra UF, depende do DETRAN). Release SERPRO: fluxo "ainda informativo", liberado em 10/11 |
 | Obrigatoriedade de campos | Mais frouxa | Vários campos passaram a `required` (RN-INT-SRP-04) |
 | Manual | 73 páginas, sem changelog | Igual, com uma lista extra de impedimentos à entrada |
+
+### Sequência oficial da entrada comprada
+
+O diagrama oficial separa a solicitação inicial das obrigações documentais posteriores:
+
+1. estabelecimento consulta veículo/restrições e realiza identificação prévia ou vistoria;
+2. solicita a entrada; o RENAVE consulta o DETRAN, cria/reaproveita a intenção de venda e cria a restrição no estado `SOLICITADO`;
+3. estabelecimento obtém a ATPV; o vendedor assina manualmente, com certificado/P7S ou pela assinatura avançada na CDT; o estabelecimento envia a assinatura quando aplicável;
+4. o DETRAN consome a intenção de venda e o RENAVE muda o estoque para `TRANSFERIDO`;
+5. o DETRAN emite o novo CRV (TR 227) e o RENAVE muda o estoque para `CONFIRMADO`;
+6. o estabelecimento emite e informa a NF-e; o RENAVE valida o radical do CNPJ no SPED e informa o Renavam;
+7. a obtenção do CRLV verifica a existência da NF-e de entrada e da assinatura da ATPV.
+
+O Swagger confirma que solicitação, ATPV e NF-e são endpoints separados; `EnvioNotaFiscal` depende de `idEstoque`, que só existe depois da solicitação. A NF-e pode ser pré-coletada localmente, mas não enviada ao RENAVE antes desse identificador.
+
+Fontes oficiais: Central de Ajuda, diagrama “Fluxo de entrada em estoque” e diagrama “Estados de um estoque”.
 
 **Ainda sem endpoint**, em produção e em homologação: identificação prévia de entrada, estoque vinculado / garantias / retomados, termos de entrega com assinatura do proprietário, contrato eletrônico de consignação e assinatura do consignante, transferência eletrônica da Res. 1.027. Ficam como *adapters* reservados com feature flag (doc 07 §7.6.5).
 

@@ -1,0 +1,39 @@
+{
+  "name": "@seu-renave/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "cli": "tsx src/cli.ts",
+    "bootstrap": "tsx src/cli.ts bootstrap",
+    "migrate": "tsx src/cli.ts migrate",
+    "purge:identity": "tsx src/cli.ts purge-identity",
+    "scan:evidence": "tsx src/cli.ts scan-evidence",
+    "status:evidence": "tsx src/cli.ts status-evidence",
+    "setup:local": "tsx src/cli.ts setup-local",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@seu-renave/access-control": "workspace:*",
+    "@seu-renave/identity": "workspace:*",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

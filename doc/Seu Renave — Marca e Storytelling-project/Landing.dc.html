@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Landing page — ViaAuto</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+          a {
+            color: #0f766e;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #115e59;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          width: 1440px;
+          height: 2200px;
+          box-sizing: border-box;
+          background: #ffffff;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-direction: column;
+        "
+      >
+        <nav
+          aria-label="Principal"
+          style="
+            height: 76px;
+            padding: 0 80px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #e4e7ec;
+          "
+        >
+          <a
+            href="#"
+            style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              color: #101828;
+            "
+          >
+            <svg width="34" height="34" viewBox="0 0 48 48" aria-hidden="true">
+              <path
+                d="M2.5 28.5L8.5 22.5L19 33L41 6.5L44 9.5L19.5 42Z"
+                fill="#0F766E"
+                stroke="#0F766E"
+                stroke-width="2"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M21 35.6L41.8 9"
+                fill="none"
+                stroke="#FFFFFF"
+                stroke-width="1.5"
+                stroke-dasharray="3 2.6"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span
+              style="
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 24px;
+                font-weight: 700;
+                letter-spacing: -0.035em;
+              "
+              ><span style="color: #0f766e">Via</span>Auto</span
+            >
+          </a>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 32px;
+              font-size: 15px;
+              font-weight: 500;
+            "
+          >
+            <a href="#" style="color: #344054">Como funciona</a>
+            <a href="#" style="color: #344054">Para quem é</a>
+            <a href="#" style="color: #344054">Integrações</a>
+            <a href="#" style="color: #344054">Preços</a>
+            <a href="#" style="color: #344054">Entrar</a>
+            <a
+              href="#"
+              style="
+                padding: 12px 20px;
+                border-radius: 8px;
+                background: #0f766e;
+                color: #ffffff;
+                font-weight: 600;
+              "
+              >Agendar demonstração</a
+            >
+          </div>
+        </nav>
+        <section
+          style="
+            padding: 96px 80px 80px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 64px;
+            align-items: center;
+            background: #f6f7f9;
+            position: relative;
+            overflow: hidden;
+          "
+        >
+          <svg
+            aria-hidden="true"
+            width="1440"
+            height="560"
+            viewBox="0 0 1440 560"
+            style="position: absolute; left: 0; bottom: -120px; opacity: 0.5"
+          >
+            <path
+              d="M-40 560C300 560 420 360 760 360S1180 160 1500 160"
+              fill="none"
+              stroke="#E6F4F1"
+              stroke-width="120"
+              stroke-linecap="round"
+            />
+            <path
+              d="M-40 560C300 560 420 360 760 360S1180 160 1500 160"
+              fill="none"
+              stroke="#FFFFFF"
+              stroke-width="4"
+              stroke-dasharray="22 18"
+            />
+          </svg>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 28px;
+              position: relative;
+            "
+          >
+            <span
+              style="
+                align-self: flex-start;
+                padding: 8px 14px;
+                border-radius: 999px;
+                background: #e6f4f1;
+                color: #115e59;
+                font-size: 14px;
+                font-weight: 600;
+              "
+              >Plataforma de integração e conformidade RENAVE</span
+            >
+            <h1
+              style="
+                margin: 0;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 68px;
+                line-height: 1.04;
+                font-weight: 700;
+                letter-spacing: -0.04em;
+              "
+            >
+              O caminho simples para sua operação veicular.
+            </h1>
+            <p
+              style="
+                margin: 0;
+                font-size: 20px;
+                line-height: 1.6;
+                color: #475467;
+                max-width: 560px;
+              "
+            >
+              Entradas, saídas, transferências e consignações registradas no
+              RENAVE com organização, agilidade e confiança — tudo em um só
+              lugar.
+            </p>
+            <div style="display: flex; gap: 14px; flex-wrap: wrap">
+              <a
+                href="#"
+                style="
+                  padding: 16px 26px;
+                  border-radius: 8px;
+                  background: #0f766e;
+                  color: #ffffff;
+                  font-weight: 600;
+                  font-size: 17px;
+                "
+                >Agendar demonstração</a
+              >
+              <a
+                href="#"
+                style="
+                  padding: 16px 26px;
+                  border-radius: 8px;
+                  background: #ffffff;
+                  border: 1px solid #d0d5dd;
+                  color: #101828;
+                  font-weight: 600;
+                  font-size: 17px;
+                "
+                >Ver como funciona</a
+              >
+            </div>
+            <span style="font-size: 14px; color: #475467"
+              >Para revendas, concessionárias, montadoras, ITEs e instituições
+              credoras.</span
+            >
+          </div>
+          <div
+            style="
+              position: relative;
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 16px;
+              padding: 24px;
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+              box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+            "
+          >
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <strong style="font-size: 16px"
+                >O que precisa da sua atenção</strong
+              ><span style="font-size: 13px; color: #475467">Hoje</span>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 14px;
+                border-radius: 10px;
+                border: 1px solid #e4e7ec;
+              "
+            >
+              <span
+                style="
+                  padding: 4px 10px;
+                  border-radius: 999px;
+                  background: #fffaeb;
+                  color: #b54708;
+                  font-size: 12px;
+                  font-weight: 600;
+                "
+                >Prazo</span
+              ><span style="flex-grow: 1; font-size: 14px"
+                >Entrada do
+                <span style="font-family: &quot;JetBrains Mono&quot;, monospace"
+                  >QTP4H82</span
+                >
+                vence amanhã</span
+              ><span style="font-size: 14px; font-weight: 600; color: #0f766e"
+                >Resolver</span
+              >
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 14px;
+                border-radius: 10px;
+                border: 1px solid #e4e7ec;
+              "
+            >
+              <span
+                style="
+                  padding: 4px 10px;
+                  border-radius: 999px;
+                  background: #fef3f2;
+                  color: #b42318;
+                  font-size: 12px;
+                  font-weight: 600;
+                "
+                >Fiscal</span
+              ><span style="flex-grow: 1; font-size: 14px"
+                >NF-e de entrada não vinculada</span
+              ><span style="font-size: 14px; font-weight: 600; color: #0f766e"
+                >Vincular</span
+              >
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 14px;
+                border-radius: 10px;
+                border: 1px solid #e4e7ec;
+              "
+            >
+              <span
+                style="
+                  padding: 4px 10px;
+                  border-radius: 999px;
+                  background: #eff8ff;
+                  color: #175cd3;
+                  font-size: 12px;
+                  font-weight: 600;
+                "
+                >Certificado</span
+              ><span style="flex-grow: 1; font-size: 14px"
+                >Filial Santos vence em 12 dias</span
+              ><span style="font-size: 14px; font-weight: 600; color: #0f766e"
+                >Renovar</span
+              >
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 14px;
+                border-radius: 10px;
+                background: #ecfdf3;
+              "
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#067647"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12l5 5L20 7" /></svg
+              ><span
+                style="
+                  flex-grow: 1;
+                  font-size: 14px;
+                  color: #067647;
+                  font-weight: 600;
+                "
+                >RVA2C17 · entrada confirmada no RENAVE</span
+              >
+            </div>
+            <span style="font-size: 12px; color: #475467"
+              >Dados ilustrativos.</span
+            >
+          </div>
+        </section>
+        <section
+          aria-label="Prova social"
+          style="
+            padding: 36px 80px;
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            border-bottom: 1px solid #e4e7ec;
+          "
+        >
+          <span style="font-size: 14px; color: #475467; white-space: nowrap"
+            >Empresas que seguem pela via:</span
+          >
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(5, minmax(0, 1fr));
+              gap: 20px;
+              flex-grow: 1;
+            "
+          >
+            <div
+              style="
+                height: 48px;
+                border-radius: 8px;
+                border: 1.5px dashed #d0d5dd;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                color: #475467;
+              "
+            >
+              [LOGO CLIENTE]
+            </div>
+            <div
+              style="
+                height: 48px;
+                border-radius: 8px;
+                border: 1.5px dashed #d0d5dd;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                color: #475467;
+              "
+            >
+              [LOGO CLIENTE]
+            </div>
+            <div
+              style="
+                height: 48px;
+                border-radius: 8px;
+                border: 1.5px dashed #d0d5dd;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                color: #475467;
+              "
+            >
+              [LOGO CLIENTE]
+            </div>
+            <div
+              style="
+                height: 48px;
+                border-radius: 8px;
+                border: 1.5px dashed #d0d5dd;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                color: #475467;
+              "
+            >
+              [LOGO PARCEIRO]
+            </div>
+            <div
+              style="
+                height: 48px;
+                border-radius: 8px;
+                border: 1.5px dashed #d0d5dd;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 13px;
+                color: #475467;
+              "
+            >
+              [LOGO PARCEIRO]
+            </div>
+          </div>
+        </section>
+        <section
+          style="
+            padding: 88px 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+              max-width: 760px;
+            "
+          >
+            <span
+              style="
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #0f766e;
+              "
+              >Por que ViaAuto</span
+            >
+            <h2
+              style="
+                margin: 0;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 44px;
+                font-weight: 600;
+                letter-spacing: -0.025em;
+                line-height: 1.1;
+              "
+            >
+              Porque administrar veículos não precisa ser complicado.
+            </h2>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                padding: 26px;
+                border-radius: 14px;
+                border: 1px solid #e4e7ec;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0F766E"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 12h16M14 6l6 6-6 6" /></svg
+              ><strong style="font-size: 20px">Simplicidade</strong
+              ><span style="font-size: 15px; line-height: 1.55; color: #475467"
+                >Assistentes que guiam cada entrada e venda, em linguagem de
+                negócio.</span
+              >
+            </div>
+            <div
+              style="
+                padding: 26px;
+                border-radius: 14px;
+                border: 1px solid #e4e7ec;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0F766E"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="8" height="8" rx="1.5" />
+                <rect x="13" y="3" width="8" height="8" rx="1.5" />
+                <rect x="3" y="13" width="8" height="8" rx="1.5" />
+                <rect x="13" y="13" width="8" height="8" rx="1.5" /></svg
+              ><strong style="font-size: 20px">Organização</strong
+              ><span style="font-size: 15px; line-height: 1.55; color: #475467"
+                >Estoque, NF-e, documentos e filiais em um só lugar.</span
+              >
+            </div>
+            <div
+              style="
+                padding: 26px;
+                border-radius: 14px;
+                border: 1px solid #e4e7ec;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0F766E"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z" />
+                <path d="M9 12l2 2 4-4" /></svg
+              ><strong style="font-size: 20px">Confiança</strong
+              ><span style="font-size: 15px; line-height: 1.55; color: #475467"
+                >Conferência antes do envio e registro imutável de cada
+                operação.</span
+              >
+            </div>
+            <div
+              style="
+                padding: 26px;
+                border-radius: 14px;
+                border: 1px solid #e4e7ec;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0F766E"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 7.5V12l3 2" /></svg
+              ><strong style="font-size: 20px">Tranquilidade</strong
+              ><span style="font-size: 15px; line-height: 1.55; color: #475467"
+                >Alertas de prazo e certificado antes de virar problema.</span
+              >
+            </div>
+          </div>
+        </section>
+        <section
+          style="
+            padding: 88px 80px;
+            background: #0b1220;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            gap: 44px;
+          "
+        >
+          <div style="display: flex; flex-direction: column; gap: 12px">
+            <span
+              style="
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #5eead4;
+              "
+              >Como funciona</span
+            >
+            <h2
+              style="
+                margin: 0;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 44px;
+                font-weight: 600;
+                letter-spacing: -0.025em;
+              "
+            >
+              Três passos até o caminho certo
+            </h2>
+          </div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 24px;
+            "
+          >
+            <div
+              style="
+                padding: 28px;
+                border-radius: 14px;
+                background: #111a2e;
+                border: 1px solid #1e293b;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <span
+                style="
+                  font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                  font-size: 48px;
+                  font-weight: 700;
+                  color: #2dd4bf;
+                "
+                >1</span
+              ><strong style="font-size: 20px">Conecte sua empresa</strong
+              ><span style="font-size: 15px; line-height: 1.6; color: #cbd5e1"
+                >Cadastro guiado de matriz e filiais, certificado e-CNPJ
+                guardado em cofre e adesão ao RENAVE acompanhada etapa por
+                etapa.</span
+              >
+            </div>
+            <div
+              style="
+                padding: 28px;
+                border-radius: 14px;
+                background: #111a2e;
+                border: 1px solid #1e293b;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <span
+                style="
+                  font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                  font-size: 48px;
+                  font-weight: 700;
+                  color: #2dd4bf;
+                "
+                >2</span
+              ><strong style="font-size: 20px"
+                >Opere pelo assistente ou pela API</strong
+              ><span style="font-size: 15px; line-height: 1.6; color: #cbd5e1"
+                >Dê entrada, venda e transfira com conferência automática — ou
+                integre seu sistema por API e webhooks.</span
+              >
+            </div>
+            <div
+              style="
+                padding: 28px;
+                border-radius: 14px;
+                background: #111a2e;
+                border: 1px solid #1e293b;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <span
+                style="
+                  font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                  font-size: 48px;
+                  font-weight: 700;
+                  color: #2dd4bf;
+                "
+                >3</span
+              ><strong style="font-size: 20px">Acompanhe e comprove</strong
+              ><span style="font-size: 15px; line-height: 1.6; color: #cbd5e1"
+                >Painel com o que resolver agora e dossiê de cada operação
+                pronto para qualquer fiscalização.</span
+              >
+            </div>
+          </div>
+        </section>
+        <section
+          style="
+            padding: 88px 80px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 48px;
+            align-items: center;
+          "
+        >
+          <div style="display: flex; flex-direction: column; gap: 14px">
+            <span
+              style="
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #0f766e;
+              "
+              >Preço transparente</span
+            >
+            <h2
+              style="
+                margin: 0;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 40px;
+                font-weight: 600;
+                letter-spacing: -0.025em;
+                line-height: 1.12;
+              "
+            >
+              Você sabe quanto paga antes de contratar.
+            </h2>
+            <p
+              style="
+                margin: 0;
+                font-size: 17px;
+                line-height: 1.6;
+                color: #475467;
+              "
+            >
+              Preço dentro da faixa pública definida pela SENATRAN. O serviço
+              RENAVE é contratável isoladamente, sem pacote obrigatório.
+            </p>
+          </div>
+          <div
+            style="
+              padding: 32px;
+              border-radius: 16px;
+              border: 2px solid #0f766e;
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+              "
+            >
+              <strong style="font-size: 20px">Plano RENAVE</strong
+              ><span style="font-size: 14px; color: #475467">por operação</span>
+            </div>
+            <span
+              style="
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 48px;
+                font-weight: 700;
+                letter-spacing: -0.03em;
+              "
+              >[PREÇO]</span
+            >
+            <ul
+              style="
+                margin: 0;
+                padding-left: 20px;
+                font-size: 15px;
+                line-height: 1.8;
+                color: #344054;
+              "
+            >
+              <li>Entradas, saídas e transferências</li>
+              <li>Usuários e filiais ilimitados</li>
+              <li>Dossiê e trilha de auditoria</li>
+              <li>Suporte em horário ampliado</li>
+            </ul>
+            <a
+              href="#"
+              style="
+                padding: 14px 20px;
+                border-radius: 8px;
+                background: #0f766e;
+                color: #ffffff;
+                font-weight: 600;
+                text-align: center;
+              "
+              >Falar com especialista</a
+            >
+          </div>
+        </section>
+        <footer
+          style="
+            margin-top: auto;
+            padding: 40px 80px;
+            border-top: 1px solid #e4e7ec;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 24px;
+            font-size: 14px;
+            color: #475467;
+          "
+        >
+          <div style="display: flex; align-items: center; gap: 10px">
+            <svg width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
+              <path
+                d="M2.5 28.5L8.5 22.5L19 33L41 6.5L44 9.5L19.5 42Z"
+                fill="#0F766E"
+                stroke="#0F766E"
+                stroke-width="2"
+                stroke-linejoin="round"
+              /></svg
+            ><span
+              style="
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-weight: 700;
+                font-size: 18px;
+                color: #101828;
+              "
+              ><span style="color: #0f766e">Via</span>Auto</span
+            >
+          </div>
+          <span
+            >Produto independente — não é sistema oficial do governo. RENAVE é
+            sistema da SENATRAN.</span
+          >
+          <span>[CNPJ] · [ENDEREÇO] · Política de privacidade</span>
+        </footer>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":2200}}'
+    >
+      class Component extends DCLogic {
+        renderVals() { return {}; }
+      }
+    </script>
+  </body>
+</html>

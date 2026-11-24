@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+
+# Material privado de mTLS/ICP-Brasil nunca é versionado.
+*.jks
+*.key
+*.keystore
+*.p12
+*.pfx
+*.private.pem
+*-key.pem

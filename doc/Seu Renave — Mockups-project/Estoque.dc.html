@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Estoque RENAVE — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+            vertical-align: middle;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="estoque"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Estoque RENAVE
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  184 veículos com registro de entrada ativo no RENAVE ·
+                  atualizado às 15:12
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button
+                  type="button"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #344054;
+                    font: inherit;
+                    font-size: 14px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 4v12M7 11l5 5 5-5M4 20h16" /></svg
+                  >Exportar
+                </button>
+                <a
+                  href="Entrada.dc.html"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    height: 44px;
+                    padding: 0 16px;
+                    border-radius: 8px;
+                    background: #067a45;
+                    color: #ffffff;
+                    font-size: 14px;
+                    font-weight: 600;
+                  "
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M5 12h14" /></svg
+                  >Dar entrada
+                </a>
+              </div>
+            </div>
+
+            <!-- Resumo por situação -->
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+                <button
+                  type="button"
+                  style="display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid {{t.border}}; background: {{t.bg}}; color: {{t.color}}"
+                >
+                  {{t.label}}
+                  <span style="font-weight: 500; opacity: 0.85">{{t.n}}</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <!-- Filtros -->
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 16px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <div
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                  gap: 12px;
+                "
+              >
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Estabelecimento
+                  <select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Todos</option>
+                    <option>Matriz São Paulo</option>
+                    <option>Filial Campinas</option>
+                    <option>Filial Santos</option>
+                  </select>
+                </label>
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Tipo
+                  <select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Usado</option>
+                    <option>Zero km</option>
+                    <option>Todos</option>
+                  </select>
+                </label>
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Prazo de escrituração
+                  <select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Qualquer</option>
+                    <option>Vence hoje</option>
+                    <option>Vence em 1–2 dias</option>
+                    <option>Vencido</option>
+                  </select>
+                </label>
+                <label
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #344054;
+                  "
+                  >Com pendências
+                  <select
+                    style="
+                      height: 40px;
+                      padding: 0 10px;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      font: inherit;
+                      font-size: 14px;
+                      background: #ffffff;
+                    "
+                  >
+                    <option>Todos</option>
+                    <option>Somente com pendência</option>
+                    <option>Sem pendência</option>
+                  </select>
+                </label>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 8px;
+                  align-items: center;
+                "
+              >
+                <span style="font-size: 13px; color: #475467"
+                  >Filtros ativos:</span
+                >
+                <span
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    height: 28px;
+                    padding: 0 6px 0 10px;
+                    border-radius: 999px;
+                    background: #e7f6ee;
+                    color: #05663a;
+                    font-size: 13px;
+                    font-weight: 500;
+                  "
+                  >Tipo: Usado
+                  <button
+                    type="button"
+                    aria-label="Remover filtro Tipo"
+                    style="
+                      display: inline-flex;
+                      width: 20px;
+                      height: 20px;
+                      align-items: center;
+                      justify-content: center;
+                      border: 0;
+                      border-radius: 999px;
+                      background: transparent;
+                      color: inherit;
+                      cursor: pointer;
+                    "
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg></button
+                ></span>
+                <span
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    height: 28px;
+                    padding: 0 6px 0 10px;
+                    border-radius: 999px;
+                    background: #e7f6ee;
+                    color: #05663a;
+                    font-size: 13px;
+                    font-weight: 500;
+                  "
+                  >Situação: todas exceto vendidos
+                  <button
+                    type="button"
+                    aria-label="Remover filtro Situação"
+                    style="
+                      display: inline-flex;
+                      width: 20px;
+                      height: 20px;
+                      align-items: center;
+                      justify-content: center;
+                      border: 0;
+                      border-radius: 999px;
+                      background: transparent;
+                      color: inherit;
+                      cursor: pointer;
+                    "
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg></button
+                ></span>
+                <button
+                  type="button"
+                  style="
+                    border: 0;
+                    background: transparent;
+                    color: #067a45;
+                    font: inherit;
+                    font-size: 13px;
+                    font-weight: 600;
+                    cursor: pointer;
+                  "
+                >
+                  Limpar tudo
+                </button>
+              </div>
+            </section>
+
+            <!-- Barra de ações em massa -->
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                align-items: center;
+                padding: 10px 16px;
+                border-radius: 10px;
+                background: #101828;
+                color: #ffffff;
+              "
+            >
+              <strong style="font-size: 14px; font-weight: 600"
+                >2 veículos selecionados</strong
+              >
+              <span style="flex: 1"></span>
+              <button
+                type="button"
+                style="
+                  height: 36px;
+                  padding: 0 12px;
+                  border: 1px solid #475467;
+                  border-radius: 8px;
+                  background: transparent;
+                  color: #ffffff;
+                  font: inherit;
+                  font-size: 13px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Transferir para filial
+              </button>
+              <button
+                type="button"
+                style="
+                  height: 36px;
+                  padding: 0 12px;
+                  border: 1px solid #475467;
+                  border-radius: 8px;
+                  background: transparent;
+                  color: #ffffff;
+                  font: inherit;
+                  font-size: 13px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Verificar situação no RENAVE
+              </button>
+              <button
+                type="button"
+                style="
+                  height: 36px;
+                  padding: 0 12px;
+                  border: 1px solid #475467;
+                  border-radius: 8px;
+                  background: transparent;
+                  color: #ffffff;
+                  font: inherit;
+                  font-size: 13px;
+                  font-weight: 600;
+                  cursor: pointer;
+                "
+              >
+                Exportar dossiês
+              </button>
+            </div>
+
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow: hidden;
+              "
+            >
+              <div style="overflow-x: auto">
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 1040px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>
+                        <input
+                          type="checkbox"
+                          aria-label="Selecionar todos"
+                          style="
+                            width: 16px;
+                            height: 16px;
+                            accent-color: #067a45;
+                          "
+                        />
+                      </th>
+                      <th>Placa / veículo</th>
+                      <th>Chassi</th>
+                      <th>RENAVAM</th>
+                      <th>Estabelecimento</th>
+                      <th>Data de entrada</th>
+                      <th>Situação RENAVE</th>
+                      <th>Prazo / pendência</th>
+                      <th>
+                        <span
+                          style="
+                            position: absolute;
+                            width: 1px;
+                            height: 1px;
+                            overflow: hidden;
+                            clip: rect(0 0 0 0);
+                          "
+                          >Ações</span
+                        >
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+                      <tr style="background: {{r.rowBg}}">
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked="{{r.sel}}"
+                            aria-label="Selecionar {{r.placa}}"
+                            style="
+                              width: 16px;
+                              height: 16px;
+                              accent-color: #067a45;
+                            "
+                          />
+                        </td>
+                        <td>
+                          <a
+                            href="Veiculo.dc.html"
+                            style="display: flex; color: #101828"
+                          >
+                            <span
+                              style="
+                                display: flex;
+                                flex-direction: column;
+                                gap: 2px;
+                              "
+                            >
+                              <strong
+                                style="
+                                  font-size: 14px;
+                                  font-weight: 600;
+                                  letter-spacing: 0.04em;
+                                "
+                                >{{r.placa}}</strong
+                              >
+                              <span style="font-size: 13px; color: #475467"
+                                >{{r.modelo}}</span
+                              >
+                            </span>
+                          </a>
+                        </td>
+                        <td
+                          style="
+                            font-family:
+                              ui-monospace, SFMono-Regular, Menlo, monospace;
+                            font-size: 13px;
+                            color: #344054;
+                          "
+                        >
+                          {{r.chassi}}
+                        </td>
+                        <td
+                          style="
+                            font-family:
+                              ui-monospace, SFMono-Regular, Menlo, monospace;
+                            font-size: 13px;
+                            color: #344054;
+                          "
+                        >
+                          {{r.renavam}}
+                        </td>
+                        <td style="color: #344054">{{r.estab}}</td>
+                        <td style="color: #344054">{{r.entrada}}</td>
+                        <td>
+                          <span
+                            style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{r.stBg}}; color: {{r.stColor}}"
+                            >{{r.status}}</span
+                          >
+                        </td>
+                        <td style="font-size: 13px; color: {{r.pendColor}}">
+                          {{r.pend}}
+                        </td>
+                        <td>
+                          <a
+                            href="Veiculo.dc.html"
+                            style="font-size: 13px; font-weight: 600"
+                            >Abrir</a
+                          >
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 12px;
+                  align-items: center;
+                  justify-content: space-between;
+                  padding: 12px 16px;
+                  border-top: 1px solid #e4e7ec;
+                  font-size: 14px;
+                  color: #475467;
+                "
+              >
+                <span>Mostrando 1–10 de 142 veículos usados</span>
+                <nav aria-label="Paginação" style="display: flex; gap: 6px">
+                  <a
+                    href="#p"
+                    style="
+                      display: inline-flex;
+                      height: 36px;
+                      padding: 0 12px;
+                      align-items: center;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      color: #344054;
+                      font-weight: 600;
+                    "
+                    >Anterior</a
+                  >
+                  <a
+                    href="#p1"
+                    aria-current="page"
+                    style="
+                      display: inline-flex;
+                      width: 36px;
+                      height: 36px;
+                      align-items: center;
+                      justify-content: center;
+                      border-radius: 8px;
+                      background: #e7f6ee;
+                      color: #067a45;
+                      font-weight: 600;
+                    "
+                    >1</a
+                  >
+                  <a
+                    href="#p2"
+                    style="
+                      display: inline-flex;
+                      width: 36px;
+                      height: 36px;
+                      align-items: center;
+                      justify-content: center;
+                      border-radius: 8px;
+                      color: #344054;
+                    "
+                    >2</a
+                  >
+                  <a
+                    href="#p3"
+                    style="
+                      display: inline-flex;
+                      width: 36px;
+                      height: 36px;
+                      align-items: center;
+                      justify-content: center;
+                      border-radius: 8px;
+                      color: #344054;
+                    "
+                    >3</a
+                  >
+                  <span
+                    style="
+                      display: inline-flex;
+                      width: 24px;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                    >…</span
+                  >
+                  <a
+                    href="#p15"
+                    style="
+                      display: inline-flex;
+                      width: 36px;
+                      height: 36px;
+                      align-items: center;
+                      justify-content: center;
+                      border-radius: 8px;
+                      color: #344054;
+                    "
+                    >15</a
+                  >
+                  <a
+                    href="#n"
+                    style="
+                      display: inline-flex;
+                      height: 36px;
+                      padding: 0 12px;
+                      align-items: center;
+                      border: 1px solid #d0d5dd;
+                      border-radius: 8px;
+                      color: #344054;
+                      font-weight: 600;
+                    "
+                    >Próxima</a
+                  >
+                </nav>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1200}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const S = {
+            est: ['Em estoque', '#ECFDF3', '#067647'],
+            vin: ['Vinculado', '#FEF3F2', '#B42318'],
+            con: ['Consignado', '#EFF8FF', '#175CD3'],
+            tra: ['Em transferência', '#F2F4F7', '#344054'],
+            agu: ['Aguardando ATPV-e', '#FFFAEB', '#B54708']
+          };
+          let n = 0;
+          const RV = ['01345298761', '01283746592', '01177465230', '01299381745', '01310984426', '01356627190', '01204418833', '01338170259', '01291054478', '01166203917'];
+          const r = (sel, placa, modelo, chassi, estab, entrada, dias, valor, st, pend) => ({
+            renavam: RV[n++], sel, placa, modelo, chassi, estab, entrada, dias: String(dias), valor,
+            status: S[st][0], stBg: S[st][1], stColor: S[st][2],
+            pend: pend || 'Nenhuma', pendColor: pend ? '#B54708' : '#475467',
+            diasColor: dias > 90 ? '#B42318' : (dias > 60 ? '#B54708' : '#344054'),
+            rowBg: sel ? '#F3FBF6' : '#FFFFFF'
+          });
+          return {
+            tabs: [
+              { label: 'Todos', n: '184', bg: '#067A45', color: '#FFFFFF', border: '#067A45' },
+              { label: 'Em estoque', n: '161', bg: '#FFFFFF', color: '#344054', border: '#D0D5DD' },
+              { label: 'Vinculados', n: '4', bg: '#FFFFFF', color: '#344054', border: '#D0D5DD' },
+              { label: 'Consignados', n: '12', bg: '#FFFFFF', color: '#344054', border: '#D0D5DD' },
+              { label: 'Em transferência', n: '7', bg: '#FFFFFF', color: '#344054', border: '#D0D5DD' }
+            ],
+            rows: [
+              r(false, 'RVA2C17', 'VW T-Cross Highline 1.4 TSI · 2022/2023', '9BWBH6BF4P4••••27', 'Matriz São Paulo', '21/11/2026', 2, 'R$ 112.000,00', 'agu', 'ATPV-e sem assinatura'),
+              r(true, 'QTP4H82', 'Toyota Corolla XEi 2.0 · 2021/2022', '9BRBDWHE3N0••••54', 'Matriz São Paulo', '03/10/2026', 51, 'R$ 118.500,00', 'est', ''),
+              r(true, 'SGL8B03', 'Jeep Compass Longitude T270 · 2022/2022', '98861112XNK••••09', 'Matriz São Paulo', '17/09/2026', 67, 'R$ 134.900,00', 'est', 'NF-e de saída incoerente'),
+              r(false, 'FJK3D21', 'Hyundai HB20 Comfort 1.0 · 2020/2021', '9BHBG51CAMP••••62', 'Filial Campinas', '12/11/2026', 11, 'R$ 61.300,00', 'tra', ''),
+              r(false, 'HBX5J90', 'Honda HR-V EXL 1.5 · 2021/2021', '93HRV2860MZ••••18', 'Matriz São Paulo', '05/11/2026', 18, 'R$ 129.000,00', 'con', 'Consignante não assinou'),
+              r(false, 'PLM7E44', 'Fiat Argo Drive 1.0 · 2022/2023', '9BD358A1NPY••••35', 'Filial Campinas', '08/11/2026', 15, 'R$ 66.800,00', 'tra', ''),
+              r(false, 'KTR6A55', 'Chevrolet Onix Plus LTZ · 2020/2020', '9BGEB69H0LG••••71', 'Filial Santos', '28/07/2026', 118, 'R$ 72.400,00', 'vin', 'Restrição judicial após entrada'),
+              r(false, 'NBE1F36', 'Renault Duster Iconic 1.3 · 2022/2023', '93YHJD20XPJ••••43', 'Filial Santos', '30/08/2026', 85, 'R$ 98.200,00', 'est', ''),
+              r(false, 'OZC9G12', 'Nissan Kicks SV 1.6 · 2021/2022', '94DFCAP15NB••••86', 'Matriz São Paulo', '19/10/2026', 35, 'R$ 93.700,00', 'est', ''),
+              r(false, 'MXA4K78', 'Ford Ranger XLS 2.2 · 2019/2020', '8AFAR22L4LJ••••20', 'Filial Campinas', '22/06/2026', 154, 'R$ 141.000,00', 'est', '')
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>QTP4H82 — Registro do veículo no RENAVE — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 10px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="estoque"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <nav aria-label="Trilha" style="font-size: 14px; color: #475467">
+              <a href="Estoque.dc.html" style="font-weight: 600"
+                >Estoque RENAVE</a
+              >
+              / QTP4H82
+            </nav>
+
+            <!-- Cabeçalho -->
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 24px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 24px;
+                align-items: flex-start;
+              "
+            >
+              <div
+                style="
+                  flex: 1 1 360px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 10px;
+                  min-width: 0;
+                "
+              >
+                <span style="font-size: 13px; font-weight: 600; color: #067a45"
+                  >Registro do veículo no RENAVE</span
+                >
+                <div
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    align-items: center;
+                  "
+                >
+                  <span
+                    style="
+                      display: inline-flex;
+                      align-items: center;
+                      height: 32px;
+                      padding: 0 12px;
+                      border: 2px solid #101828;
+                      border-radius: 6px;
+                      font-size: 18px;
+                      font-weight: 700;
+                      letter-spacing: 0.08em;
+                    "
+                    >QTP4H82</span
+                  >
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 4px 10px;
+                      border-radius: 999px;
+                      background: #ecfdf3;
+                      color: #067647;
+                    "
+                    >Em estoque</span
+                  >
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 4px 10px;
+                      border-radius: 999px;
+                      background: #f2f4f7;
+                      color: #344054;
+                    "
+                    >Usado</span
+                  >
+                </div>
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 24px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Toyota Corolla XEi 2.0 Flex · 2021/2022 · Prata
+                </h1>
+                <dl
+                  style="
+                    margin: 0;
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+                    gap: 10px 20px;
+                  "
+                >
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">Chassi</dt>
+                    <dd
+                      style="
+                        margin: 2px 0 0;
+                        font-size: 14px;
+                        font-family: ui-monospace, Menlo, monospace;
+                      "
+                    >
+                      9BRBDWHE3N0412354
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">RENAVAM</dt>
+                    <dd style="margin: 2px 0 0; font-size: 14px">
+                      01283746592
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Estabelecimento
+                    </dt>
+                    <dd style="margin: 2px 0 0; font-size: 14px">
+                      Matriz São Paulo
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Em estoque desde
+                    </dt>
+                    <dd style="margin: 2px 0 0; font-size: 14px">
+                      03/10/2026 · 51 dias
+                    </dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Hodômetro na entrada
+                    </dt>
+                    <dd style="margin: 2px 0 0; font-size: 14px">38.412 km</dd>
+                  </div>
+                  <div>
+                    <dt style="font-size: 12px; color: #475467">
+                      Valor informado na entrada
+                    </dt>
+                    <dd style="margin: 2px 0 0; font-size: 14px">
+                      R$ 118.500,00
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <a
+                  href="Saida.dc.html"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    height: 44px;
+                    padding: 0 16px;
+                    border-radius: 8px;
+                    background: #067a45;
+                    color: #ffffff;
+                    font-size: 14px;
+                    font-weight: 600;
+                  "
+                  >Registrar saída (venda)</a
+                >
+                <a
+                  href="Transferencias.dc.html"
+                  style="
+                    display: inline-flex;
+                    align-items: center;
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    color: #344054;
+                    font-size: 14px;
+                    font-weight: 600;
+                  "
+                  >Transferir</a
+                >
+                <button
+                  type="button"
+                  aria-label="Mais ações"
+                  style="
+                    display: inline-flex;
+                    width: 44px;
+                    height: 44px;
+                    align-items: center;
+                    justify-content: center;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    color: #344054;
+                    cursor: pointer;
+                  "
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <circle cx="5" cy="12" r="1.6" />
+                    <circle cx="12" cy="12" r="1.6" />
+                    <circle cx="19" cy="12" r="1.6" />
+                  </svg>
+                </button>
+              </div>
+            </section>
+
+            <!-- Abas -->
+            <div
+              role="tablist"
+              aria-label="Seções do veículo"
+              style="
+                display: flex;
+                gap: 4px;
+                border-bottom: 1px solid #e4e7ec;
+                overflow-x: auto;
+              "
+            >
+              <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected="{{t.on}}"
+                  onClick="{{t.pick}}"
+                  style="height: 44px; padding: 0 14px; border: 0; background: transparent; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; font-weight: {{t.weight}}; color: {{t.color}}; border-bottom: 2px solid {{t.line}}"
+                >
+                  {{t.label}}
+                </button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{showGeral}}" hint-placeholder-val="{{ true }}">
+              <div
+                style="
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 24px;
+                  align-items: flex-start;
+                "
+              >
+                <section
+                  style="
+                    flex: 1 1 420px;
+                    min-width: 0;
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                  "
+                >
+                  <div
+                    style="
+                      padding: 16px 20px;
+                      border-bottom: 1px solid #e4e7ec;
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      gap: 12px;
+                    "
+                  >
+                    <div
+                      style="display: flex; flex-direction: column; gap: 2px"
+                    >
+                      <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                        Pronto para registrar a saída?
+                      </h2>
+                      <span style="font-size: 13px; color: #475467"
+                        >4 de 5 condições atendidas · verificado às 15:08</span
+                      >
+                    </div>
+                    <span
+                      style="
+                        font-size: 12px;
+                        font-weight: 600;
+                        padding: 4px 10px;
+                        border-radius: 999px;
+                        background: #fffaeb;
+                        color: #b54708;
+                      "
+                      >1 pendência</span
+                    >
+                  </div>
+                  <sc-for list="{{checks}}" as="c" hint-placeholder-count="5">
+                    <div
+                      style="
+                        display: flex;
+                        gap: 12px;
+                        align-items: flex-start;
+                        padding: 14px 20px;
+                        border-bottom: 1px solid #f2f4f7;
+                      "
+                    >
+                      <span
+                        style="flex-shrink: 0; display: inline-flex; width: 24px; height: 24px; border-radius: 999px; align-items: center; justify-content: center; background: {{c.bg}}; color: {{c.color}}"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2.5"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="{{c.icon}}" />
+                        </svg>
+                      </span>
+                      <div
+                        style="
+                          flex: 1;
+                          display: flex;
+                          flex-direction: column;
+                          gap: 3px;
+                        "
+                      >
+                        <span style="font-size: 14px; font-weight: 600"
+                          >{{c.label}}
+                          <span
+                            style="font-weight: 600; font-size: 12px; color: {{c.color}}"
+                            >· {{c.state}}</span
+                          ></span
+                        >
+                        <span style="font-size: 13px; color: #475467"
+                          >{{c.detail}}</span
+                        >
+                      </div>
+                      <sc-if
+                        value="{{c.hasAction}}"
+                        hint-placeholder-val="{{ false }}"
+                      >
+                        <button
+                          type="button"
+                          style="
+                            height: 36px;
+                            padding: 0 12px;
+                            border: 0;
+                            border-radius: 8px;
+                            background: #067a45;
+                            color: #ffffff;
+                            font: inherit;
+                            font-size: 13px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            white-space: nowrap;
+                          "
+                        >
+                          {{c.action}}
+                        </button>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </section>
+
+                <section
+                  style="
+                    flex: 1 1 360px;
+                    min-width: 0;
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                  "
+                >
+                  <h2
+                    style="margin: 0 0 12px; font-size: 17px; font-weight: 600"
+                  >
+                    Linha do tempo
+                  </h2>
+                  <ol style="list-style: none; margin: 0; padding: 0">
+                    <sc-for
+                      list="{{timeline}}"
+                      as="e"
+                      hint-placeholder-count="7"
+                    >
+                      <li style="display: flex; gap: 12px">
+                        <div
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                          "
+                        >
+                          <span
+                            style="width: 12px; height: 12px; border-radius: 999px; margin-top: 4px; background: {{e.dot}}; border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px {{e.dot}}"
+                          ></span>
+                          <span
+                            style="
+                              flex: 1;
+                              width: 2px;
+                              background: #e4e7ec;
+                              min-height: 28px;
+                            "
+                          ></span>
+                        </div>
+                        <div
+                          style="
+                            display: flex;
+                            flex-direction: column;
+                            gap: 2px;
+                            padding-bottom: 16px;
+                          "
+                        >
+                          <span style="font-size: 14px; font-weight: 600"
+                            >{{e.title}}</span
+                          >
+                          <span style="font-size: 13px; color: #475467"
+                            >{{e.detail}}</span
+                          >
+                          <span style="font-size: 12px; color: #475467"
+                            >{{e.when}}</span
+                          >
+                        </div>
+                      </li>
+                    </sc-for>
+                  </ol>
+                </section>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{showDocs}}" hint-placeholder-val="{{ false }}">
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Documento</th>
+                      <th>Situação</th>
+                      <th>Data</th>
+                      <th>Integridade (SHA-256)</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>ATPV-e de entrada</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #ecfdf3;
+                            color: #067647;
+                          "
+                          >Assinada pelo vendedor</span
+                        >
+                      </td>
+                      <td>03/10/2026</td>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                        "
+                      >
+                        a41f…9c02
+                      </td>
+                      <td>
+                        <a href="Documentos.dc.html" style="font-weight: 600"
+                          >Ver</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>NF-e de entrada nº 18.204</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #ecfdf3;
+                            color: #067647;
+                          "
+                          >Validada no RENAVE</span
+                        >
+                      </td>
+                      <td>03/10/2026</td>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                        "
+                      >
+                        7be2…10fa
+                      </td>
+                      <td>
+                        <a href="Documentos.dc.html" style="font-weight: 600"
+                          >Ver</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Termo de entrada em estoque</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #ecfdf3;
+                            color: #067647;
+                          "
+                          >Emitido</span
+                        >
+                      </td>
+                      <td>03/10/2026</td>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                        "
+                      >
+                        c90d…44e1
+                      </td>
+                      <td>
+                        <a href="Documentos.dc.html" style="font-weight: 600"
+                          >Ver</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Identificação prévia (fotos + hodômetro)</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #ecfdf3;
+                            color: #067647;
+                          "
+                          >Aprovada</span
+                        >
+                      </td>
+                      <td>02/10/2026</td>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                        "
+                      >
+                        1d33…b7a8
+                      </td>
+                      <td>
+                        <a href="Documentos.dc.html" style="font-weight: 600"
+                          >Ver</a
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+            </sc-if>
+
+            <sc-if value="{{showFiscal}}" hint-placeholder-val="{{ false }}">
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                  gap: 16px;
+                "
+              >
+                <div>
+                  <span style="font-size: 12px; color: #475467"
+                    >NF-e de entrada</span
+                  >
+                  <div style="font-size: 14px; font-weight: 600">
+                    nº 18.204 · série 1
+                  </div>
+                </div>
+                <div>
+                  <span style="font-size: 12px; color: #475467"
+                    >Chave de acesso</span
+                  >
+                  <div
+                    style="
+                      font-size: 13px;
+                      font-family: ui-monospace, Menlo, monospace;
+                      word-break: break-all;
+                    "
+                  >
+                    3526 1012 3456 7800 0190 5500 1000 0182 0410 2938 4756
+                  </div>
+                </div>
+                <div>
+                  <span style="font-size: 12px; color: #475467"
+                    >Emitente / destinatário</span
+                  >
+                  <div style="font-size: 14px">
+                    Auto Prime (emissão própria, entrada)
+                  </div>
+                </div>
+                <div>
+                  <span style="font-size: 12px; color: #475467"
+                    >Coerência com o RENAVE</span
+                  >
+                  <div
+                    style="font-size: 14px; font-weight: 600; color: #067647"
+                  >
+                    CNPJ, chassi e valor conferem
+                  </div>
+                </div>
+                <div>
+                  <span style="font-size: 12px; color: #475467"
+                    >NF-e de saída</span
+                  >
+                  <div style="font-size: 14px; color: #475467">
+                    Ainda não emitida
+                  </div>
+                </div>
+              </section>
+            </sc-if>
+
+            <sc-if value="{{showRestr}}" hint-placeholder-val="{{ false }}">
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  padding: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 12px;
+                "
+              >
+                <div style="display: flex; gap: 10px; align-items: center">
+                  <span
+                    style="
+                      font-size: 12px;
+                      font-weight: 600;
+                      padding: 4px 10px;
+                      border-radius: 999px;
+                      background: #ecfdf3;
+                      color: #067647;
+                    "
+                    >Sem restrições impeditivas</span
+                  ><span style="font-size: 13px; color: #475467"
+                    >Consulta ao RENAVE em 23/11/2026 15:08</span
+                  >
+                </div>
+                <p style="margin: 0; font-size: 14px; color: #344054">
+                  Se uma restrição, pendência ou débito for incluído depois da
+                  entrada, o veículo passa a "Vinculado" e a venda fica
+                  bloqueada até a regularização. Você será avisado na fila de
+                  pendências.
+                </p>
+              </section>
+            </sc-if>
+
+            <sc-if value="{{showAudit}}" hint-placeholder-val="{{ false }}">
+              <section
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Data/hora (HLB)</th>
+                      <th>Usuário</th>
+                      <th>Ação</th>
+                      <th>Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>23/11/2026 15:08:12</td>
+                      <td>Marina Costa</td>
+                      <td>Consulta de aptidão para saída</td>
+                      <td style="color: #067647; font-weight: 600">Sucesso</td>
+                    </tr>
+                    <tr>
+                      <td>03/10/2026 11:41:55</td>
+                      <td>Sistema (conector)</td>
+                      <td>Entrada confirmada pelo RENAVE</td>
+                      <td style="color: #067647; font-weight: 600">Sucesso</td>
+                    </tr>
+                    <tr>
+                      <td>03/10/2026 11:40:03</td>
+                      <td>Marina Costa</td>
+                      <td>Entrada solicitada</td>
+                      <td style="color: #067647; font-weight: 600">Sucesso</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style="padding: 12px 16px">
+                  <a
+                    href="Auditoria.dc.html"
+                    style="font-size: 14px; font-weight: 600"
+                    >Abrir trilha completa</a
+                  >
+                </div>
+              </section>
+            </sc-if>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1500}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { tab: 'geral' }; }
+        renderVals() {
+          const tab = this.state.tab;
+          const tabs = [['geral','Visão geral'],['docs','Documentos (4)'],['fiscal','Fiscal'],['restr','Restrições'],['audit','Auditoria']].map(([id, label]) => ({
+            label, on: tab === id ? 'true' : 'false',
+            weight: tab === id ? '600' : '500', color: tab === id ? '#067A45' : '#475467', line: tab === id ? '#067A45' : 'transparent',
+            pick: () => this.setState({ tab: id })
+          }));
+          const OK = 'M5 12l5 5L20 7', WARN = 'M12 7v6M12 17h.01';
+          const ck = (ok, label, state, detail, action) => ({ label, state, detail, action, hasAction: !!action,
+            icon: ok ? OK : WARN, bg: ok ? '#ECFDF3' : '#FFFAEB', color: ok ? '#067647' : '#B54708' });
+          return {
+            tabs,
+            showGeral: tab === 'geral', showDocs: tab === 'docs', showFiscal: tab === 'fiscal', showRestr: tab === 'restr', showAudit: tab === 'audit',
+            checks: [
+              ck(true, 'Entrada confirmada no RENAVE', 'OK', 'Registro ativo desde 03/10/2026 na Matriz São Paulo.'),
+              ck(true, 'ATPV-e de entrada assinada', 'OK', 'Assinada eletronicamente pelo vendedor em 03/10/2026 10:57.'),
+              ck(true, 'NF-e de entrada vinculada', 'OK', 'NF-e nº 18.204 validada pelo RENAVE.'),
+              ck(false, 'Código de segurança do CRV', 'Pendente', 'Obrigatório para registrar a venda de veículo usado. Está no CRV ou no CRLV-e do veículo.', 'Informar código'),
+              ck(true, 'Restrições e certificado', 'OK', 'Sem restrição impeditiva · certificado e-CNPJ da Matriz válido até 14/08/2027.')
+            ],
+            timeline: [
+              { title: 'Aptidão para venda consultada', detail: 'Sem impedimentos no RENAVE', when: '23/11/2026 15:08 · Marina Costa', dot: '#067A45' },
+              { title: 'Entrada confirmada', detail: 'Termo de entrada emitido pelo RENAVE', when: '03/10/2026 11:41 · Conector RENAVE', dot: '#067647' },
+              { title: 'NF-e de entrada vinculada', detail: 'nº 18.204 · coerência validada', when: '03/10/2026 11:40 · Integração ERP', dot: '#067A45' },
+              { title: 'ATPV-e assinada pelo vendedor', detail: 'Assinatura eletrônica avançada', when: '03/10/2026 10:57 · Vendedor PF', dot: '#067A45' },
+              { title: 'Entrada solicitada', detail: 'Compra de veículo usado · R$ 118.500,00', when: '03/10/2026 10:31 · Marina Costa', dot: '#067A45' },
+              { title: 'Identificação prévia aprovada', detail: '8 fotos + hodômetro 38.412 km', when: '02/10/2026 17:20 · Pátio Matriz', dot: '#067A45' },
+              { title: 'Veículo consultado', detail: 'Apto para entrada', when: '02/10/2026 16:58 · Marina Costa', dot: '#98A2B3' }
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

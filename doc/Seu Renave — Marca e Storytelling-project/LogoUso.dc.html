@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Uso do logo — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Nunito:wght@800;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          width: 1600px;
+          height: 1000px;
+          box-sizing: border-box;
+          padding: 44px 64px;
+          background: #f7f8fa;
+          font-family: Inter, system-ui, sans-serif;
+          color: #0b2550;
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          "
+        >
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div
+              style="
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #067a45;
+              "
+            >
+              03 · Regras de uso
+            </div>
+            <h1
+              style="
+                margin: 0;
+                font-family: Nunito, Inter, sans-serif;
+                font-size: 40px;
+                font-weight: 900;
+              "
+            >
+              Construção, proteção e limites
+            </h1>
+          </div>
+          <span style="font-size: 15px; color: #475467"
+            >Módulo
+            <strong
+              style="
+                color: #0b2550;
+                font-family: &quot;JetBrains Mono&quot;, monospace;
+              "
+              >x</strong
+            >
+            = altura do selo de check (1/4 do símbolo)</span
+          >
+        </div>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(
+                0,
+                1fr
+              );
+            gap: 20px;
+          "
+        >
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+            "
+          >
+            <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+              Grid de construção
+            </h2>
+            <div style="display: flex; justify-content: center">
+              <div
+                style="
+                  position: relative;
+                  width: 240px;
+                  height: 240px;
+                  background: #f7f8fa;
+                "
+              >
+                <dc-import
+                  name="Logo"
+                  size="{{ 240 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  hint-size="240px,240px"
+                ></dc-import>
+                <svg
+                  width="240"
+                  height="240"
+                  viewBox="0 0 64 64"
+                  aria-hidden="true"
+                  style="position: absolute; left: 0; top: 0"
+                >
+                  <g
+                    stroke="#067A45"
+                    stroke-width="0.2"
+                    stroke-dasharray="0.8 0.8"
+                    fill="none"
+                    opacity="0.8"
+                  >
+                    <path
+                      d="M0 16H64M0 32H64M0 48H64M16 0V64M32 0V64M48 0V64"
+                    ></path>
+                    <path d="M18 0V64M48 0V64"></path>
+                  </g>
+                  <circle
+                    cx="48"
+                    cy="29"
+                    r="10.5"
+                    fill="none"
+                    stroke="#B54708"
+                    stroke-width="0.35"
+                    stroke-dasharray="1 0.8"
+                  ></circle>
+                  <path
+                    d="M11 31H43"
+                    stroke="#B54708"
+                    stroke-width="0.35"
+                    stroke-dasharray="1 0.8"
+                  ></path>
+                </svg>
+              </div>
+            </div>
+            <p
+              style="
+                margin: 0;
+                font-size: 13px;
+                line-height: 1.55;
+                color: #475467;
+              "
+            >
+              Grade 4×4 (módulo 16 u). Documento de 30 u de largura com traço 5
+              u; selo centrado na borda direita, na altura média; carro 2 u mais
+              largo que o documento à esquerda; estrada nasce no canto inferior
+              esquerdo.
+            </p>
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+            "
+          >
+            <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+              Área de proteção
+            </h2>
+            <div
+              style="
+                flex-grow: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <div
+                style="
+                  position: relative;
+                  padding: 34px;
+                  border: 1.5px dashed #067a45;
+                  border-radius: 6px;
+                  background: #e7f6ee;
+                "
+              >
+                <div style="background: #ffffff">
+                  <dc-import
+                    name="Logo"
+                    size="{{ 84 }}"
+                    variant="cor"
+                    lockup="h"
+                    hint-size="430px,84px"
+                  ></dc-import>
+                </div>
+                <span
+                  style="
+                    position: absolute;
+                    top: 8px;
+                    left: 50%;
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #067a45;
+                  "
+                  >1x</span
+                >
+                <span
+                  style="
+                    position: absolute;
+                    bottom: 8px;
+                    left: 50%;
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #067a45;
+                  "
+                  >1x</span
+                >
+                <span
+                  style="
+                    position: absolute;
+                    left: 8px;
+                    top: 44%;
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #067a45;
+                  "
+                  >1x</span
+                >
+                <span
+                  style="
+                    position: absolute;
+                    right: 8px;
+                    top: 44%;
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: #067a45;
+                  "
+                  >1x</span
+                >
+              </div>
+            </div>
+            <p
+              style="
+                margin: 0;
+                font-size: 13px;
+                line-height: 1.55;
+                color: #475467;
+              "
+            >
+              Espaço livre mínimo de 1x (altura do selo de check) em todos os
+              lados.
+            </p>
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+            "
+          >
+            <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+              Tamanhos mínimos e ícones
+            </h2>
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                font-size: 14px;
+                color: #475467;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  border-bottom: 1px solid #f2f4f7;
+                  padding-bottom: 6px;
+                "
+              >
+                <span>Horizontal</span
+                ><strong style="color: #0b2550">≥ 120 px · 30 mm</strong>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  border-bottom: 1px solid #f2f4f7;
+                  padding-bottom: 6px;
+                "
+              >
+                <span>Símbolo completo</span
+                ><strong style="color: #0b2550">≥ 48 px · 12 mm</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between">
+                <span>Símbolo simplificado</span
+                ><strong style="color: #0b2550">≥ 16 px · 5 mm</strong>
+              </div>
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: flex-end;
+                gap: 14px;
+                padding-top: 6px;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 4px;
+                "
+              >
+                <dc-import
+                  name="Logo"
+                  size="{{ 16 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  simples="{{ true }}"
+                  hint-size="16px,16px"
+                ></dc-import
+                ><span style="font-size: 11px; color: #475467">16</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 4px;
+                "
+              >
+                <dc-import
+                  name="Logo"
+                  size="{{ 32 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  simples="{{ true }}"
+                  hint-size="32px,32px"
+                ></dc-import
+                ><span style="font-size: 11px; color: #475467">32</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 4px;
+                "
+              >
+                <div
+                  style="
+                    width: 72px;
+                    height: 72px;
+                    border-radius: 16px;
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <dc-import
+                    name="Logo"
+                    size="{{ 56 }}"
+                    variant="cor"
+                    lockup="simbolo"
+                    simples="{{ true }}"
+                    hint-size="56px,56px"
+                  ></dc-import>
+                </div>
+                <span style="font-size: 11px; color: #475467">180</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 4px;
+                "
+              >
+                <div
+                  style="
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 22px;
+                    background: #0b2550;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  <dc-import
+                    name="Logo"
+                    size="{{ 76 }}"
+                    variant="escuro"
+                    lockup="simbolo"
+                    simples="{{ true }}"
+                    hint-size="76px,76px"
+                  ></dc-import>
+                </div>
+                <span style="font-size: 11px; color: #475467">512 · dark</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1"
+        >
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600">Não faça</h2>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(6, minmax(0, 1fr));
+              gap: 14px;
+              flex-grow: 1;
+            "
+          >
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  flex-grow: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div style="filter: hue-rotate(150deg) saturate(1.6)">
+                  <dc-import
+                    name="Logo"
+                    size="{{ 70 }}"
+                    variant="cor"
+                    lockup="simbolo"
+                    hint-size="70px,70px"
+                  ></dc-import>
+                </div>
+              </div>
+              <div
+                style="
+                  padding: 9px 10px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  background: #fef3f2;
+                  color: #b42318;
+                  font-size: 13px;
+                  font-weight: 600;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B42318"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6L6 18"></path></svg
+                >Trocar as cores
+              </div>
+            </div>
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  flex-grow: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  background: #f2a90c;
+                "
+              >
+                <dc-import
+                  name="Logo"
+                  size="{{ 70 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  hint-size="70px,70px"
+                ></dc-import>
+              </div>
+              <div
+                style="
+                  padding: 9px 10px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  background: #fef3f2;
+                  color: #b42318;
+                  font-size: 13px;
+                  font-weight: 600;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B42318"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6L6 18"></path></svg
+                >Âmbar em grandes áreas
+              </div>
+            </div>
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  flex-grow: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 6px;
+                "
+              >
+                <dc-import
+                  name="Logo"
+                  size="{{ 52 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  simples="{{ true }}"
+                  hint-size="52px,52px"
+                ></dc-import>
+                <svg
+                  width="48"
+                  height="40"
+                  viewBox="10 30 34 26"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M14 40L17.5 33.5C18.3 32 19.6 31 21.3 31H32.7C34.4 31 35.7 32 36.5 33.5L40 40C41.7 40.6 43 42.2 43 44V49A2 2 0 0 1 41 51H39V53A2 2 0 0 1 37 55H34A2 2 0 0 1 32 53V51H22V53A2 2 0 0 1 20 55H17A2 2 0 0 1 15 53V51H13A2 2 0 0 1 11 49V44C11 42.2 12.3 40.6 14 40Z"
+                    fill="#0B2550"
+                  ></path>
+                </svg>
+              </div>
+              <div
+                style="
+                  padding: 9px 10px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  background: #fef3f2;
+                  color: #b42318;
+                  font-size: 13px;
+                  font-weight: 600;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B42318"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6L6 18"></path></svg
+                >Separar o carro
+              </div>
+            </div>
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  flex-grow: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div style="transform: scaleX(1.7)">
+                  <dc-import
+                    name="Logo"
+                    size="{{ 60 }}"
+                    variant="cor"
+                    lockup="simbolo"
+                    hint-size="60px,60px"
+                  ></dc-import>
+                </div>
+              </div>
+              <div
+                style="
+                  padding: 9px 10px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  background: #fef3f2;
+                  color: #b42318;
+                  font-size: 13px;
+                  font-weight: 600;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B42318"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6L6 18"></path></svg
+                >Esticar
+              </div>
+            </div>
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  flex-grow: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  background: repeating-linear-gradient(
+                    45deg,
+                    #94a3b8 0 8px,
+                    #cbd5e1 8px 16px,
+                    #64748b 16px 24px
+                  );
+                "
+              >
+                <dc-import
+                  name="Logo"
+                  size="{{ 70 }}"
+                  variant="cor"
+                  lockup="simbolo"
+                  hint-size="70px,70px"
+                ></dc-import>
+              </div>
+              <div
+                style="
+                  padding: 9px 10px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  background: #fef3f2;
+                  color: #b42318;
+                  font-size: 13px;
+                  font-weight: 600;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B42318"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6L6 18"></path></svg
+                >Foto poluída
+              </div>
+            </div>
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 12px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+              "
+            >
+              <div
+                style="
+                  flex-grow: 1;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <div
+                  style="filter: drop-shadow(4px 6px 3px rgba(11, 37, 80, 0.5))"
+                >
+                  <dc-import
+                    name="Logo"
+                    size="{{ 70 }}"
+                    variant="cor"
+                    lockup="simbolo"
+                    hint-size="70px,70px"
+                  ></dc-import>
+                </div>
+              </div>
+              <div
+                style="
+                  padding: 9px 10px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  background: #fef3f2;
+                  color: #b42318;
+                  font-size: 13px;
+                  font-weight: 600;
+                "
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#B42318"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 6l12 12M18 6L6 18"></path></svg
+                >Sombra ou contorno
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1600,"height":1000}}'
+    >
+      class Component extends DCLogic {
+        renderVals() { return {}; }
+      }
+    </script>
+  </body>
+</html>

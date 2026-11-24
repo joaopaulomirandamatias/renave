@@ -14,7 +14,7 @@
 | ID | Regra | Sev. | Origem |
 |---|---|---|---|
 | RN-GER-01 | Toda operação pertence a **um tenant e um estabelecimento**. O contexto é resolvido **no backend**, nunca vindo só do frontend. | 🔴 | GUIA, ANEXO |
-| RN-GER-02 | O RENAVE só é acessado com **certificado e-CNPJ ICP-Brasil válido** do estabelecimento. Certificado expirado, suspenso ou revogado **bloqueia** qualquer chamada. | 🔴 | RES art. 30 |
+| RN-GER-02 | No modo padrão `INTEGRADORA`, o RENAVE só é acessado com o **e-CNPJ ICP-Brasil válido da integradora**, mantido em HSM, e com `CNPJ-Estabelecimento` resolvido no backend. Certificado expirado, suspenso, revogado ou identidade divergente em `cliente-autenticado` **bloqueia** a chamada. O certificado do estabelecimento existe apenas no modo legado `ESTABELECIMENTO`, desligado por padrão. | 🔴 | RES art. 30, doc 14 |
 | RN-GER-03 | Todo registro exige um **título do negócio jurídico**: compra, venda, transferência entre estabelecimentos, consignação, execução de garantia real, entrada de veículo próprio ou entrada de veículo retomado. | 🔴 | RES art. 2º VI, 16, 17 |
 | RN-GER-04 | Não há registro para veículo com **restrição impeditiva** ou **débito não liquidado**. Exigir consulta de aptidão **válida e recente** antes do envio. | 🔴 | RES art. 11 §2º |
 | RN-GER-05 | O estado local **"Em estoque"** ou **"Baixado"** só é assumido **após confirmação** do RENAVE ou reconciliação. Nunca de forma otimista. | 🔴 | GUIA |
@@ -35,9 +35,9 @@
 | RN-ADE-02 | CNPJ deve ter DV válido, aceitando o **formato alfanumérico** e situação cadastral **ativa**. | 🔴 | PROD |
 | RN-ADE-03 | Quem vende **0 km** tem adesão **obrigatória**. Credoras têm adesão **facultativa**. | 🔵 | RES art. 7º §2º, II |
 | RN-ADE-04 | Quando a adesão é feita **por intermédio da integradora**, o estabelecimento passa a usar **o sistema homologado dessa integradora** (vínculo registrado). | 🔴 | RES art. 8º §3º |
-| RN-ADE-05 | A adesão exige o **e-CNPJ válido do estabelecimento**. Sem certificado cadastrado e válido, a etapa "Credencia" não avança. | 🔴 | RES art. 8º §1º, 10 |
+| RN-ADE-05 | No modo padrão `INTEGRADORA`, a etapa Credencia exige **vínculo ativo e habilitado** entre o estabelecimento e a integradora para a natureza do serviço; o estabelecimento não entrega sua chave privada. No modo legado `ESTABELECIMENTO`, exige-se o e-CNPJ válido do estabelecimento. | 🔴 | RES art. 8º §1º, 10; doc 14 |
 | RN-ADE-06 | O status do pedido segue a máquina: `RASCUNHO → PROTOCOLADO → EM_ANALISE → (PENDENTE ↔ EM_ANALISE) → APROVADO / INDEFERIDO`. Os prazos de análise são acompanhados (30 + 30 dias). Pendência não sanada em **30 dias** gera **alerta de indeferimento iminente** a partir do 20º dia. | 🟠 | RES art. 10 |
-| RN-ADE-07 | Só vai para **produção** o estabelecimento com adesão aprovada, certificado válido, homologação concluída e aceite dos termos de uso e privacidade. | 🔴 | GUIA, ANEXO |
+| RN-ADE-07 | Só vai para **produção** o estabelecimento com adesão aprovada, vínculo Credencia verificado para a natureza, homologação concluída, aceite dos termos de uso e privacidade e certificado da integradora saudável. A ativação do modo `INTEGRADORA` em produção depende de confirmação formal do SERPRO e do contrato publicado no Swagger de produção. | 🔴 | GUIA, ANEXO, doc 14 |
 | RN-ADE-08 | Com a adesão cancelada por reincidência, nova adesão só é possível **180 dias** após a decisão definitiva. O sistema guarda essa data e bloqueia nova solicitação. | 🔴 | RES art. 26 §2º |
 | RN-ADE-09 | Em **sucessão empresarial** (incorporação, fusão, cisão), o estoque e os consignados são transferidos à sucessora **sem perder o histórico**, com a operação de sucessão registrada na auditoria. | 🟠 | RES art. 22 |
 | RN-ADE-10 | Em **falência ou liquidação**, um **administrador judicial** recebe perfil próprio. Os consignados são separados e seus contratos cancelados, com a posse restituída. | 🟠 | RES art. 21 |
@@ -79,8 +79,9 @@
 | RN-ENT-01c | O **e-mail do estabelecimento** é cadastrado uma vez e enviado sempre igual. Se já houver uma intenção de venda ("2 — Venda Comunicada"), valor e e-mails devem **coincidir** com ela. | 🔴 | MAN |
 | RN-ENT-01d | A assinatura do vendedor no ATPV é enviada num de quatro formatos: foto do ATPV papel-moeda assinado de próprio punho; foto do ATPV-e assinado de próprio punho; P7S qualificado sobre a foto; ou **P7S qualificado sobre o XML do ATPV-e**, assinando **exatamente os bytes** retornados pelo RENAVE. A assinatura **avançada gov.br** (contas prata/ouro) é feita pela CDT e dispensa o envio. Um novo envio sobrescreve o anterior até o DETRAN iniciar a transferência. Veículo próprio **não** precisa de assinatura. | 🔴 | MAN |
 | RN-ENT-01e | O RENAVE pede **consentimento ao DETRAN**. Se a comunicação com o DETRAN falhar (`comunicacaoComDetranFalhou`), a operação fica **"Aguardando DETRAN"** e é refeita automaticamente mais tarde. | 🟠 | MAN |
+| RN-ENT-01f | Na compra de usado, **ATPV-e assinada e NF-e não são pré-condições do POST inicial**. A sequência oficial é: solicitar entrada → criar/reaproveitar intenção e disponibilizar ATPV → assinar/enviar ATPV → DETRAN levar o estoque a `TRANSFERIDO` → emissão do CRV levar a `CONFIRMADO` → emitir/informar NF-e → liberar a obtenção do CRLV. Cada ausência posterior vira pendência explícita e bloqueia a etapa dependente, não a solicitação inicial. | 🔴 | DIAGRAMA OFICIAL SERPRO |
 | RN-ENT-02 | Na compra de usado, o estabelecimento deve **emitir NF-e de compra** e **assinar a ATPV-e**. | 🔴 | RES art. 14 |
-| RN-ENT-03 | **Entrada de veículo próprio** exige: estabelecimento proprietário, identificação prévia, data, valor e título "entrada em estoque de veículo próprio". Não exige vendedor. | 🔴 | RES art. 16 |
+| RN-ENT-03 | **Entrada de veículo próprio** exige: estabelecimento proprietário, identificação prévia, data, valor e título "entrada em estoque de veículo próprio". Não exige vendedor nem assinatura do vendedor, mas a **NF-e de entrada deve ser enviada após a solicitação bem-sucedida**. | 🔴 | RES art. 16, MAN |
 | RN-ENT-04 | A identificação prévia pode ser **substituída por vistoria veicular**, a critério do estabelecimento (Res. 1.032 art. 35 §§2º–3º). A **vistoria de transferência é dispensada** quando a transferência se destina à entrada em estoque Renave (Res. 1.032 art. 35 §1º II). A escolha e as evidências são registradas. O Seu Renave **não realiza vistoria**: só registra a evidência ou o resultado vindo de empresa de vistoria, por causa da vedação cruzada. | 🔵 | RES 1.026 art. 15; RES 1.032 art. 35 |
 | RN-ENT-05 | A **data de entrada** não pode ser futura e não pode ser anterior à data da ATPV-e/assinatura do vendedor. | 🔴 | PROD |
 | RN-ENT-06 | O **valor** deve ser maior que zero e **coerente com a NF-e** (tolerância zero, salvo regra MAN diferente). | 🔴 | RES art. 5º VI, PROD |
@@ -134,7 +135,7 @@
 | ID | Regra | Sev. | Origem |
 |---|---|---|---|
 | RN-TRF-01 | Só ocorre entre estabelecimentos **aderidos** ao Renave. O sistema checa a adesão do destino antes de solicitar. | 🔴 | RES art. 19 §1º |
-| RN-TRF-02 | É solicitada **pelo vendedor**, com identificação prévia, comprador, data, valor, título e NF-e. | 🔴 | RES art. 19 |
+| RN-TRF-02 | O estabelecimento de **origem autoriza** a transferência; o estabelecimento de **destino aceita/consome a autorização e solicita a entrada**, com identificação prévia ou vistoria quando aplicável. Os dois comandos, atores e escopos de permissão são distintos. | 🔴 | RES art. 19, DIAGRAMA OFICIAL SERPRO |
 | RN-TRF-03 | É **concluída somente após a confirmação** do estabelecimento comprador. Até lá, o veículo fica "Em transferência" e **não pode** ser vendido nem transferido de novo. | 🔴 | RES art. 19 §2º |
 | RN-TRF-04 | O comprador pode substituir a identificação prévia por **vistoria**. | 🔵 | RES art. 19 §4º |
 | RN-TRF-05 | A **transferência entre filiais** do mesmo grupo tem tratamento próprio quando previsto no MAN e mostra as duas pontas no mesmo painel. | 🔵 | GUIA |
@@ -210,7 +211,7 @@
 | RN-REC-09 | O **cancelamento** de uma operação só é oferecido quando permitido pelo RENAVE (tipo e janela) e gera uma **nova operação** de cancelamento, sem apagar a original. | 🔴 | GUIA, MAN |
 | RN-REC-10 | **Cancelar entrada** só é possível com o estoque no estado **SOLICITADO**. Depois de CONFIRMADO, a saída do veículo é feita por saída de estoque. O cancelamento anula a intenção de venda, e a ATPV-e já assinada perde o valor (o usuário é avisado). | 🔴 | MAN |
 | RN-REC-11 | **Cancelar saída** é exceção e só é possível enquanto o DETRAN **não** transferiu o veículo. Ela recria o estoque como CONFIRMADO. Saídas com benefício **Renovar** **não** podem ser canceladas. | 🔴 | MAN |
-| RN-REC-12 | O estado local mapeia os estados do RENAVE: `SOLICITADO` → "Aguardando DETRAN/confirmação"; `CONFIRMADO` → "Em estoque"; `TRANSFERIDO` → "Transferido"; `FINALIZADO` → "Baixado". Qualquer divergência entre os dois estados gera `reconciliation_issue`. | 🔴 | MAN |
+| RN-REC-12 | O estado local mapeia os estados do RENAVE: `SOLICITADO` → "Entrada solicitada/aguardando transferência"; `TRANSFERIDO` → "Propriedade transferida/aguardando novo CRV"; `CONFIRMADO` → "Em estoque"; `FINALIZADO` → "Baixado". Na entrada comprada, `TRANSFERIDO` é intermediário entre `SOLICITADO` e `CONFIRMADO`, não terminal. Qualquer divergência entre os dois estados gera `reconciliation_issue`. | 🔴 | MAN, DIAGRAMA OFICIAL SERPRO |
 
 ## 4.15 Auditoria (AUD)
 

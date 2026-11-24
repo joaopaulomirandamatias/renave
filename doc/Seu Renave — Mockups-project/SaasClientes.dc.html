@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backoffice — Clientes — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 14px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div style="flex: 1 1 248px; max-width: 100%; background: #0b2550">
+          <dc-import
+            name="SidebarSaas"
+            active="clientes"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <header
+            style="
+              box-sizing: border-box;
+              min-height: 64px;
+              padding: 10px 32px;
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #e4e7ec;
+            "
+          >
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 30px;
+                padding: 0 12px;
+                border-radius: 999px;
+                background: #0b2550;
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+              "
+              ><span
+                style="
+                  width: 7px;
+                  height: 7px;
+                  border-radius: 999px;
+                  background: #0a9b55;
+                "
+              ></span
+              >Backoffice — Seu Renave</span
+            >
+            <span
+              style="
+                margin-left: auto;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 4px 10px;
+                border-radius: 999px;
+                background: #ecfdf3;
+                color: #067647;
+              "
+              >PRODUÇÃO</span
+            >
+          </header>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Clientes
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  51 empresas-clientes (tenants) · cobrança por registro
+                  confirmado · valores faturados são dados de exemplo
+                </p>
+              </div>
+              <a
+                href="SaasNovoCliente.dc.html"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  height: 44px;
+                  padding: 0 16px;
+                  border-radius: 8px;
+                  background: #067a45;
+                  color: #ffffff;
+                  font-size: 14px;
+                  font-weight: 600;
+                "
+                ><svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" /></svg
+                >Novo cliente</a
+              >
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              <sc-for list="{{chips}}" as="c" hint-placeholder-count="6">
+                <button
+                  type="button"
+                  aria-pressed="{{c.on}}"
+                  style="height: 36px; padding: 0 12px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid {{c.border}}; background: {{c.bg}}; color: {{c.color}}"
+                >
+                  {{c.label}} <span style="font-weight: 500">{{c.n}}</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <section
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                padding: 16px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 12px;
+              "
+            >
+              <label
+                style="
+                  grid-column: span 2;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Buscar<input
+                  placeholder="Nome, CNPJ ou e-mail do administrador"
+                  style="
+                    height: 40px;
+                    box-sizing: border-box;
+                    padding: 0 12px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                  "
+              /></label>
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Tipo<select
+                  style="
+                    height: 40px;
+                    padding: 0 10px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                    background: #ffffff;
+                  "
+                >
+                  <option>Todos</option>
+                  <option>Revenda</option>
+                  <option>Concessionária</option>
+                  <option>Grupo</option>
+                  <option>Montadora</option>
+                  <option>ITE</option>
+                  <option>Instituição credora</option>
+                </select></label
+              >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >Módulo habilitado<select
+                  style="
+                    height: 40px;
+                    padding: 0 10px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                    background: #ffffff;
+                  "
+                >
+                  <option>Todos</option>
+                  <option>Usados</option>
+                  <option>Zero km</option>
+                  <option>ITE / inacabados</option>
+                  <option>Consignação</option>
+                  <option>Retomados</option>
+                </select></label
+              >
+              <label
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  font-size: 13px;
+                  font-weight: 500;
+                  color: #344054;
+                "
+                >CSM<select
+                  style="
+                    height: 40px;
+                    padding: 0 10px;
+                    border: 1px solid #d0d5dd;
+                    border-radius: 8px;
+                    font: inherit;
+                    font-size: 14px;
+                    background: #ffffff;
+                  "
+                >
+                  <option>Todos</option>
+                  <option>Bruno Tavares</option>
+                  <option>Carla Dias</option>
+                </select></label
+              >
+            </section>
+
+            <div
+              style="
+                background: #ffffff;
+                border: 1px solid #e4e7ec;
+                border-radius: 10px;
+                overflow-x: auto;
+              "
+            >
+              <table
+                style="
+                  width: 100%;
+                  border-collapse: collapse;
+                  min-width: 1180px;
+                "
+              >
+                <thead>
+                  <tr>
+                    <th>Empresa</th>
+                    <th>CNPJ raiz</th>
+                    <th>Tipo</th>
+                    <th>Status</th>
+                    <th>Estab.</th>
+                    <th>Usuários</th>
+                    <th>Registros no mês</th>
+                    <th>Faturado no mês (exemplo)</th>
+                    <th>Saúde</th>
+                    <th>CSM</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+                    <tr>
+                      <td>
+                        <a
+                          href="SaasClienteDetalhe.dc.html"
+                          style="font-weight: 600; color: #101828"
+                          >{{r.nome}}</a
+                        >
+                      </td>
+                      <td
+                        style="
+                          font-family: ui-monospace, Menlo, monospace;
+                          font-size: 13px;
+                          color: #344054;
+                        "
+                      >
+                        {{r.cnpj}}
+                      </td>
+                      <td style="color: #344054">{{r.tipo}}</td>
+                      <td>
+                        <span
+                          style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: {{r.stBg}}; color: {{r.stColor}}"
+                          >{{r.status}}</span
+                        >
+                      </td>
+                      <td>{{r.estab}}</td>
+                      <td>{{r.users}}</td>
+                      <td>{{r.ops}}</td>
+                      <td>{{r.mrr}}</td>
+                      <td>
+                        <span
+                          style="
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                          "
+                          ><span
+                            style="
+                              width: 48px;
+                              height: 6px;
+                              border-radius: 999px;
+                              background: #f2f4f7;
+                              overflow: hidden;
+                              display: inline-block;
+                            "
+                            ><span
+                              style="display: block; height: 6px; width: {{r.hPct}}; background: {{r.hColor}}"
+                            ></span></span
+                          ><span
+                            style="font-size: 13px; font-weight: 600; color: {{r.hColor}}"
+                            >{{r.saude}}</span
+                          ></span
+                        >
+                      </td>
+                      <td style="color: #344054">{{r.csm}}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <span style="font-size: 13px; color: #475467"
+              >Saúde: combina uso, pendências abertas, certificados,
+              inadimplência e chamados. Abaixo de 60 aciona o CSM.</span
+            >
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1200}}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const S = { 'Homologação': ['#EFF8FF', '#175CD3'], Ativo: ['#ECFDF3', '#067647'], Inadimplente: ['#FFFAEB', '#B54708'], Suspenso: ['#FEF3F2', '#B42318'], Encerrado: ['#F2F4F7', '#344054'] };
+          const r = (nome, cnpj, tipo, plano, status, estab, users, ops, mrr, s, csm) => ({ nome, cnpj, tipo, plano, status, stBg: S[status][0], stColor: S[status][1], estab, users, ops, mrr, saude: String(s), hPct: s + '%', hColor: s >= 80 ? '#067647' : (s >= 60 ? '#B54708' : '#B42318'), csm });
+          const chip = (label, n, on) => ({ label, n, on: on ? 'true' : 'false', bg: on ? '#101828' : '#FFFFFF', color: on ? '#FFFFFF' : '#344054', border: on ? '#101828' : '#D0D5DD' });
+          return {
+            chips: [chip('Todos', '51', true), chip('Homologação', '9'), chip('Ativo', '37'), chip('Inadimplente', '3'), chip('Suspenso', '1'), chip('Encerrado', '1')],
+            rows: [
+              r('Auto Prime Veículos Ltda', '12.345.***', 'Grupo', 'Grupo', 'Ativo', '3', '9', '3.604', 'R$ 6.300', 74, 'Carla Dias'),
+              r('Concessionária Litoral Norte S.A.', '23.456.***', 'Concessionária', 'Grupo', 'Ativo', '5', '22', '4.212', 'R$ 7.900', 91, 'Bruno Tavares'),
+              r('Montadora Exemplo do Brasil', '34.567.***', 'Montadora', 'Enterprise / API', 'Homologação', '1', '6', '0', 'Sem cobrança', 88, 'Bruno Tavares'),
+              r('Financeira Crédito Fácil', '45.678.***', 'Instituição credora', 'Enterprise / API', 'Ativo', '1', '4', '1.120', 'R$ 3.200', 95, 'Carla Dias'),
+              r('Revenda Bom Negócio ME', '56.789.***', 'Revenda', 'Essencial', 'Inadimplente', '1', '2', '96', 'R$ 390', 41, 'Carla Dias'),
+              r('Implementos Rota Sul (ITE)', '67.890.***', 'ITE', 'Profissional', 'Homologação', '1', '3', '0', 'Sem cobrança', 70, 'Bruno Tavares'),
+              r('Garagem Bandeirantes Ltda', '78.901.***', 'Revenda', 'Profissional', 'Suspenso', '2', '5', '311', 'R$ 1.150', 38, 'Carla Dias'),
+              r('Multimarcas Horizonte Ltda', '89.012.***', 'Revenda', 'Essencial', 'Encerrado', '1', '0', '0', '—', 0, '—')
+            ]
+          };
+        }
+      }
+    </script>
+  </body>
+</html>

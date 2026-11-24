@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tom de voz e taglines — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap"
+        />
+        <style>
+          body {
+            margin: 0;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          width: 1600px;
+          height: 1000px;
+          box-sizing: border-box;
+          padding: 48px 64px;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        "
+      >
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          "
+        >
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div
+              style="
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #0f766e;
+              "
+            >
+              10 · Voz
+            </div>
+            <h1
+              style="
+                margin: 0;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 40px;
+                font-weight: 600;
+                letter-spacing: -0.025em;
+              "
+            >
+              Falamos como quem cuida do que é seu
+            </h1>
+          </div>
+          <p
+            style="margin: 0; font-size: 15px; color: #475467; max-width: 600px"
+          >
+            Sempre:
+            <strong style="color: #101828"
+              >plataforma privada de integração com o RENAVE</strong
+            >, exclusiva para escrituração de entradas, saídas, transferências e
+            consignações. Nunca falar como se fôssemos o RENAVE oficial ou um
+            sistema de gestão de loja.
+          </p>
+        </div>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+          "
+        >
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 12px;
+              padding: 16px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            "
+          >
+            <strong
+              style="
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 20px;
+                color: #115e59;
+              "
+              >Claro</strong
+            >
+            <span style="font-size: 13px; color: #067647; font-weight: 600"
+              >Dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45"
+              >“Falta vincular a NF-e de entrada.”</span
+            >
+            <span style="font-size: 13px; color: #b42318; font-weight: 600"
+              >Não dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45; color: #475467"
+              >“Erro 422: payload inválido.”</span
+            >
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 12px;
+              padding: 16px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            "
+          >
+            <strong
+              style="
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 20px;
+                color: #115e59;
+              "
+              >Seguro</strong
+            >
+            <span style="font-size: 13px; color: #067647; font-weight: 600"
+              >Dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45"
+              >“Somos uma integradora privada; o registro é feito no RENAVE
+              oficial.”</span
+            >
+            <span style="font-size: 13px; color: #b42318; font-weight: 600"
+              >Não dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45; color: #475467"
+              >“O novo RENAVE” ou “o RENAVE oficial”.</span
+            >
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 12px;
+              padding: 16px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            "
+          >
+            <strong
+              style="
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 20px;
+                color: #115e59;
+              "
+              >Humano</strong
+            >
+            <span style="font-size: 13px; color: #067647; font-weight: 600"
+              >Dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45"
+              >“Pronto, Marina. O veículo já está no seu estoque.”</span
+            >
+            <span style="font-size: 13px; color: #b42318; font-weight: 600"
+              >Não dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45; color: #475467"
+              >“Operação processada com êxito pelo sistema.”</span
+            >
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 12px;
+              padding: 16px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            "
+          >
+            <strong
+              style="
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 20px;
+                color: #115e59;
+              "
+              >Preciso</strong
+            >
+            <span style="font-size: 13px; color: #067647; font-weight: 600"
+              >Dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45"
+              >“Você paga só pelo registro realizado.”</span
+            >
+            <span style="font-size: 13px; color: #b42318; font-weight: 600"
+              >Não dizemos</span
+            ><span style="font-size: 14px; line-height: 1.45; color: #475467"
+              >“Planos a partir de…” ou “garantimos zero multas”.</span
+            >
+          </div>
+        </div>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+            gap: 18px;
+            flex-grow: 1;
+          "
+        >
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            "
+          >
+            <strong style="font-size: 15px">Taglines</strong>
+            <div
+              style="
+                padding: 14px;
+                border-radius: 10px;
+                background: #0f766e;
+                color: #ffffff;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+              "
+            >
+              <span
+                style="
+                  font-size: 12px;
+                  font-weight: 700;
+                  letter-spacing: 0.06em;
+                  color: #ccfbf1;
+                "
+                >OFICIAL · RECOMENDADA</span
+              >
+              <span
+                style="
+                  font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                  font-size: 22px;
+                  font-weight: 600;
+                  line-height: 1.3;
+                "
+                >O RENAVE da sua empresa, do seu jeito.</span
+              >
+            </div>
+            <div
+              style="
+                padding: 12px 14px;
+                border-radius: 10px;
+                border: 1px solid #e4e7ec;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 17px;
+                font-weight: 600;
+              "
+            >
+              RENAVE sem complicação.
+            </div>
+            <div
+              style="
+                padding: 12px 14px;
+                border-radius: 10px;
+                border: 1px solid #e4e7ec;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 17px;
+                font-weight: 600;
+              "
+            >
+              Suas operações RENAVE em dia.
+            </div>
+            <div
+              style="
+                padding: 12px 14px;
+                border-radius: 10px;
+                border: 1px solid #e4e7ec;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 17px;
+                font-weight: 600;
+              "
+            >
+              Simples, seguro e do seu jeito.
+            </div>
+            <div
+              style="
+                padding: 12px 14px;
+                border-radius: 10px;
+                border: 1px solid #e4e7ec;
+                font-family: &quot;Space Grotesk&quot;, Inter, sans-serif;
+                font-size: 17px;
+                font-weight: 600;
+              "
+            >
+              Registrou, tá feito.
+            </div>
+            <span style="font-size: 13px; color: #475467"
+              >Secundárias: campanhas, posts e títulos de seção.</span
+            >
+          </div>
+          <div
+            style="
+              background: #ffffff;
+              border: 1px solid #e4e7ec;
+              border-radius: 14px;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              gap: 12px;
+            "
+          >
+            <strong style="font-size: 15px">Mensagens por público</strong>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+                flex-grow: 1;
+              "
+            >
+              <div
+                style="
+                  border-radius: 10px;
+                  background: #f6f7f9;
+                  padding: 14px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span
+                  style="
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #0f766e;
+                    letter-spacing: 0.06em;
+                  "
+                  >REVENDA DE USADOS</span
+                >
+                <strong style="font-size: 16px; line-height: 1.35"
+                  >Dê entrada e venda no RENAVE sem medo de errar.</strong
+                >
+                <ul
+                  style="
+                    margin: 0;
+                    padding-left: 18px;
+                    font-size: 13px;
+                    line-height: 1.6;
+                    color: #475467;
+                  "
+                >
+                  <li>Assistente passo a passo, conferido antes de enviar</li>
+                  <li>Paga só pelo registro realizado, sem mensalidade</li>
+                  <li>Prova de cada operação para a fiscalização</li>
+                </ul>
+              </div>
+              <div
+                style="
+                  border-radius: 10px;
+                  background: #f6f7f9;
+                  padding: 14px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span
+                  style="
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #0f766e;
+                    letter-spacing: 0.06em;
+                  "
+                  >CONCESSIONÁRIA / GRUPO</span
+                >
+                <strong style="font-size: 16px; line-height: 1.35"
+                  >Todas as filiais em dia, num só painel.</strong
+                >
+                <ul
+                  style="
+                    margin: 0;
+                    padding-left: 18px;
+                    font-size: 13px;
+                    line-height: 1.6;
+                    color: #475467;
+                  "
+                >
+                  <li>0 km em lote e transferência entre filiais</li>
+                  <li>Pendências e certificados de todas as unidades</li>
+                  <li>Perfis e permissões por estabelecimento</li>
+                </ul>
+              </div>
+              <div
+                style="
+                  border-radius: 10px;
+                  background: #f6f7f9;
+                  padding: 14px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span
+                  style="
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #0f766e;
+                    letter-spacing: 0.06em;
+                  "
+                  >PARCEIRO DMS / ERP</span
+                >
+                <strong style="font-size: 16px; line-height: 1.35"
+                  >Seus clientes no RENAVE, sem sair do seu sistema.</strong
+                >
+                <ul
+                  style="
+                    margin: 0;
+                    padding-left: 18px;
+                    font-size: 13px;
+                    line-height: 1.6;
+                    color: #475467;
+                  "
+                >
+                  <li>API versionada e webhooks assinados</li>
+                  <li>Sandbox com cenários de homologação</li>
+                  <li>
+                    Integradora independente, sem conflito com o seu negócio
+                  </li>
+                </ul>
+              </div>
+              <div
+                style="
+                  border-radius: 10px;
+                  background: #f6f7f9;
+                  padding: 14px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                "
+              >
+                <span
+                  style="
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #0f766e;
+                    letter-spacing: 0.06em;
+                  "
+                  >INSTITUIÇÃO CREDORA</span
+                >
+                <strong style="font-size: 16px; line-height: 1.35"
+                  >Retomados registrados com rastreabilidade total.</strong
+                >
+                <ul
+                  style="
+                    margin: 0;
+                    padding-left: 18px;
+                    font-size: 13px;
+                    line-height: 1.6;
+                    color: #475467;
+                  "
+                >
+                  <li>Entrada de retomados com NSU ou processo</li>
+                  <li>Veículos aptos a financiamento visíveis</li>
+                  <li>Trilha imutável de cada movimentação</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1600,"height":1000}}'
+    >
+      class Component extends DCLogic {
+        renderVals() { return {}; }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Transferências — Seu Renave</title>
+    <script src="./_runtime/react.js"></script>
+    <script src="./_runtime/react-dom.js"></script>
+    <script src="./_runtime/support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #f6f7f9;
+          }
+          a {
+            color: #067a45;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #05663a;
+          }
+          th {
+            font-size: 12px;
+            font-weight: 600;
+            color: #475467;
+            text-align: left;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e4e7ec;
+            white-space: nowrap;
+          }
+          td {
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f2f4f7;
+            white-space: nowrap;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          background: #f6f7f9;
+          font-family: Inter, system-ui, sans-serif;
+          color: #101828;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: stretch;
+        "
+      >
+        <div
+          style="
+            flex: 1 1 248px;
+            max-width: 100%;
+            background: #ffffff;
+            border-right: 1px solid #e4e7ec;
+          "
+        >
+          <dc-import
+            name="Sidebar"
+            active="transferencias"
+            hint-size="248px,900px"
+          ></dc-import>
+        </div>
+        <div
+          style="
+            flex: 999 1 560px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <dc-import name="Topbar" hint-size="100%,64px"></dc-import>
+          <main
+            style="
+              box-sizing: border-box;
+              width: 100%;
+              max-width: 1192px;
+              padding: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                justify-content: space-between;
+                align-items: flex-end;
+              "
+            >
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <h1
+                  style="
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 600;
+                    letter-spacing: -0.01em;
+                  "
+                >
+                  Transferências
+                </h1>
+                <p style="margin: 0; font-size: 15px; color: #475467">
+                  Entre estabelecimentos aderidos ao RENAVE. A transferência só
+                  conclui com o aceite de quem recebe.
+                </p>
+              </div>
+              <a
+                href="Estoque.dc.html"
+                style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  height: 44px;
+                  padding: 0 16px;
+                  border-radius: 8px;
+                  background: #067a45;
+                  color: #ffffff;
+                  font-size: 14px;
+                  font-weight: 600;
+                "
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4" /></svg
+                >Nova transferência
+              </a>
+            </div>
+
+            <div
+              role="tablist"
+              aria-label="Transferências"
+              style="
+                display: flex;
+                gap: 4px;
+                border-bottom: 1px solid #e4e7ec;
+                overflow-x: auto;
+              "
+            >
+              <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected="{{t.on}}"
+                  onClick="{{t.pick}}"
+                  style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border: 0; background: transparent; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; font-weight: {{t.weight}}; color: {{t.color}}; border-bottom: 2px solid {{t.line}}"
+                >
+                  {{t.label}}
+                  <span
+                    style="font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: {{t.nBg}}; color: {{t.nColor}}"
+                    >{{t.n}}</span
+                  >
+                </button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{rec}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; flex-direction: column; gap: 16px">
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 24px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                  "
+                >
+                  <div
+                    style="
+                      display: flex;
+                      flex-wrap: wrap;
+                      gap: 12px;
+                      justify-content: space-between;
+                      align-items: flex-start;
+                    "
+                  >
+                    <div
+                      style="display: flex; flex-direction: column; gap: 6px"
+                    >
+                      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #e7f6ee;
+                            color: #05663a;
+                          "
+                          >Entre filiais</span
+                        ><span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #fffaeb;
+                            color: #b54708;
+                          "
+                          >Aguardando seu aceite</span
+                        >
+                      </div>
+                      <h2 style="margin: 0; font-size: 19px; font-weight: 600">
+                        Filial Campinas → Matriz São Paulo · 2 veículos
+                      </h2>
+                      <span style="font-size: 14px; color: #475467"
+                        >Solicitada em 22/11/2026 09:14 por Rafael Lima · aceite
+                        até 25/11/2026</span
+                      >
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                      <button
+                        type="button"
+                        style="
+                          height: 44px;
+                          padding: 0 16px;
+                          border: 1px solid #d0d5dd;
+                          border-radius: 8px;
+                          background: #ffffff;
+                          color: #b42318;
+                          font: inherit;
+                          font-size: 14px;
+                          font-weight: 600;
+                          cursor: pointer;
+                        "
+                      >
+                        Recusar
+                      </button>
+                      <button
+                        type="button"
+                        style="
+                          height: 44px;
+                          padding: 0 18px;
+                          border: 0;
+                          border-radius: 8px;
+                          background: #067a45;
+                          color: #ffffff;
+                          font: inherit;
+                          font-size: 14px;
+                          font-weight: 600;
+                          cursor: pointer;
+                        "
+                      >
+                        Aceitar e dar entrada
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      overflow-x: auto;
+                      border: 1px solid #e4e7ec;
+                      border-radius: 10px;
+                    "
+                  >
+                    <table
+                      style="
+                        width: 100%;
+                        border-collapse: collapse;
+                        min-width: 760px;
+                      "
+                    >
+                      <thead>
+                        <tr>
+                          <th>Veículo</th>
+                          <th>Chassi</th>
+                          <th style="text-align: right">Valor</th>
+                          <th>NF-e de transferência</th>
+                          <th>Identificação prévia</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <strong>FJK3D21</strong> · HB20 Comfort 2020/2021
+                          </td>
+                          <td
+                            style="
+                              font-family: ui-monospace, Menlo, monospace;
+                              font-size: 13px;
+                            "
+                          >
+                            9BHBG51CAMP••••62
+                          </td>
+                          <td style="text-align: right">R$ 61.300,00</td>
+                          <td style="color: #067647; font-weight: 500">
+                            nº 4.511 · coerente
+                          </td>
+                          <td>
+                            <span
+                              style="
+                                font-size: 12px;
+                                font-weight: 600;
+                                padding: 3px 10px;
+                                border-radius: 999px;
+                                background: #ecfdf3;
+                                color: #067647;
+                              "
+                              >Aproveitada da origem</span
+                            >
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <strong>PLM7E44</strong> · Argo Drive 2022/2023
+                          </td>
+                          <td
+                            style="
+                              font-family: ui-monospace, Menlo, monospace;
+                              font-size: 13px;
+                            "
+                          >
+                            9BD358A1NPY••••35
+                          </td>
+                          <td style="text-align: right">R$ 66.800,00</td>
+                          <td style="color: #067647; font-weight: 500">
+                            nº 4.512 · coerente
+                          </td>
+                          <td>
+                            <span
+                              style="
+                                font-size: 12px;
+                                font-weight: 600;
+                                padding: 3px 10px;
+                                border-radius: 999px;
+                                background: #ecfdf3;
+                                color: #067647;
+                              "
+                              >Aproveitada da origem</span
+                            >
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p style="margin: 0; font-size: 13px; color: #475467">
+                    Ao aceitar, os veículos saem do estoque de Campinas e entram
+                    no da Matriz no RENAVE. Se recusar, eles permanecem em
+                    Campinas e a NF-e precisa ser cancelada pela origem.
+                  </p>
+                </section>
+
+                <section
+                  style="
+                    background: #ffffff;
+                    border: 1px solid #e4e7ec;
+                    border-radius: 10px;
+                    padding: 24px;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 16px;
+                    justify-content: space-between;
+                    align-items: center;
+                  "
+                >
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                      <span
+                        style="
+                          font-size: 12px;
+                          font-weight: 600;
+                          padding: 3px 10px;
+                          border-radius: 999px;
+                          background: #f2f4f7;
+                          color: #344054;
+                        "
+                        >Outro estabelecimento</span
+                      ><span
+                        style="
+                          font-size: 12px;
+                          font-weight: 600;
+                          padding: 3px 10px;
+                          border-radius: 999px;
+                          background: #fffaeb;
+                          color: #b54708;
+                        "
+                        >Aguardando seu aceite</span
+                      >
+                    </div>
+                    <h2 style="margin: 0; font-size: 17px; font-weight: 600">
+                      Litoral Motors Ltda (98.765.432/0001-10) → Matriz São
+                      Paulo
+                    </h2>
+                    <span style="font-size: 14px; color: #475467"
+                      >1 veículo · BRT2E66 · Fiat Toro Volcano 2023/2023 · R$
+                      139.000,00 · NF-e nº 22.103</span
+                    >
+                  </div>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                    <button
+                      type="button"
+                      style="
+                        height: 44px;
+                        padding: 0 16px;
+                        border: 1px solid #d0d5dd;
+                        border-radius: 8px;
+                        background: #ffffff;
+                        color: #344054;
+                        font: inherit;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                      "
+                    >
+                      Ver detalhes
+                    </button>
+                    <button
+                      type="button"
+                      style="
+                        height: 44px;
+                        padding: 0 18px;
+                        border: 0;
+                        border-radius: 8px;
+                        background: #067a45;
+                        color: #ffffff;
+                        font: inherit;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                      "
+                    >
+                      Aceitar
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{env}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 880px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Veículo</th>
+                      <th>Destino</th>
+                      <th>Solicitada</th>
+                      <th>Situação no destino</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>NBE1F36</strong> · Duster Iconic</td>
+                      <td>Filial Campinas</td>
+                      <td>23/11/2026 10:02</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #fffaeb;
+                            color: #b54708;
+                          "
+                          >Aguardando aceite</span
+                        >
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          style="
+                            border: 0;
+                            background: transparent;
+                            color: #b42318;
+                            font: inherit;
+                            font-size: 13px;
+                            font-weight: 600;
+                            cursor: pointer;
+                          "
+                        >
+                          Cancelar autorização
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>OZC9G12</strong> · Kicks SV</td>
+                      <td>Garagem Bandeirantes Ltda</td>
+                      <td>21/11/2026 14:40</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #fffaeb;
+                            color: #b54708;
+                          "
+                          >Aguardando aceite</span
+                        >
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          style="
+                            border: 0;
+                            background: transparent;
+                            color: #b42318;
+                            font: inherit;
+                            font-size: 13px;
+                            font-weight: 600;
+                            cursor: pointer;
+                          "
+                        >
+                          Cancelar autorização
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>KTR6A55</strong> · Onix Plus</td>
+                      <td>Filial Campinas</td>
+                      <td>20/11/2026 08:55</td>
+                      <td>
+                        <span
+                          style="
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            background: #fef3f2;
+                            color: #b42318;
+                          "
+                          >Bloqueada: veículo vinculado</span
+                        >
+                      </td>
+                      <td>
+                        <a
+                          href="Pendencias.dc.html"
+                          style="font-size: 13px; font-weight: 600"
+                          >Resolver pendência</a
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{conc}}" hint-placeholder-val="{{ false }}">
+              <div
+                style="
+                  background: #ffffff;
+                  border: 1px solid #e4e7ec;
+                  border-radius: 10px;
+                  overflow-x: auto;
+                "
+              >
+                <table
+                  style="
+                    width: 100%;
+                    border-collapse: collapse;
+                    min-width: 760px;
+                  "
+                >
+                  <thead>
+                    <tr>
+                      <th>Veículo</th>
+                      <th>Origem → destino</th>
+                      <th>Concluída</th>
+                      <th>Documentos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>GHT5C40</strong> · Creta Limited</td>
+                      <td>Matriz → Filial Santos</td>
+                      <td>17/11/2026</td>
+                      <td>
+                        <a href="Documentos.dc.html" style="font-weight: 600"
+                          >Termos e NF-e</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><strong>LPA8D19</strong> · Renegade Sport</td>
+                      <td>Filial Santos → Matriz</td>
+                      <td>12/11/2026</td>
+                      <td>
+                        <a href="Documentos.dc.html" style="font-weight: 600"
+                          >Termos e NF-e</a
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+          </main>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":1200}}'
+    >
+      class Component extends DCLogic {
+        constructor(props) { super(props); this.state = { tab: 'rec' }; }
+        renderVals() {
+          const tab = this.state.tab;
+          const tabs = [['rec','Recebidas para aceitar','3'],['env','Enviadas','3'],['conc','Concluídas','41']].map(([id, label, n]) => ({
+            label, n, on: tab === id ? 'true' : 'false', weight: tab === id ? '600' : '500',
+            color: tab === id ? '#067A45' : '#475467', line: tab === id ? '#067A45' : 'transparent',
+            nBg: id === 'rec' ? '#FFFAEB' : '#F2F4F7', nColor: id === 'rec' ? '#B54708' : '#344054',
+            pick: () => this.setState({ tab: id })
+          }));
+          return { tabs, rec: tab === 'rec', env: tab === 'env', conc: tab === 'conc' };
+        }
+      }
+    </script>
+  </body>
+</html>
