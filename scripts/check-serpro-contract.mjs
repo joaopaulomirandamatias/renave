@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+
+import {
+  fetchBoundedJson,
+  MAX_SERPRO_JSON_RESPONSE_BYTES,
+} from "./serpro-json-monitor.mjs";
 
 const methods = new Set(["delete", "get", "patch", "post", "put"]);
 const baselineUrl = new URL(
@@ -7,7 +13,7 @@ const baselineUrl = new URL(
   import.meta.url,
 );
 
-function metrics(document) {
+export function contractMetrics(document) {
   const operations = Object.values(document.paths ?? {}).flatMap((path) =>
     Object.entries(path).filter(([method]) => methods.has(method)),
   );
@@ -24,50 +30,59 @@ function metrics(document) {
   };
 }
 
-const baseline = JSON.parse(await readFile(baselineUrl, "utf8"));
-let changed = false;
+export async function checkSerproContract({
+  baseline,
+  fetchImpl = globalThis.fetch,
+  maxBytes = MAX_SERPRO_JSON_RESPONSE_BYTES,
+  output = console,
+}) {
+  let changed = false;
 
-for (const [environment, expected] of Object.entries(baseline.environments)) {
-  const response = await fetch(expected.source, {
-    headers: { accept: "application/json" },
-    redirect: "error",
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `${environment}: Swagger respondeu HTTP ${response.status}`,
+  for (const [environment, expected] of Object.entries(baseline.environments)) {
+    const { bytes, document } = await fetchBoundedJson(
+      environment,
+      expected.source,
+      { fetchImpl, maxBytes },
     );
-  }
-
-  const body = await response.text();
-  const document = JSON.parse(body);
-  if (
-    expected.operationsSecuredByCnpjEstabelecimento > 0 &&
-    document.securityDefinitions?.cnpjEstabelecimento?.name !==
-      "CNPJ-Estabelecimento"
-  ) {
-    throw new Error(
-      `${environment}: security definition deixou de usar CNPJ-Estabelecimento`,
+    if (
+      expected.operationsSecuredByCnpjEstabelecimento > 0 &&
+      document.securityDefinitions?.cnpjEstabelecimento?.name !==
+        "CNPJ-Estabelecimento"
+    ) {
+      throw new Error(
+        `${environment}: security definition deixou de usar CNPJ-Estabelecimento`,
+      );
+    }
+    const actual = {
+      ...contractMetrics(document),
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    };
+    const differences = Object.entries(actual).filter(
+      ([key, value]) => expected[key] !== value,
     );
-  }
-  const actual = {
-    ...metrics(document),
-    sha256: createHash("sha256").update(body).digest("hex"),
-  };
-  const differences = Object.entries(actual).filter(
-    ([key, value]) => expected[key] !== value,
-  );
 
-  if (differences.length === 0) {
-    console.log(`${environment}: contrato sem mudanças`);
-    continue;
+    if (differences.length === 0) {
+      output.log(`${environment}: contrato sem mudanças`);
+      continue;
+    }
+
+    changed = true;
+    output.error(`${environment}: contrato mudou`);
+    for (const [key, value] of differences) {
+      output.error(`  ${key}: esperado=${expected[key]} atual=${value}`);
+    }
   }
 
-  changed = true;
-  console.error(`${environment}: contrato mudou`);
-  for (const [key, value] of differences) {
-    console.error(`  ${key}: esperado=${expected[key]} atual=${value}`);
-  }
+  return { changed };
 }
 
-if (changed) process.exitCode = 1;
+export async function runContractCli() {
+  const baseline = JSON.parse(await readFile(baselineUrl, "utf8"));
+  const { changed } = await checkSerproContract({ baseline });
+  if (changed) process.exitCode = 1;
+}
+
+const entrypoint = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href
+  : undefined;
+if (entrypoint === import.meta.url) await runContractCli();

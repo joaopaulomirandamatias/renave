@@ -42,7 +42,7 @@
     "stock-entry:profile:suspend-establishment": "pnpm --filter @seu-renave/stock-entry-provisioning cli suspend-establishment",
     "test": "pnpm -r test",
     "test:integration": "pnpm db:up && pnpm --filter @seu-renave/db test:integration && pnpm --filter @seu-renave/api test:integration && pnpm --filter @seu-renave/stock-entry-provisioning test:integration",
-    "test:contract:serpro": "node --test scripts/check-serpro-guidance.test.mjs",
+    "test:contract:serpro": "node --test scripts/check-serpro-*.test.mjs",
     "test:foundation": "pnpm --filter @seu-renave/api test && pnpm --filter @seu-renave/web test",
     "test:smoke:serpro": "node --test scripts/smoke-serpro-homologation.test.mjs",
     "typecheck": "pnpm -r typecheck"
