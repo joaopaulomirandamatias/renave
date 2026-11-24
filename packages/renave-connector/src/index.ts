@@ -47,6 +47,7 @@ export {
   type EstablishmentHeaders,
   type IdentityMismatchReason,
   type MutationResult,
+  type MutationExecutionResult,
   type RenaveEnvironment,
   type RenaveServerContext,
   type RenaveTransport,
@@ -54,6 +55,13 @@ export {
   type StockSummary,
   type VerifiedRenaveIdentity,
 } from "./connector.js";
+export {
+  InvalidPreparedRenaveMutationError,
+  PreparedRenaveMutation,
+  prepareRenaveMutation,
+  restorePreparedRenaveMutation,
+  type InvalidPreparedRenaveMutationReason,
+} from "./mutation-request.js";
 export { InvalidStockPlateQueryError, normalizeStockPlate } from "./plate.js";
 export {
   InvalidStockEntryReconciliationError,

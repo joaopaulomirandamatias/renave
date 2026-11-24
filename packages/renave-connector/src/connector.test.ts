@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   InvalidStockPlateQueryError,
+  prepareRenaveMutation,
   RenaveConnector,
   RenaveIdentityMismatchError,
   type AuthenticatedClientIdentity,
   type EstablishmentHeaders,
   type RenaveServerContext,
   type RenaveTransport,
+  type PreparedRenaveMutation,
   type StockEntryRequest,
 } from "./index.js";
 
@@ -23,9 +25,8 @@ function transportWithIdentity(identity: AuthenticatedClientIdentity) {
   const getAuthenticatedClient = vi.fn(async () => identity);
   const mutate = vi.fn(
     async (
-      _operation: string,
       _headers: EstablishmentHeaders,
-      _payload: unknown,
+      _prepared: PreparedRenaveMutation,
     ) => ({ operationId: "op-1" }),
   );
   const transport: RenaveTransport = {
@@ -36,10 +37,9 @@ function transportWithIdentity(identity: AuthenticatedClientIdentity) {
       diagnostico: { veiculoApto: true },
     })),
     mutate: async <TResult>(
-      operation: string,
       headers: EstablishmentHeaders,
-      payload: unknown,
-    ) => (await mutate(operation, headers, payload)) as TResult,
+      prepared: PreparedRenaveMutation,
+    ) => (await mutate(headers, prepared)) as TResult,
   };
   return { getAuthenticatedClient, mutate, transport };
 }
@@ -83,6 +83,46 @@ describe("RenaveConnector", () => {
     expect(fake.mutate).toHaveBeenCalledTimes(1);
   });
 
+  it("recusa operação desconhecida antes de autenticar ou serializar", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    const toJSON = vi.fn(() => ({ placa: "QTP4H82" }));
+
+    await expect(
+      new RenaveConnector(fake.transport).executeMutation(
+        context,
+        "unknown" as "request-stock-entry",
+        { toJSON },
+      ),
+    ).rejects.toMatchObject({ reason: "OPERATION" });
+    expect(toJSON).not.toHaveBeenCalled();
+    expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(fake.mutate).not.toHaveBeenCalled();
+  });
+
+  it("reutiliza os mesmos bytes preparados e revalida identidade a cada envio", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    const connector = new RenaveConnector(fake.transport);
+    const prepared = await prepareRenaveMutation("request-stock-entry", {
+      observacao: "ação 🚗",
+    });
+
+    const first = await connector.executePreparedMutation(context, prepared);
+    const second = await connector.executePreparedMutation(context, prepared);
+
+    expect(first.requestSha256).toBe(prepared.requestSha256);
+    expect(second.requestSha256).toBe(prepared.requestSha256);
+    expect(fake.getAuthenticatedClient).toHaveBeenCalledTimes(2);
+    expect(fake.mutate).toHaveBeenCalledTimes(2);
+    expect(fake.mutate.mock.calls[0]![1]).toBe(prepared);
+    expect(fake.mutate.mock.calls[1]![1]).toBe(prepared);
+  });
+
   it.each([
     [
       "ESTABLISHMENT_MISSING",
@@ -113,6 +153,24 @@ describe("RenaveConnector", () => {
     },
   );
 
+  it("não serializa payload quando a identidade é recusada", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "00000000000000",
+      cnpjIntegradora: "69418503000188",
+    });
+    const toJSON = vi.fn(() => ({ placa: "QTP4H82" }));
+
+    await expect(
+      new RenaveConnector(fake.transport).executeMutation(
+        context,
+        "request-stock-entry",
+        { toJSON },
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_IDENTITY_MISMATCH" });
+    expect(toJSON).not.toHaveBeenCalled();
+    expect(fake.mutate).not.toHaveBeenCalled();
+  });
+
   it("bloqueia contexto de produção antes de tocar um transporte de homologação", async () => {
     const fake = transportWithIdentity({
       cnpj: "85106037000585",
@@ -129,6 +187,24 @@ describe("RenaveConnector", () => {
     ).rejects.toMatchObject({ code: "RENAVE_PRODUCTION_BLOCKED" });
     expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
     expect(fake.mutate).not.toHaveBeenCalled();
+  });
+
+  it("não serializa payload em contexto de produção", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    const toJSON = vi.fn(() => ({ placa: "QTP4H82" }));
+
+    await expect(
+      new RenaveConnector(fake.transport).executeMutation(
+        { ...context, environment: "production" },
+        "request-stock-entry",
+        { toJSON },
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_PRODUCTION_BLOCKED" });
+    expect(toJSON).not.toHaveBeenCalled();
+    expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
   });
 
   it("bloqueia produção mesmo quando contexto e transporte coincidem", async () => {
@@ -195,15 +271,25 @@ describe("RenaveConnector", () => {
       },
     };
 
-    await new RenaveConnector(fake.transport).requestStockEntry(
-      context,
-      payload,
-    );
+    const response = await new RenaveConnector(
+      fake.transport,
+    ).requestStockEntry(context, payload);
 
-    expect(fake.mutate).toHaveBeenCalledWith(
-      "request-stock-entry",
-      { "CNPJ-Estabelecimento": "85106037000585" },
-      payload,
+    expect(fake.mutate).toHaveBeenCalledTimes(1);
+    const [sentHeaders, prepared] = fake.mutate.mock.calls[0]!;
+    expect(sentHeaders).toEqual({
+      "CNPJ-Estabelecimento": "85106037000585",
+    });
+    expect(prepared.operation).toBe("request-stock-entry");
+    expect(
+      JSON.parse(new TextDecoder().decode(prepared.copyBodyBytes())),
+    ).toEqual(payload);
+    expect(response).toMatchObject({
+      requestByteLength: prepared.byteLength,
+      requestSha256: prepared.requestSha256,
+    });
+    expect(JSON.stringify(response)).not.toMatch(
+      /12345678901|loja@example\.com|QTP4H82/u,
     );
   });
 

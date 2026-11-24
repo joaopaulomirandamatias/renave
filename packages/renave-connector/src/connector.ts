@@ -7,6 +7,11 @@ import type {
   VehicleEligibilityQuery,
   VehicleEligibilityResponse,
 } from "./operations.js";
+import {
+  assertRenaveMutationOperation,
+  prepareRenaveMutation,
+  type PreparedRenaveMutation,
+} from "./mutation-request.js";
 import { normalizeStockPlate } from "./plate.js";
 import {
   reconcileStockEntry as reconcileStockEntryRecords,
@@ -68,15 +73,21 @@ export interface RenaveTransport {
     plate: string,
   ): Promise<RenaveStockRecord[]>;
   mutate<TResult>(
-    operation: RenaveMutationOperation,
     headers: EstablishmentHeaders,
-    payload: unknown,
+    prepared: PreparedRenaveMutation,
   ): Promise<TResult>;
 }
 
 export interface MutationResult<TResult> {
   result: TResult;
   verifiedIdentity: VerifiedRenaveIdentity;
+}
+
+export interface MutationExecutionResult<
+  TResult,
+> extends MutationResult<TResult> {
+  requestByteLength: number;
+  requestSha256: string;
 }
 
 export type IdentityMismatchReason =
@@ -281,22 +292,45 @@ export class RenaveConnector {
     context: RenaveServerContext,
     operation: RenaveMutationOperation,
     payload: unknown,
-  ): Promise<MutationResult<TResult>> {
-    // Não há cache autorizador: cada mutação confirma as duas identidades.
-    const { headers, verifiedIdentity } = await this.authorize(context);
-    const result = await this.transport.mutate<TResult>(
-      operation,
-      headers,
-      payload,
-    );
+  ): Promise<MutationExecutionResult<TResult>> {
+    assertRenaveMutationOperation(operation);
+    // Autoriza antes de executar JSON.stringify/toJSON controlado pelo chamador.
+    const authorization = await this.authorize(context);
+    const prepared = await prepareRenaveMutation(operation, payload);
+    return this.executeAuthorizedMutation(authorization, prepared);
+  }
 
-    return { result, verifiedIdentity };
+  async executePreparedMutation<TResult>(
+    context: RenaveServerContext,
+    prepared: PreparedRenaveMutation,
+  ): Promise<MutationExecutionResult<TResult>> {
+    // Não há cache autorizador: cada mutação confirma as duas identidades.
+    const authorization = await this.authorize(context);
+    return this.executeAuthorizedMutation(authorization, prepared);
+  }
+
+  private async executeAuthorizedMutation<TResult>(
+    authorization: {
+      headers: EstablishmentHeaders;
+      verifiedIdentity: VerifiedRenaveIdentity;
+    },
+    prepared: PreparedRenaveMutation,
+  ): Promise<MutationExecutionResult<TResult>> {
+    const { headers, verifiedIdentity } = authorization;
+    const result = await this.transport.mutate<TResult>(headers, prepared);
+
+    return {
+      requestByteLength: prepared.byteLength,
+      requestSha256: prepared.requestSha256,
+      result,
+      verifiedIdentity,
+    };
   }
 
   requestStockEntry(
     context: RenaveServerContext,
     payload: StockEntryRequest,
-  ): Promise<MutationResult<StockEntryResponse>> {
+  ): Promise<MutationExecutionResult<StockEntryResponse>> {
     return this.executeMutation(context, "request-stock-entry", payload);
   }
 

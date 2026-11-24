@@ -4,6 +4,7 @@ import type {
   RenaveEnvironment,
   RenaveTransport,
 } from "./connector.js";
+import { RenaveProductionBlockedError } from "./connector.js";
 import {
   renaveMutationRoutes,
   type RenaveMutationOperation,
@@ -12,6 +13,10 @@ import {
 } from "./operations.js";
 import type { RenaveStockRecord } from "./reconciliation.js";
 import { normalizeStockPlate } from "./plate.js";
+import {
+  copyPreparedRenaveMutationBody,
+  type PreparedRenaveMutation,
+} from "./mutation-request.js";
 
 const baseUrls: Readonly<Record<RenaveEnvironment, string>> = Object.freeze({
   homologation: "https://hom.renave.estaleiro.serpro.gov.br/renave-ws",
@@ -81,16 +86,6 @@ export class RenaveProtocolError extends Error {
     super("O RENAVE respondeu em formato incompatível com o contrato esperado");
     this.name = "RenaveProtocolError";
   }
-}
-
-async function sha256(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
 }
 
 async function parseJson(
@@ -512,13 +507,16 @@ export class HttpRenaveTransport implements RenaveTransport {
   }
 
   async mutate<TResult>(
-    operation: RenaveMutationOperation,
     headers: EstablishmentHeaders,
-    payload: unknown,
+    prepared: PreparedRenaveMutation,
   ): Promise<TResult> {
+    if (this.environment === "production") {
+      throw new RenaveProductionBlockedError();
+    }
+    // Copiado antes do primeiro await e enviado sem nova serialização.
+    const body = copyPreparedRenaveMutationBody(prepared);
+    const { operation, requestSha256 } = prepared;
     const route = renaveMutationRoutes[operation];
-    const body = JSON.stringify(payload);
-    const requestSha256 = await sha256(body);
     let response: Response;
 
     try {

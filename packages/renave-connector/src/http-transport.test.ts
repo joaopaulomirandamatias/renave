@@ -1,16 +1,34 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   HttpRenaveTransport,
   RenaveHttpError,
   RenaveMutationOutcomeUnknownError,
+  PreparedRenaveMutation,
+  RenaveProductionBlockedError,
   RenaveProtocolError,
+  prepareRenaveMutation,
+  restorePreparedRenaveMutation,
   type EstablishmentHeaders,
 } from "./index.js";
 
 const headers: EstablishmentHeaders = {
   "CNPJ-Estabelecimento": "85106037000585",
 };
+
+async function mutate<TResult>(
+  transport: HttpRenaveTransport,
+  payload: unknown,
+): Promise<TResult> {
+  const prepared = await prepareRenaveMutation("request-stock-entry", payload);
+  return transport.mutate<TResult>(headers, prepared);
+}
+
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
 
 describe("HttpRenaveTransport", () => {
   it("consulta a identidade no host fixo do ambiente com o CNPJ autorizado", async () => {
@@ -48,17 +66,91 @@ describe("HttpRenaveTransport", () => {
       request,
     });
 
-    await expect(
-      transport.mutate("request-stock-entry", headers, { placa: "QTP4H82" }),
-    ).resolves.toEqual({ id: 7, estado: "SOLICITADO" });
+    await expect(mutate(transport, { placa: "QTP4H82" })).resolves.toEqual({
+      id: 7,
+      estado: "SOLICITADO",
+    });
     expect(request).toHaveBeenCalledWith(
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/solicitacoes-entrada-estoque",
       expect.objectContaining({
-        body: JSON.stringify({ placa: "QTP4H82" }),
+        body: new TextEncoder().encode('{"placa":"QTP4H82"}'),
         method: "POST",
         redirect: "error",
       }),
     );
+  });
+
+  it("envia exatamente os bytes preparados e o hash independente coincide", async () => {
+    let sent: Uint8Array | undefined;
+    const request = vi.fn(async (_url: string, init: RequestInit) => {
+      sent = Uint8Array.from(init.body as Uint8Array);
+      return Response.json({ id: 7, estado: "SOLICITADO" }, { status: 201 });
+    });
+    const exact = Buffer.from('{ "z":1,\n"a":"ação 🚗" }\n', "utf8");
+    const expectedHash = sha256(exact);
+    const prepared = await restorePreparedRenaveMutation(
+      "request-stock-entry",
+      exact,
+      expectedHash,
+    );
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await transport.mutate(headers, prepared);
+
+    expect(Buffer.from(sent!)).toEqual(exact);
+    expect(sha256(sent!)).toBe(prepared.requestSha256);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("bloqueia mutação direta em produção antes da rede", async () => {
+    const request = vi.fn();
+    const transport = new HttpRenaveTransport({
+      environment: "production",
+      request,
+    });
+    const prepared = await prepareRenaveMutation("request-stock-entry", {});
+
+    await expect(transport.mutate(headers, prepared)).rejects.toBeInstanceOf(
+      RenaveProductionBlockedError,
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("recusa envelope forjado antes da rede", async () => {
+    const request = vi.fn();
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+    const forged = Object.create(
+      PreparedRenaveMutation.prototype,
+    ) as PreparedRenaveMutation;
+
+    await expect(transport.mutate(headers, forged)).rejects.toMatchObject({
+      code: "INVALID_PREPARED_RENAVE_MUTATION",
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("não segue redirect nem repete a mutação", async () => {
+    const request = vi.fn(
+      async (_url: string, _init: RequestInit) =>
+        new Response(null, {
+          headers: { location: "https://example.invalid/coleta" },
+          status: 307,
+        }),
+    );
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await expect(mutate(transport, {})).rejects.toMatchObject({ status: 307 });
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]![1]).toMatchObject({ redirect: "error" });
   });
 
   it("consulta aptidão por um identificador na rota oficial", async () => {
@@ -96,7 +188,7 @@ describe("HttpRenaveTransport", () => {
     });
 
     await transport.getAuthenticatedClient(headers);
-    await transport.mutate("request-stock-entry", headers, {});
+    await mutate(transport, {});
     expect(request).toHaveBeenCalledTimes(2);
     expect(timeout).toHaveBeenNthCalledWith(1, 60_000);
     expect(timeout).toHaveBeenNthCalledWith(2, 120_000);
@@ -248,15 +340,18 @@ describe("HttpRenaveTransport", () => {
         request,
       });
 
-      const outcome = transport.mutate("request-stock-entry", headers, {
+      const prepared = await prepareRenaveMutation("request-stock-entry", {
         placa: "QTP4H82",
       });
+
+      const outcome = transport.mutate(headers, prepared);
 
       await expect(outcome).rejects.toBeInstanceOf(
         RenaveMutationOutcomeUnknownError,
       );
       await expect(outcome).rejects.toMatchObject({
         code: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
+        requestSha256: prepared.requestSha256,
         status,
       });
       expect(request).toHaveBeenCalledTimes(1);
@@ -274,14 +369,13 @@ describe("HttpRenaveTransport", () => {
         environment: "homologation",
         request,
       });
+      const prepared = await prepareRenaveMutation("request-stock-entry", {
+        placa: "QTP4H82",
+      });
 
-      await expect(
-        transport.mutate("request-stock-entry", headers, {
-          placa: "QTP4H82",
-        }),
-      ).rejects.toMatchObject({
+      await expect(transport.mutate(headers, prepared)).rejects.toMatchObject({
         code: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
-        requestSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+        requestSha256: prepared.requestSha256,
         status: 201,
       });
       expect(request).toHaveBeenCalledTimes(1);
@@ -304,14 +398,13 @@ describe("HttpRenaveTransport", () => {
         environment: "homologation",
         request,
       });
+      const prepared = await prepareRenaveMutation("request-stock-entry", {
+        placa: "QTP4H82",
+      });
 
-      await expect(
-        transport.mutate("request-stock-entry", headers, {
-          placa: "QTP4H82",
-        }),
-      ).rejects.toMatchObject({
+      await expect(transport.mutate(headers, prepared)).rejects.toMatchObject({
         code: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
-        requestSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+        requestSha256: prepared.requestSha256,
         status: 201,
       });
       expect(request).toHaveBeenCalledTimes(1);
@@ -327,10 +420,55 @@ describe("HttpRenaveTransport", () => {
       request,
     });
 
-    await expect(
-      transport.mutate("request-stock-entry", headers, {}),
-    ).rejects.toBeInstanceOf(RenaveMutationOutcomeUnknownError);
+    const prepared = await prepareRenaveMutation("request-stock-entry", {});
+    await expect(transport.mutate(headers, prepared)).rejects.toMatchObject({
+      code: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
+      requestSha256: prepared.requestSha256,
+    });
     expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("não transforma 503 em sucesso por uma segunda tentativa", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(
+        Response.json({ id: 7, estado: "SOLICITADO" }, { status: 201 }),
+      );
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await expect(mutate(transport, {})).rejects.toMatchObject({ status: 503 });
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("não inclui corpo nem dados pessoais no erro de desfecho incerto", async () => {
+    const request = vi.fn(async () => {
+      throw new Error("timeout");
+    });
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+    const prepared = await prepareRenaveMutation("request-stock-entry", {
+      cpf: "12345678901",
+      email: "pessoa@example.com",
+      placa: "QTP4H82",
+    });
+
+    let serialized = "";
+    try {
+      await transport.mutate(headers, prepared);
+      throw new Error("deveria produzir desfecho incerto");
+    } catch (error) {
+      serialized = JSON.stringify(error);
+    }
+
+    expect(serialized).toContain(prepared.requestSha256);
+    expect(serialized).not.toMatch(/12345678901|pessoa@example\.com|QTP4H82/u);
+    expect(request).toHaveBeenCalledOnce();
   });
 
   it("trata rejeição 422 como resultado conhecido sem retry", async () => {
@@ -340,7 +478,7 @@ describe("HttpRenaveTransport", () => {
       request,
     });
 
-    const outcome = transport.mutate("request-stock-entry", headers, {});
+    const outcome = mutate(transport, {});
 
     await expect(outcome).rejects.toBeInstanceOf(RenaveHttpError);
     await expect(outcome).rejects.toMatchObject({ status: 422 });
