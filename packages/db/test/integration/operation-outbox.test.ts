@@ -462,19 +462,19 @@ describe("fundação operation/outbox", () => {
           "select count(*)::int as count from renave.operation where id = $1",
           [created.operation_id],
         );
-        const children = await Promise.all(
-          [
-            "operation_outbox",
-            "operation_transition",
-            "operation_reconciliation_projection",
-          ].map((table) =>
-            client.query(
-              `select count(*)::int as count from renave.${table} where operation_id = $1`,
-              [created.operation_id],
-            ),
-          ),
-        );
-        return [operation, ...children].map(({ rows }) => rows[0].count);
+        const counts = [operation.rows[0].count];
+        for (const table of [
+          "operation_outbox",
+          "operation_transition",
+          "operation_reconciliation_projection",
+        ]) {
+          const child = await client.query(
+            `select count(*)::int as count from renave.${table} where operation_id = $1`,
+            [created.operation_id],
+          );
+          counts.push(child.rows[0].count);
+        }
+        return counts;
       },
     );
     expect(tenantBCounts).toEqual([0, 0, 0, 0]);

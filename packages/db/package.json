@@ -36,7 +36,7 @@
     "status:evidence": "tsx src/cli.ts status-evidence",
     "setup:local": "tsx src/cli.ts setup-local",
     "test": "vitest run --project unit",
-    "test:integration": "vitest run --project integration",
+    "test:integration": "NODE_OPTIONS=--throw-deprecation vitest run --project integration",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
