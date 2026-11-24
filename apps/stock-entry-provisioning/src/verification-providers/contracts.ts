@@ -1,5 +1,15 @@
+import type {
+  RenaveProfileEvidenceBinding,
+  RenaveProfileEvidenceProvider,
+  VerifiedProfileEvidence,
+} from "@seu-renave/protected-evidence";
+
 export interface RenaveVerificationProvider {
-  readonly id: string;
+  readonly id: RenaveProfileEvidenceProvider;
+  verifyEvidence(
+    attestation: string,
+    binding: RenaveProfileEvidenceBinding,
+  ): Promise<VerifiedProfileEvidence>;
 }
 
 export interface RenaveVerificationProviderRegistry {

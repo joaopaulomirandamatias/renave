@@ -55,6 +55,23 @@ export {
   type RenavePrincipalPurposeConfig,
 } from "./renave-principal-crypto.js";
 export {
+  encodeRenaveProfileEvidenceClaims,
+  readVerifiedProfileEvidence,
+  RENAVE_PROFILE_EVIDENCE_AUDIENCE,
+  RenaveProfileEvidenceConfigurationError,
+  RenaveProfileEvidenceInvalidError,
+  RenaveProfileEvidenceVerifier,
+  VerifiedProfileEvidence,
+  type RenaveProfileEvidenceBinding,
+  type RenaveProfileEvidenceClaims,
+  type RenaveProfileEvidenceEnvironment,
+  type RenaveProfileEvidenceKeyring,
+  type RenaveProfileEvidenceProvider,
+  type RenaveProfileEvidenceTargetType,
+  type RenaveProfileEvidenceVerifierConfig,
+  type VerifiedProfileEvidenceSnapshot,
+} from "./renave-profile-evidence.js";
+export {
   destroyStockEntryKeyBundle,
   parseStockEntryKeyBundle,
   StockEntryKeyBundleError,
