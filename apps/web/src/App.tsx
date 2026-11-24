@@ -34,6 +34,27 @@ export interface BrowserEstablishment {
   tradeName: string;
 }
 
+export type EstablishmentManagementCapability =
+  "available" | "mfa_required" | "denied";
+
+export interface BrowserEstablishmentCollection {
+  capabilities: {
+    establishmentManagement: EstablishmentManagementCapability;
+  };
+  establishments: readonly BrowserEstablishment[];
+}
+
+export interface CreateEstablishmentInput {
+  cnpj: string;
+  idempotencyKey: string;
+  tradeName: string;
+}
+
+export interface CreateEstablishmentResult {
+  establishment: BrowserEstablishment;
+  renaveLink: { status: "not_started" };
+}
+
 export type BrowserRenaveLinkStatus =
   | "not_started"
   | "pending"
@@ -92,10 +113,12 @@ export interface SessionClient {
     plate: string,
     crvType: BrowserCrvType,
   ): Promise<BrowserEligibilitySummary>;
-  load(): Promise<BrowserSession>;
-  loadEstablishments(
+  createEstablishment(
     tenantId: string,
-  ): Promise<readonly BrowserEstablishment[]>;
+    input: CreateEstablishmentInput,
+  ): Promise<CreateEstablishmentResult>;
+  load(): Promise<BrowserSession>;
+  loadEstablishments(tenantId: string): Promise<BrowserEstablishmentCollection>;
   loadTenants(): Promise<readonly BrowserTenant[]>;
   loadRenaveLinkStatus(
     tenantId: string,
@@ -175,6 +198,10 @@ function parseEstablishments(value: unknown): readonly BrowserEstablishment[] {
   return value.establishments.map((establishment) => {
     if (
       !isRecord(establishment) ||
+      Object.keys(establishment).length !== 2 ||
+      Object.keys(establishment).some(
+        (key) => key !== "id" && key !== "tradeName",
+      ) ||
       typeof establishment.id !== "string" ||
       typeof establishment.tradeName !== "string" ||
       establishment.id.length === 0 ||
@@ -184,6 +211,69 @@ function parseEstablishments(value: unknown): readonly BrowserEstablishment[] {
     }
     return { id: establishment.id, tradeName: establishment.tradeName };
   });
+}
+
+const establishmentManagementCapabilities =
+  new Set<EstablishmentManagementCapability>([
+    "available",
+    "mfa_required",
+    "denied",
+  ]);
+
+function parseEstablishmentCollection(
+  value: unknown,
+): BrowserEstablishmentCollection {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 2 ||
+    Object.keys(value).some(
+      (key) => key !== "establishments" && key !== "capabilities",
+    ) ||
+    !isRecord(value.capabilities) ||
+    Object.keys(value.capabilities).length !== 1 ||
+    typeof value.capabilities.establishmentManagement !== "string" ||
+    !establishmentManagementCapabilities.has(
+      value.capabilities
+        .establishmentManagement as EstablishmentManagementCapability,
+    )
+  ) {
+    throw new Error("Resposta de estabelecimentos inválida");
+  }
+  return {
+    capabilities: {
+      establishmentManagement: value.capabilities
+        .establishmentManagement as EstablishmentManagementCapability,
+    },
+    establishments: parseEstablishments(value),
+  };
+}
+
+function parseCreatedEstablishment(value: unknown): CreateEstablishmentResult {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 2 ||
+    Object.keys(value).some(
+      (key) => key !== "establishment" && key !== "renaveLink",
+    ) ||
+    !isRecord(value.establishment) ||
+    Object.keys(value.establishment).length !== 2 ||
+    typeof value.establishment.id !== "string" ||
+    value.establishment.id.length === 0 ||
+    typeof value.establishment.tradeName !== "string" ||
+    value.establishment.tradeName.trim().length === 0 ||
+    !isRecord(value.renaveLink) ||
+    Object.keys(value.renaveLink).length !== 1 ||
+    value.renaveLink.status !== "not_started"
+  ) {
+    throw new Error("Resposta de cadastro de estabelecimento inválida");
+  }
+  return {
+    establishment: {
+      id: value.establishment.id,
+      tradeName: value.establishment.tradeName,
+    },
+    renaveLink: { status: "not_started" },
+  };
 }
 
 const renaveLinkStatuses = new Set<BrowserRenaveLinkStatus>([
@@ -330,6 +420,17 @@ class EligibilityClientError extends Error {
   }
 }
 
+export class EstablishmentCreationClientError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code?: string,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super("Cadastro de estabelecimento não concluído");
+    this.name = "EstablishmentCreationClientError";
+  }
+}
+
 export const browserSessionClient: SessionClient = {
   async checkVehicleEligibility(tenantId, establishmentId, plate, crvType) {
     const response = await fetch(
@@ -354,6 +455,48 @@ export const browserSessionClient: SessionClient = {
       );
     }
     return parseEligibility(value);
+  },
+  async createEstablishment(tenantId, input) {
+    let response: Response;
+    try {
+      response = await fetch(
+        `/api/tenants/${encodeURIComponent(tenantId)}/establishments`,
+        {
+          body: JSON.stringify({
+            cnpj: input.cnpj,
+            tradeName: input.tradeName,
+          }),
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            "idempotency-key": input.idempotencyKey,
+          },
+          method: "POST",
+        },
+      );
+    } catch {
+      throw new EstablishmentCreationClientError(0, "NETWORK_ERROR");
+    }
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      throw new EstablishmentCreationClientError(
+        response.status,
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+        Number.isInteger(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+      );
+    }
+    try {
+      return parseCreatedEstablishment(value);
+    } catch {
+      // Um 2xx ilegível é ambíguo: a criação pode ter sido confirmada. A
+      // mesma chave precisa ser preservada para uma repetição idempotente.
+      throw new EstablishmentCreationClientError(0, "INVALID_RESPONSE");
+    }
   },
   async load() {
     const response = await fetch("/api/session", {
@@ -382,7 +525,7 @@ export const browserSessionClient: SessionClient = {
     );
     if (!response.ok)
       throw new Error("Não foi possível carregar os estabelecimentos");
-    return parseEstablishments(await response.json());
+    return parseEstablishmentCollection(await response.json());
   },
   async loadRenaveLinkStatus(tenantId, establishmentId) {
     const response = await fetch(
@@ -545,6 +688,8 @@ export function App({
   });
   const [linkReloadVersion, setLinkReloadVersion] = useState(0);
   const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [establishmentManagement, setEstablishmentManagement] =
+    useState<EstablishmentManagementCapability>("denied");
   const [establishments, setEstablishments] = useState<
     readonly BrowserEstablishment[]
   >([]);
@@ -554,6 +699,8 @@ export function App({
   const loadRequestVersion = useRef(0);
   const linkLoadVersion = useRef(0);
   const activeSelectionKeyRef = useRef("");
+  const selectedTenantIdRef = useRef("");
+  selectedTenantIdRef.current = selectedTenantId;
 
   useEffect(() => {
     if (authFeedback) onAuthErrorConsumed();
@@ -576,6 +723,7 @@ export function App({
     if (!session.authenticated) {
       if (loadRequestVersion.current !== requestVersion) return;
       setSelectedTenantId("");
+      setEstablishmentManagement("denied");
       setEstablishments([]);
       setSelectedEstablishmentByTenant({});
       setView({ status: "ready", session, tenants: [] });
@@ -585,11 +733,18 @@ export function App({
     try {
       const tenants = session.authenticated ? await client.loadTenants() : [];
       const initialTenantId = tenants[0]?.tenantId ?? "";
-      const initialEstablishments = initialTenantId
+      const initialCollection = initialTenantId
         ? await client.loadEstablishments(initialTenantId)
-        : [];
+        : {
+            capabilities: { establishmentManagement: "denied" as const },
+            establishments: [],
+          };
+      const initialEstablishments = initialCollection.establishments;
       if (loadRequestVersion.current !== requestVersion) return;
       setSelectedTenantId(initialTenantId);
+      setEstablishmentManagement(
+        initialCollection.capabilities.establishmentManagement,
+      );
       setEstablishments(initialEstablishments);
       setSelectedEstablishmentByTenant(
         initialTenantId && initialEstablishments[0]
@@ -707,6 +862,7 @@ export function App({
         },
       });
       setSelectedTenantId("");
+      setEstablishmentManagement("denied");
       setEstablishments([]);
       setSelectedEstablishmentByTenant({});
       tenantRequestVersion.current += 1;
@@ -805,14 +961,20 @@ export function App({
     const requestVersion = ++tenantRequestVersion.current;
     const previousTenantId = selectedTenantId;
     const previousEstablishments = establishments;
+    const previousManagement = establishmentManagement;
     setContextError(false);
     setContextLoading(true);
     setSelectedTenantId(tenantId);
+    setEstablishmentManagement("denied");
     setEstablishments([]);
     try {
-      const nextEstablishments = await client.loadEstablishments(tenantId);
+      const nextCollection = await client.loadEstablishments(tenantId);
+      const nextEstablishments = nextCollection.establishments;
       if (tenantRequestVersion.current === requestVersion) {
         setEstablishments(nextEstablishments);
+        setEstablishmentManagement(
+          nextCollection.capabilities.establishmentManagement,
+        );
         setSelectedEstablishmentByTenant((current) => {
           const remembered = current[tenantId];
           const selected = nextEstablishments.some(
@@ -831,6 +993,7 @@ export function App({
     } catch {
       if (tenantRequestVersion.current === requestVersion) {
         setSelectedTenantId(previousTenantId);
+        setEstablishmentManagement(previousManagement);
         setEstablishments(previousEstablishments);
         setContextError(true);
       }
@@ -841,8 +1004,62 @@ export function App({
     }
   }
 
+  async function createEstablishment(
+    input: CreateEstablishmentInput,
+  ): Promise<CreateEstablishmentResult> {
+    const tenantId = selectedTenantId;
+    const requestVersion = tenantRequestVersion.current;
+    let result: CreateEstablishmentResult;
+    try {
+      result = await client.createEstablishment(tenantId, input);
+    } catch (error) {
+      if (
+        tenantRequestVersion.current !== requestVersion ||
+        selectedTenantIdRef.current !== tenantId
+      ) {
+        throw new EstablishmentCreationClientError(0, "CONTEXT_CHANGED");
+      }
+      if (error instanceof EstablishmentCreationClientError) {
+        if (error.status === 401) void load();
+        if (error.code === "MFA_REQUIRED") {
+          setEstablishmentManagement("mfa_required");
+        }
+        if (
+          error.code === "TENANT_RESOURCE_NOT_FOUND" ||
+          error.code === "ESTABLISHMENT_CNPJ_CONFLICT"
+        ) {
+          void selectTenant(tenantId);
+        }
+      }
+      throw error;
+    }
+    if (
+      tenantRequestVersion.current !== requestVersion ||
+      selectedTenantIdRef.current !== tenantId
+    ) {
+      throw new EstablishmentCreationClientError(0, "CONTEXT_CHANGED");
+    }
+    setEstablishments((current) => [
+      ...current.filter(
+        (establishment) => establishment.id !== result.establishment.id,
+      ),
+      result.establishment,
+    ]);
+    setSelectedEstablishmentByTenant((current) => ({
+      ...current,
+      [tenantId]: result.establishment.id,
+    }));
+    linkLoadVersion.current += 1;
+    setRenaveLinkView({
+      link: { preflightAvailable: false, status: "not_started" },
+      status: "ready",
+    });
+    return result;
+  }
+
   return (
     <DashboardPage
+      establishmentManagement={establishmentManagement}
       environment={environment}
       establishments={establishments.map((establishment) => ({
         id: establishment.id,
@@ -866,6 +1083,7 @@ export function App({
           crvType,
         )
       }
+      onCreateEstablishment={createEstablishment}
       onRunPreflight={() => void runPreflight()}
       onSearchStocks={(plate) =>
         client.searchStocks(

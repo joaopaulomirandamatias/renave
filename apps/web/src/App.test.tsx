@@ -10,7 +10,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   App,
   browserSessionClient,
+  EstablishmentCreationClientError,
   type BrowserEstablishment,
+  type BrowserEstablishmentCollection,
   type BrowserSession,
   type BrowserTenant,
   type SessionClient,
@@ -23,6 +25,16 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
 });
 
+function collection(
+  establishments: readonly BrowserEstablishment[] = [],
+  establishmentManagement: BrowserEstablishmentCollection["capabilities"]["establishmentManagement"] = "denied",
+): BrowserEstablishmentCollection {
+  return {
+    capabilities: { establishmentManagement },
+    establishments,
+  };
+}
+
 function clientFor(
   session: BrowserSession,
   tenants: readonly BrowserTenant[] = [],
@@ -33,8 +45,12 @@ function clientFor(
       impediments: [],
       status: "eligible" as const,
     })),
+    createEstablishment: vi.fn(async (_tenantId, input) => ({
+      establishment: { id: "created-store", tradeName: input.tradeName },
+      renaveLink: { status: "not_started" as const },
+    })),
     load: vi.fn(async () => session),
-    loadEstablishments: vi.fn(async () => []),
+    loadEstablishments: vi.fn(async () => collection()),
     loadRenaveLinkStatus: vi.fn(async () => ({
       preflightAvailable: false,
       status: "not_started" as const,
@@ -48,10 +64,12 @@ function clientFor(
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((next, fail) => {
     resolve = next;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 describe("App session boundary", () => {
@@ -233,6 +251,104 @@ describe("App session boundary", () => {
     ).rejects.toThrow("Item de estoque inválido");
   });
 
+  it("cadastra com CNPJ somente no corpo e chave idempotente somente no header", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json(
+        {
+          establishment: { id: "store-created", tradeName: "Loja Centro" },
+          renaveLink: { status: "not_started" },
+        },
+        { status: 201 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.createEstablishment("tenant-a", {
+        cnpj: "11.222.333/0001-81",
+        idempotencyKey: "11111111-1111-4111-8111-111111111111",
+        tradeName: "Loja Centro",
+      }),
+    ).resolves.toEqual({
+      establishment: { id: "store-created", tradeName: "Loja Centro" },
+      renaveLink: { status: "not_started" },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tenants/tenant-a/establishments",
+      expect.objectContaining({
+        body: JSON.stringify({
+          cnpj: "11.222.333/0001-81",
+          tradeName: "Loja Centro",
+        }),
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: expect.objectContaining({
+          "idempotency-key": "11111111-1111-4111-8111-111111111111",
+        }),
+        method: "POST",
+      }),
+    );
+    expect(fetchMock.mock.calls[0]?.[0]).not.toContain("11.222.333");
+  });
+
+  it("trata 2xx com resposta ampliada como outcome ambíguo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        Response.json(
+          {
+            establishment: {
+              cnpj: "11222333000181",
+              id: "store-created",
+              tradeName: "Loja Centro",
+            },
+            renaveLink: { status: "not_started" },
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    await expect(
+      browserSessionClient.createEstablishment("tenant-a", {
+        cnpj: "11222333000181",
+        idempotencyKey: "11111111-1111-4111-8111-111111111111",
+        tradeName: "Loja Centro",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 0 });
+  });
+
+  it("aceita capability fechada e recusa roles ou campos extras na listagem", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({
+          capabilities: { establishmentManagement: "available" },
+          establishments: [{ id: "store-a", tradeName: "Loja A" }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          capabilities: {
+            establishmentManagement: "available",
+            role: "tenant_admin",
+          },
+          establishments: [],
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.loadEstablishments("tenant-a"),
+    ).resolves.toEqual({
+      capabilities: { establishmentManagement: "available" },
+      establishments: [{ id: "store-a", tradeName: "Loja A" }],
+    });
+    await expect(
+      browserSessionClient.loadEstablishments("tenant-a"),
+    ).rejects.toThrow("Resposta de estabelecimentos inválida");
+  });
+
   it("não mostra login nem painel enquanto verifica a sessão", () => {
     const client: SessionClient = {
       checkVehicleEligibility: vi.fn(async () => ({
@@ -240,8 +356,12 @@ describe("App session boundary", () => {
         impediments: [],
         status: "eligible" as const,
       })),
+      createEstablishment: vi.fn(async (_tenantId, input) => ({
+        establishment: { id: "created-store", tradeName: input.tradeName },
+        renaveLink: { status: "not_started" as const },
+      })),
       load: vi.fn(() => new Promise<BrowserSession>(() => undefined)),
-      loadEstablishments: vi.fn(async () => []),
+      loadEstablishments: vi.fn(async () => collection()),
       loadRenaveLinkStatus: vi.fn(async () => ({
         preflightAvailable: false,
         status: "not_started" as const,
@@ -481,8 +601,8 @@ describe("App session boundary", () => {
     );
     vi.mocked(client.loadEstablishments).mockImplementation(async (tenantId) =>
       tenantId === "tenant-b"
-        ? [{ id: "store-b", tradeName: "Loja Sul" }]
-        : [{ id: "store-a", tradeName: "Loja Norte" }],
+        ? collection([{ id: "store-b", tradeName: "Loja Sul" }])
+        : collection([{ id: "store-a", tradeName: "Loja Norte" }]),
     );
     render(<App client={client} />);
 
@@ -501,9 +621,80 @@ describe("App session boundary", () => {
     ).toBeEnabled();
   });
 
+  it("cadastra, incorpora e seleciona a nova loja sem presumir vínculo", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Administradora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([], "available"),
+    );
+    vi.mocked(client.createEstablishment).mockResolvedValue({
+      establishment: { id: "store-created", tradeName: "Loja Centro" },
+      renaveLink: { status: "not_started" },
+    });
+    render(<App client={client} />);
+
+    await screen.findByRole("heading", { name: "Cadastrar estabelecimento" });
+    fireEvent.change(screen.getByLabelText("CNPJ"), {
+      target: { value: "11.222.333/0001-81" },
+    });
+    fireEvent.change(screen.getByLabelText("Nome comercial"), {
+      target: { value: "Loja Centro" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cadastrar estabelecimento" }),
+    );
+
+    expect(
+      await screen.findByRole("option", { name: "Loja Centro" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("combobox", { name: "Estabelecimento ativo" }),
+    ).toHaveValue("store-created");
+    expect(client.createEstablishment).toHaveBeenCalledWith("tenant-a", {
+      cnpj: "11.222.333/0001-81",
+      idempotencyKey: "11111111-1111-4111-8111-111111111111",
+      tradeName: "Loja Centro",
+    });
+    expect(await screen.findByText("Não iniciado")).toBeVisible();
+  });
+
+  it("mostra step-up sem formulário quando a capability exige MFA", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: {},
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([], "mfa_required"),
+    );
+    render(<App client={client} />);
+
+    expect(
+      await screen.findByRole("link", { name: "Confirmar acesso corporativo" }),
+    ).toHaveAttribute("href", "/api/auth/login");
+    expect(screen.queryByLabelText("CNPJ")).toBeNull();
+    expect(client.createEstablishment).not.toHaveBeenCalled();
+  });
+
   it("descarta estabelecimentos de uma resposta atrasada do tenant anterior", async () => {
-    const lateSouth = deferred<readonly BrowserEstablishment[]>();
-    const currentNorth = deferred<readonly BrowserEstablishment[]>();
+    const lateSouth = deferred<BrowserEstablishmentCollection>();
+    const currentNorth = deferred<BrowserEstablishmentCollection>();
     let northCalls = 0;
     const client = clientFor(
       {
@@ -522,7 +713,9 @@ describe("App session boundary", () => {
       if (tenantId === "tenant-b") return lateSouth.promise;
       northCalls += 1;
       return northCalls === 1
-        ? Promise.resolve([{ id: "store-a", tradeName: "Loja Norte" }])
+        ? Promise.resolve(
+            collection([{ id: "store-a", tradeName: "Loja Norte" }]),
+          )
         : currentNorth.promise;
     });
     render(<App client={client} />);
@@ -532,17 +725,83 @@ describe("App session boundary", () => {
     });
     fireEvent.change(selector, { target: { value: "tenant-b" } });
     fireEvent.change(selector, { target: { value: "tenant-a" } });
-    currentNorth.resolve([{ id: "store-a2", tradeName: "Loja Norte 2" }]);
+    currentNorth.resolve(
+      collection([{ id: "store-a2", tradeName: "Loja Norte 2" }]),
+    );
     expect(
       await screen.findByRole("option", { name: "Loja Norte 2" }),
     ).toBeVisible();
 
-    lateSouth.resolve([{ id: "store-b", tradeName: "Loja Sul atrasada" }]);
+    lateSouth.resolve(
+      collection([{ id: "store-b", tradeName: "Loja Sul atrasada" }]),
+    );
     await waitFor(() =>
       expect(
         screen.queryByRole("option", { name: "Loja Sul atrasada" }),
       ).toBeNull(),
     );
+  });
+
+  it("ignora erro tardio do cadastro sem recarregar o tenant anterior", async () => {
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    const creation = deferred<{
+      establishment: BrowserEstablishment;
+      renaveLink: { status: "not_started" };
+    }>();
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: {},
+      },
+      [
+        { displayName: "Revenda Norte", tenantId: "tenant-a" },
+        { displayName: "Revenda Sul", tenantId: "tenant-b" },
+      ],
+    );
+    vi.mocked(client.loadEstablishments).mockImplementation(async (tenantId) =>
+      tenantId === "tenant-a"
+        ? collection([], "available")
+        : collection([{ id: "store-b", tradeName: "Loja Sul" }], "available"),
+    );
+    vi.mocked(client.createEstablishment).mockReturnValue(creation.promise);
+    render(<App client={client} />);
+
+    await screen.findByRole("heading", { name: "Cadastrar estabelecimento" });
+    fireEvent.change(screen.getByLabelText("CNPJ"), {
+      target: { value: "11.222.333/0001-81" },
+    });
+    fireEvent.change(screen.getByLabelText("Nome comercial"), {
+      target: { value: "Loja Norte" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cadastrar estabelecimento" }),
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Organização ativa" }),
+      { target: { value: "tenant-b" } },
+    );
+    expect(
+      await screen.findByRole("option", { name: "Loja Sul" }),
+    ).toBeVisible();
+
+    creation.reject(
+      new EstablishmentCreationClientError(404, "TENANT_RESOURCE_NOT_FOUND"),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("combobox", { name: "Organização ativa" }),
+      ).toHaveValue("tenant-b"),
+    );
+    expect(client.loadEstablishments).toHaveBeenCalledTimes(2);
+    expect(client.loadEstablishments).toHaveBeenLastCalledWith("tenant-b");
+    expect(screen.queryByText(/contexto anterior foi preservado/i)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("encerra por callback POST e remove o painel localmente", async () => {
@@ -582,9 +841,9 @@ describe("App session boundary", () => {
       },
       [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
     );
-    vi.mocked(client.loadEstablishments).mockResolvedValue([
-      { id: "store-a", tradeName: "Loja Norte" },
-    ]);
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }]),
+    );
     vi.mocked(client.loadRenaveLinkStatus)
       .mockResolvedValueOnce({
         preflightAvailable: true,
@@ -622,10 +881,12 @@ describe("App session boundary", () => {
       },
       [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
     );
-    vi.mocked(client.loadEstablishments).mockResolvedValue([
-      { id: "store-a", tradeName: "Loja A" },
-      { id: "store-b", tradeName: "Loja B" },
-    ]);
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([
+        { id: "store-a", tradeName: "Loja A" },
+        { id: "store-b", tradeName: "Loja B" },
+      ]),
+    );
     vi.mocked(client.loadRenaveLinkStatus).mockImplementation(
       async (_tenantId, establishmentId) =>
         establishmentId === "store-a"
@@ -655,9 +916,9 @@ describe("App session boundary", () => {
       },
       [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
     );
-    vi.mocked(client.loadEstablishments).mockResolvedValue([
-      { id: "store-a", tradeName: "Loja A" },
-    ]);
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja A" }]),
+    );
     vi.mocked(client.loadRenaveLinkStatus)
       .mockResolvedValueOnce({
         preflightAvailable: true,
@@ -699,9 +960,9 @@ describe("App session boundary", () => {
       },
       [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
     );
-    vi.mocked(client.loadEstablishments).mockResolvedValue([
-      { id: "store-a", tradeName: "Loja A" },
-    ]);
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja A" }]),
+    );
     vi.mocked(client.loadRenaveLinkStatus)
       .mockResolvedValueOnce({
         preflightAvailable: true,
@@ -735,9 +996,9 @@ describe("App session boundary", () => {
       },
       [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
     );
-    vi.mocked(client.loadEstablishments).mockResolvedValue([
-      { id: "store-a", tradeName: "Loja A" },
-    ]);
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja A" }]),
+    );
     vi.mocked(client.loadRenaveLinkStatus)
       .mockRejectedValueOnce(new Error("indisponível"))
       .mockResolvedValueOnce({
@@ -767,10 +1028,12 @@ describe("App session boundary", () => {
       },
       [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
     );
-    vi.mocked(client.loadEstablishments).mockResolvedValue([
-      { id: "store-a", tradeName: "Loja A" },
-      { id: "store-b", tradeName: "Loja B" },
-    ]);
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([
+        { id: "store-a", tradeName: "Loja A" },
+        { id: "store-b", tradeName: "Loja B" },
+      ]),
+    );
     vi.mocked(client.loadRenaveLinkStatus).mockResolvedValue({
       preflightAvailable: true,
       status: "pending",

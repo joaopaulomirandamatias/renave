@@ -5,6 +5,7 @@ import {
 import {
   getAuthorizationContext,
   getCredentialLink,
+  getEstablishment,
   withTenant,
   type CredentialLinkStatus,
 } from "@seu-renave/db";
@@ -44,6 +45,14 @@ export class PostgresRenaveLinkStatusUseCase implements RenaveLinkStatusUseCase 
       );
       if (!decision.allowed) {
         throw new AuthorizationDeniedError(decision.reason);
+      }
+      const establishment = await getEstablishment(
+        client,
+        input.establishmentId,
+      );
+      if (!establishment || establishment.status !== "active") {
+        // Não distingue ID ausente de loja inativa ou fora do escopo.
+        throw new AuthorizationDeniedError("ESTABLISHMENT_SCOPE_DENIED");
       }
       const link = await getCredentialLink(client, input.establishmentId);
       return { status: link?.status ?? "not_started" };

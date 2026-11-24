@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import type { IdentityService } from "@seu-renave/identity";
 import {
   EvidenceCipher,
   OperationReconciliationProjectionCipher,
@@ -13,10 +14,12 @@ import {
   createOrReplayOperation,
   createEstablishment,
   createPool,
+  computeCnpjCheckDigits,
   getCredentialLink,
   grantTenantUserAccess,
   listAuditEvents,
   listCredentialLinkHistory,
+  PostgresTenantAdminRateLimiter,
   provisionTenant,
   transitionCredentialLink,
   withTenant,
@@ -27,12 +30,16 @@ import {
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 
+import { buildApp } from "../app.js";
+import { createTenantActionRunner } from "../auth/request-access-guard.js";
+import { loadConfig } from "../config.js";
 import { PostgresVehicleEligibilityUseCase } from "../renave/use-case.js";
 import { buildCreateOperationInput } from "../renave/operation-request-builder.js";
 import { PostgresRenaveLinkPreflightUseCase } from "../renave/preflight-use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "../renave/link-status-use-case.js";
 import { PostgresStockQueryUseCase } from "../renave/stock-query-use-case.js";
 import { createPostgresTenantDirectory } from "../tenant/directory.js";
+import { PostgresTenantEstablishmentAdministration } from "../tenant/postgres-administration.js";
 
 interface DbUrls {
   admin: string;
@@ -369,18 +376,55 @@ describe("composição PostgreSQL real da API", () => {
 
     await expect(
       directory.listEstablishments({ subject: AUDITOR, tenantId: tenant.id }),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({
+      canManageEstablishments: false,
+      establishments: [],
+    });
     await expect(
       directory.listEstablishments({ subject: OPERATOR, tenantId: tenant.id }),
-    ).resolves.toEqual([
-      { id: operatorStore.id, tradeName: operatorStore.tradeName },
-    ]);
+    ).resolves.toEqual({
+      canManageEstablishments: false,
+      establishments: [
+        { id: operatorStore.id, tradeName: operatorStore.tradeName },
+      ],
+    });
     await expect(
       directory.listEstablishments({ subject: ADMIN, tenantId: tenant.id }),
-    ).resolves.toEqual([
-      { id: operatorStore.id, tradeName: operatorStore.tradeName },
-      { id: otherStore.id, tradeName: otherStore.tradeName },
-    ]);
+    ).resolves.toEqual({
+      canManageEstablishments: true,
+      establishments: [
+        { id: operatorStore.id, tradeName: operatorStore.tradeName },
+        { id: otherStore.id, tradeName: otherStore.tradeName },
+      ],
+    });
+
+    await expect(
+      directory.getEstablishment({
+        establishmentId: operatorStore.id,
+        subject: OPERATOR,
+        tenantId: tenant.id,
+      }),
+    ).resolves.toEqual({
+      establishment: {
+        id: operatorStore.id,
+        tradeName: operatorStore.tradeName,
+      },
+      renaveLink: { status: "not_started" },
+    });
+    await expect(
+      directory.getEstablishment({
+        establishmentId: otherStore.id,
+        subject: OPERATOR,
+        tenantId: tenant.id,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      directory.getEstablishment({
+        establishmentId: operatorStore.id,
+        subject: AUDITOR,
+        tenantId: tenant.id,
+      }),
+    ).resolves.toBeNull();
 
     await withTenant(migratorPool, tenant.id, (client) =>
       client.query(
@@ -400,6 +444,152 @@ describe("composição PostgreSQL real da API", () => {
           [tenant.id],
         ),
       );
+    }
+  });
+
+  it("compõe HTTP, sessão, RBAC e RLS para coleção e detalhe", async () => {
+    const directory = createPostgresTenantDirectory(appPool);
+    const identity = {
+      config: { publicOrigin: "https://app.test" },
+      getSession: vi.fn(async () => ({
+        expiresAt: Date.now() + 60_000,
+        mfaVerified: true,
+        roles: ["idp-role-must-not-authorize"],
+        subject: ADMIN,
+      })),
+    } as unknown as IdentityService;
+    const app = buildApp({
+      config: loadConfig(),
+      identity,
+      logger: false,
+      tenantDirectory: directory,
+    });
+    try {
+      const collection = await app.inject({
+        method: "GET",
+        url: `/api/tenants/${tenant.id}/establishments?role=tenant_admin`,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+      expect(collection.statusCode).toBe(200);
+      expect(collection.json()).toEqual({
+        capabilities: { establishmentManagement: "available" },
+        establishments: [
+          { id: operatorStore.id, tradeName: operatorStore.tradeName },
+          { id: otherStore.id, tradeName: otherStore.tradeName },
+        ],
+      });
+      expect(collection.body).not.toContain("tenant_admin");
+      expect(collection.body).not.toContain(operatorStore.cnpj);
+
+      const detail = await app.inject({
+        method: "GET",
+        url: `/api/tenants/${tenant.id}/establishments/${operatorStore.id}`,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json()).toEqual({
+        establishment: {
+          id: operatorStore.id,
+          tradeName: operatorStore.tradeName,
+        },
+        renaveLink: { status: "not_started" },
+      });
+      expect(detail.headers["cache-control"]).toBe("no-store");
+      expect(detail.body).not.toContain(operatorStore.cnpj);
+      expect(detail.body).not.toContain(tenant.id);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("compõe POST, replay, GET Location, auditoria e ausência de vínculo", async () => {
+    const hmacKey = Buffer.alloc(32, 0x4a);
+    const administration = new PostgresTenantEstablishmentAdministration(
+      hmacKey,
+    );
+    const limiter = new PostgresTenantAdminRateLimiter(appPool, hmacKey);
+    hmacKey.fill(0);
+    const identity = {
+      config: { publicOrigin: "https://app.test" },
+      getSession: vi.fn(async () => ({
+        expiresAt: Date.now() + 60_000,
+        mfaVerified: true,
+        roles: ["idp-role-must-not-authorize"],
+        subject: ADMIN,
+      })),
+    } as unknown as IdentityService;
+    const app = buildApp({
+      config: loadConfig(),
+      identity,
+      logger: false,
+      tenantActionRunner: createTenantActionRunner(appPool),
+      tenantDirectory: createPostgresTenantDirectory(appPool),
+      tenantEstablishmentAdministration: administration,
+      tenantMutationRateLimiter: {
+        acquire: (input) => limiter.consume(input),
+      },
+    });
+    const base = "98ADMIN00001";
+    const cnpj = `${base}${computeCnpjCheckDigits(base)}`;
+    const idempotencyKey = randomUUID();
+    try {
+      const create = () =>
+        app.inject({
+          method: "POST",
+          url: `/api/tenants/${tenant.id}/establishments`,
+          headers: {
+            cookie: "renave_session=opaque-session",
+            "idempotency-key": idempotencyKey,
+            origin: "https://app.test",
+          },
+          payload: { cnpj, tradeName: "Loja Composta" },
+        });
+      const created = await create();
+      expect(created.statusCode).toBe(201);
+      expect(created.body).not.toContain(cnpj);
+      const createdBody = created.json<{
+        establishment: { id: string; tradeName: string };
+        renaveLink: { status: string };
+      }>();
+      expect(createdBody).toMatchObject({
+        establishment: { tradeName: "Loja Composta" },
+        renaveLink: { status: "not_started" },
+      });
+      expect(created.headers.location).toBe(
+        `/api/tenants/${tenant.id}/establishments/${createdBody.establishment.id}`,
+      );
+
+      const replayed = await create();
+      expect(replayed.statusCode).toBe(201);
+      expect(replayed.headers["idempotency-replayed"]).toBe("true");
+      expect(replayed.json()).toEqual(createdBody);
+
+      const detail = await app.inject({
+        method: "GET",
+        url: created.headers.location!,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json()).toEqual(createdBody);
+
+      const persisted = await withTenant(
+        appPool,
+        tenant.id,
+        async (client) => ({
+          audits: (await listAuditEvents(client)).filter(
+            (event) =>
+              event.action === "tenant.establishment.create" &&
+              event.establishmentId === createdBody.establishment.id,
+          ),
+          link: await getCredentialLink(client, createdBody.establishment.id),
+        }),
+      );
+      expect(persisted.audits).toHaveLength(1);
+      expect(persisted.link).toBeNull();
+    } finally {
+      await app.close();
+      administration.destroy();
+      limiter.destroy();
     }
   });
 

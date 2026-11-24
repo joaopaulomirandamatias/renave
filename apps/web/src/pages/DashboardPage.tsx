@@ -17,8 +17,12 @@ import type {
   BrowserCrvType,
   BrowserEligibilitySummary,
   BrowserRenaveLinkStatus,
+  CreateEstablishmentInput,
+  CreateEstablishmentResult,
+  EstablishmentManagementCapability,
 } from "../App.js";
 import { ActivationPage } from "./ActivationPage.js";
+import { EstablishmentCreationPanel } from "./EstablishmentCreationPanel.js";
 import { EligibilityPanel } from "./EligibilityPanel.js";
 import { StockSearchPanel } from "./StockSearchPanel.js";
 
@@ -27,6 +31,7 @@ export interface DashboardPageProps {
   contextError?: boolean;
   contextLoading?: boolean;
   environment: AppEnvironment;
+  establishmentManagement?: EstablishmentManagementCapability;
   establishments: readonly AppShellEstablishment[];
   logoutPending?: boolean;
   logoutError?: boolean;
@@ -37,6 +42,9 @@ export interface DashboardPageProps {
     plate: string,
     crvType: BrowserCrvType,
   ) => Promise<BrowserEligibilitySummary>;
+  onCreateEstablishment?: (
+    input: CreateEstablishmentInput,
+  ) => Promise<CreateEstablishmentResult>;
   onEstablishmentChange?: (establishmentId: string) => void;
   onLogout: () => void | Promise<void>;
   onReloadLinkStatus?: () => void;
@@ -80,6 +88,7 @@ export function DashboardPage({
   contextError = false,
   contextLoading = false,
   environment,
+  establishmentManagement = "denied",
   establishments,
   logoutPending = false,
   logoutError = false,
@@ -87,6 +96,7 @@ export function DashboardPage({
   linkStatusError = false,
   linkStatusLoading = false,
   onCheckEligibility,
+  onCreateEstablishment,
   onEstablishmentChange,
   onLogout,
   onReloadLinkStatus,
@@ -263,6 +273,14 @@ export function DashboardPage({
           linkStatusError={linkStatusError}
           linkStatusLoading={linkStatusLoading}
         />
+
+        {onCreateEstablishment && selectedTenantId ? (
+          <EstablishmentCreationPanel
+            capability={establishmentManagement}
+            onCreate={onCreateEstablishment}
+            selectionKey={selectedTenantId}
+          />
+        ) : null}
 
         {(linkStatus === "confirmed" || linkStatus === "enabled") &&
         selectedTenantId &&

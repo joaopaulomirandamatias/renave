@@ -7,6 +7,7 @@ import type { TenantDirectory } from "./routes.js";
 
 const apps: ReturnType<typeof buildApp>[] = [];
 const TENANT_ID = "11111111-1111-4111-8111-111111111111";
+const ESTABLISHMENT_ID = "22222222-2222-4222-8222-222222222222";
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
@@ -16,6 +17,7 @@ function setup(
   options: {
     authenticated?: boolean;
     directory?: TenantDirectory;
+    mfaVerified?: boolean;
     sessionLookupGate?: { tryAcquire(): (() => void) | undefined };
   } = {},
 ) {
@@ -24,6 +26,7 @@ function setup(
       ? undefined
       : {
           expiresAt: Date.now() + 60_000,
+          mfaVerified: options.mfaVerified ?? true,
           roles: ["idp-role-must-not-authorize"],
           subject: "oidc|tenant-user",
         },
@@ -50,7 +53,11 @@ function directoryWith(
 ): TenantDirectory {
   return {
     discover: vi.fn(async () => []),
-    listEstablishments: vi.fn(async () => []),
+    getEstablishment: vi.fn(async () => null),
+    listEstablishments: vi.fn(async () => ({
+      canManageEstablishments: false,
+      establishments: [],
+    })),
     ...overrides,
   };
 }
@@ -144,7 +151,11 @@ describe("diretório autenticado de tenants", () => {
       discover: vi.fn(async () => {
         throw new Error("postgres://secret@db/tenant-private");
       }),
-      listEstablishments: vi.fn(async () => []),
+      getEstablishment: vi.fn(async () => null),
+      listEstablishments: vi.fn(async () => ({
+        canManageEstablishments: false,
+        establishments: [],
+      })),
     };
     const { app } = setup({ directory });
     const response = await app.inject({
@@ -163,7 +174,10 @@ describe("diretório autenticado de tenants", () => {
 
   it("lista somente estabelecimentos autorizados calculados no servidor", async () => {
     const listEstablishments = vi.fn<TenantDirectory["listEstablishments"]>(
-      async () => [{ id: "store-a", tradeName: "Loja A" }],
+      async () => ({
+        canManageEstablishments: true,
+        establishments: [{ id: "store-a", tradeName: "Loja A" }],
+      }),
     );
     const { app } = setup({
       directory: directoryWith({ listEstablishments }),
@@ -176,6 +190,7 @@ describe("diretório autenticado de tenants", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
+      capabilities: { establishmentManagement: "available" },
       establishments: [{ id: "store-a", tradeName: "Loja A" }],
     });
     expect(listEstablishments).toHaveBeenCalledWith({
@@ -202,9 +217,101 @@ describe("diretório autenticado de tenants", () => {
       headers: { cookie: "renave_session=opaque-session" },
     });
 
-    expect(guessed.statusCode).toBe(403);
-    expect(malformed.statusCode).toBe(403);
-    expect(guessed.json()).toEqual({ code: "TENANT_ACCESS_DENIED" });
-    expect(malformed.json()).toEqual({ code: "TENANT_ACCESS_DENIED" });
+    expect(guessed.statusCode).toBe(404);
+    expect(malformed.statusCode).toBe(404);
+    expect(guessed.json()).toEqual({ code: "TENANT_RESOURCE_NOT_FOUND" });
+    expect(malformed.json()).toEqual({ code: "TENANT_RESOURCE_NOT_FOUND" });
+  });
+
+  it("projeta capability sem expor roles e distingue MFA ausente", async () => {
+    const manageable = vi.fn<TenantDirectory["listEstablishments"]>(
+      async () => ({ canManageEstablishments: true, establishments: [] }),
+    );
+    const withMfaMissing = setup({
+      directory: directoryWith({ listEstablishments: manageable }),
+      mfaVerified: false,
+    });
+    const mfaRequired = await withMfaMissing.app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/establishments?role=tenant_admin`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(mfaRequired.json()).toEqual({
+      capabilities: { establishmentManagement: "mfa_required" },
+      establishments: [],
+    });
+    expect(mfaRequired.body).not.toContain("tenant_admin");
+
+    const deniedDirectory = directoryWith({
+      listEstablishments: vi.fn(async () => ({
+        canManageEstablishments: false,
+        establishments: [],
+      })),
+    });
+    const deniedApp = setup({ directory: deniedDirectory });
+    const denied = await deniedApp.app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/establishments`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(denied.json()).toEqual({
+      capabilities: { establishmentManagement: "denied" },
+      establishments: [],
+    });
+  });
+
+  it("retorna detalhe mínimo e torna o Location administrativo dereferenciável", async () => {
+    const getEstablishment = vi.fn<TenantDirectory["getEstablishment"]>(
+      async () => ({
+        establishment: { id: ESTABLISHMENT_ID, tradeName: "Loja Centro" },
+        renaveLink: { status: "not_started" },
+      }),
+    );
+    const { app } = setup({
+      directory: directoryWith({ getEstablishment }),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}?cnpj=secret`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      establishment: { id: ESTABLISHMENT_ID, tradeName: "Loja Centro" },
+      renaveLink: { status: "not_started" },
+    });
+    expect(getEstablishment).toHaveBeenCalledWith({
+      establishmentId: ESTABLISHMENT_ID,
+      subject: "oidc|tenant-user",
+      tenantId: TENANT_ID,
+    });
+    expect(response.body).not.toContain("cnpj");
+    expect(response.body).not.toContain("tenant_admin");
+  });
+
+  it("não distingue IDs inválidos, inexistentes ou fora do escopo no detalhe", async () => {
+    const getEstablishment = vi.fn<TenantDirectory["getEstablishment"]>(
+      async () => null,
+    );
+    const { app } = setup({
+      directory: directoryWith({ getEstablishment }),
+    });
+    const missing = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    const malformed = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/establishments/not-a-uuid`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+
+    expect(missing.statusCode).toBe(404);
+    expect(malformed.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ code: "TENANT_RESOURCE_NOT_FOUND" });
+    expect(malformed.json()).toEqual({ code: "TENANT_RESOURCE_NOT_FOUND" });
+    expect(getEstablishment).toHaveBeenCalledTimes(1);
   });
 });

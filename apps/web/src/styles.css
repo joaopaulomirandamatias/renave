@@ -447,6 +447,115 @@ footer {
   text-align: right;
 }
 
+.establishment-creation {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-card);
+  box-shadow: var(--sr-shadow-card);
+}
+
+.establishment-creation__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.establishment-creation__heading > svg {
+  flex: 0 0 auto;
+  color: var(--sr-color-brand);
+}
+
+.establishment-creation__heading p,
+.establishment-creation__heading h2,
+.establishment-creation__intro,
+.establishment-creation__field p,
+.establishment-creation__feedback {
+  margin: 0;
+}
+
+.establishment-creation__heading p {
+  color: var(--sr-color-brand);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.establishment-creation__heading h2 {
+  font-size: 1rem;
+}
+
+.establishment-creation__intro,
+.establishment-creation__field p,
+.establishment-creation > p {
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.establishment-creation form {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.75fr) minmax(14rem, 1.25fr) auto;
+  align-items: start;
+  gap: 1rem;
+}
+
+.establishment-creation__field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.establishment-creation__field label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.establishment-creation__field input {
+  min-height: var(--sr-touch-target-min);
+  padding: 0 0.75rem;
+  color: var(--sr-color-text);
+  font: inherit;
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-border-strong);
+  border-radius: var(--sr-radius-control);
+}
+
+.establishment-creation__field input[aria-invalid="true"] {
+  border-color: var(--sr-color-danger);
+}
+
+.establishment-creation__field input:focus-visible {
+  outline: 3px solid var(--sr-color-focus);
+  outline-offset: 2px;
+}
+
+.establishment-creation__field .field-error {
+  min-height: 1.25rem;
+  color: var(--sr-color-danger);
+}
+
+.establishment-creation form .sr-button {
+  margin-top: 1.25rem;
+}
+
+.establishment-creation__feedback {
+  padding: 0.75rem;
+  border-radius: var(--sr-radius-control);
+}
+
+.establishment-creation__feedback--error {
+  color: var(--sr-color-danger);
+  background: var(--sr-color-danger-soft);
+}
+
+.establishment-creation__feedback--success {
+  color: var(--sr-color-brand);
+  background: var(--sr-color-brand-soft);
+}
+
 .stock-search {
   display: grid;
   gap: 1rem;
@@ -608,5 +717,14 @@ footer {
   .stock-search__result li {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .establishment-creation form {
+    grid-template-columns: 1fr;
+  }
+
+  .establishment-creation form .sr-button {
+    width: 100%;
+    margin-top: 0;
   }
 }
