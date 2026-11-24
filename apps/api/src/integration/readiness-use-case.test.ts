@@ -7,6 +7,8 @@ import {
   grantTenantUserAccess,
   provisionTenant,
   transitionCredentialLink,
+  transitionEstablishmentRegulatoryJurisdiction,
+  transitionCredentialServiceScope,
   withTenant,
   type Establishment,
   type TenantClient,
@@ -20,6 +22,7 @@ import { PostgresRenaveReadinessUseCase } from "../renave/readiness-use-case.js"
 interface DbUrls {
   admin: string;
   app: string;
+  credentialScopeProvisioner: string;
   identity: string;
   maintenance: string;
   migrator: string;
@@ -39,6 +42,7 @@ const MISSING_OPERATOR = "oidc|readiness-missing";
 
 let appPool: Pool;
 let migratorPool: Pool;
+let credentialScopeProvisionerPool: Pool;
 let tenantA: Tenant;
 let tenantB: Tenant;
 let storeA: Establishment;
@@ -76,6 +80,38 @@ async function grantAndConfirm(
     establishmentId,
     source: "serpro_preflight",
     status: "confirmed",
+  });
+}
+
+async function enableEstablishmentScope(
+  tenantId: string,
+  establishmentId: string,
+): Promise<void> {
+  const now = Date.now();
+  const validFrom = new Date(now - 60_000);
+  const expiresAt = new Date(now + 86_400_000);
+  await withTenant(credentialScopeProvisionerPool, tenantId, async (client) => {
+    await transitionEstablishmentRegulatoryJurisdiction(client, {
+      changedByDigest: digest(`jurisdiction-actor:${establishmentId}`),
+      decisionTicketDigest: digest(`jurisdiction-ticket:${establishmentId}`),
+      establishmentId,
+      evidenceDigest: digest(`jurisdiction-evidence:${establishmentId}`),
+      expiresAt,
+      jurisdictionUf: "PA",
+      status: "verified",
+      validFrom,
+    });
+    await transitionCredentialServiceScope(client, {
+      changedByDigest: digest(`scope-actor:${establishmentId}`),
+      decisionTicketDigest: digest(`scope-ticket:${establishmentId}`),
+      establishmentId,
+      evidenceDigest: digest(`scope-evidence:${establishmentId}`),
+      expiresAt,
+      jurisdictionUf: "PA",
+      serviceNature: "establishment",
+      status: "enabled",
+      validFrom,
+    });
   });
 }
 
@@ -154,6 +190,9 @@ async function seedEstablishmentProfile(
 beforeAll(async () => {
   appPool = createPool(urls.app, { max: 4 });
   migratorPool = createPool(urls.migrator, { max: 2 });
+  credentialScopeProvisionerPool = createPool(urls.credentialScopeProvisioner, {
+    max: 2,
+  });
   tenantA = await provisionTenant(migratorPool, {
     displayName: "Readiness A",
     slug: "readiness-a",
@@ -203,10 +242,19 @@ beforeAll(async () => {
     await seedOperatorProfile(client, SUSPENDED_OPERATOR, "suspended");
     await seedEstablishmentProfile(client, suspendedStoreA.id, "suspended");
   });
+  await Promise.all(
+    [storeA, pendingStoreA, suspendedStoreA, missingStoreA].map((store) =>
+      enableEstablishmentScope(tenantA.id, store.id),
+    ),
+  );
 });
 
 afterAll(async () => {
-  await Promise.all([appPool?.end(), migratorPool?.end()]);
+  await Promise.all([
+    appPool?.end(),
+    migratorPool?.end(),
+    credentialScopeProvisionerPool?.end(),
+  ]);
 });
 
 function useCase(status: "healthy" | "expired" = "healthy") {

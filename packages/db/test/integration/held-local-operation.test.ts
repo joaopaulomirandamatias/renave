@@ -6,6 +6,10 @@ import { afterAll, beforeAll, describe, expect, it, inject } from "vitest";
 import { computeCnpjCheckDigits } from "../../src/cnpj.js";
 import { transitionCredentialLink } from "../../src/credential-links.js";
 import {
+  transitionCredentialServiceScope,
+  transitionEstablishmentRegulatoryJurisdiction,
+} from "../../src/credential-service-scopes.js";
+import {
   createEstablishment,
   type Establishment,
 } from "../../src/establishments.js";
@@ -15,7 +19,6 @@ import {
   OperationActiveConflictError,
   OperationCredentialLinkNotEnabledError,
   OperationIdempotencyConflictError,
-  OperationStorageError,
   type CreateOperationInput,
 } from "../../src/operations.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
@@ -28,6 +31,7 @@ let adminPool: Pool;
 let appPool: Pool;
 let racePool: Pool;
 let migratorPool: Pool;
+let scopeProvisionerPool: Pool;
 let tenantA: Tenant;
 let tenantB: Tenant;
 let enabledA: Establishment;
@@ -104,6 +108,34 @@ async function createTestEstablishment(
   );
 }
 
+async function authorizeService(
+  tenantId: string,
+  establishmentId: string,
+): Promise<void> {
+  const validFrom = new Date(Date.now() - 60_000);
+  const expiresAt = new Date(Date.now() + 3_600_000);
+  const common = {
+    changedByDigest: digest(`scope-actor:${establishmentId}`),
+    decisionTicketDigest: digest(`scope-ticket:${establishmentId}`),
+    establishmentId,
+    evidenceDigest: digest(`scope-evidence:${establishmentId}`),
+    expiresAt,
+    jurisdictionUf: "PA" as const,
+    validFrom,
+  };
+  await withTenant(scopeProvisionerPool, tenantId, async (client) => {
+    await transitionEstablishmentRegulatoryJurisdiction(client, {
+      ...common,
+      status: "verified",
+    });
+    await transitionCredentialServiceScope(client, {
+      ...common,
+      serviceNature: "establishment",
+      status: "enabled",
+    });
+  });
+}
+
 beforeAll(async () => {
   adminPool = createPool(urls.admin, { max: 2 });
   appPool = createPool(urls.app, { max: 16 });
@@ -112,6 +144,9 @@ beforeAll(async () => {
     max: 1,
   });
   migratorPool = createPool(urls.migrator, { max: 2 });
+  scopeProvisionerPool = createPool(urls.credentialScopeProvisioner, {
+    max: 4,
+  });
   tenantA = await provisionTenant(migratorPool, {
     displayName: "Held Local A",
     slug: "held-local-a",
@@ -135,6 +170,11 @@ beforeAll(async () => {
     establishLink(tenantA.id, raceA.id, "enabled"),
     establishLink(tenantB.id, enabledB.id, "enabled"),
   ]);
+  await Promise.all([
+    authorizeService(tenantA.id, enabledA.id),
+    authorizeService(tenantA.id, raceA.id),
+    authorizeService(tenantB.id, enabledB.id),
+  ]);
 });
 
 afterAll(async () => {
@@ -143,6 +183,7 @@ afterAll(async () => {
     appPool?.end(),
     racePool?.end(),
     migratorPool?.end(),
+    scopeProvisionerPool?.end(),
   ]);
 });
 
@@ -319,7 +360,7 @@ describe("held local operation integration", () => {
           operationInput("foreign-establishment", enabledA.id),
         ),
       ),
-    ).rejects.toBeInstanceOf(OperationStorageError);
+    ).rejects.toBeInstanceOf(OperationCredentialLinkNotEnabledError);
 
     await expect(
       withTenant(appPool, tenantB.id, (client) =>

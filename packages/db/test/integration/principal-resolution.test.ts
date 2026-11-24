@@ -7,6 +7,10 @@ import { grantTenantUserAccess } from "../../src/authorization.js";
 import { computeCnpjCheckDigits } from "../../src/cnpj.js";
 import { transitionCredentialLink } from "../../src/credential-links.js";
 import {
+  transitionCredentialServiceScope,
+  transitionEstablishmentRegulatoryJurisdiction,
+} from "../../src/credential-service-scopes.js";
+import {
   createEstablishment,
   type Establishment,
 } from "../../src/establishments.js";
@@ -35,6 +39,7 @@ let adminPool: Pool;
 let appPool: Pool;
 let racePool: Pool;
 let migratorPool: Pool;
+let scopeProvisionerPool: Pool;
 let tenantA: Tenant;
 let tenantB: Tenant;
 let storeA: Establishment;
@@ -216,6 +221,32 @@ async function seedEstablishmentProfile(
   );
 }
 
+async function authorizeStockEntry(
+  tenantId: string,
+  establishmentId: string,
+): Promise<void> {
+  const common = {
+    changedByDigest: digest(`scope-actor:${establishmentId}`),
+    decisionTicketDigest: digest(`scope-ticket:${establishmentId}`),
+    establishmentId,
+    evidenceDigest: digest(`scope-evidence:${establishmentId}`),
+    expiresAt: new Date(Date.now() + 3_600_000),
+    jurisdictionUf: "PA" as const,
+    validFrom: new Date(Date.now() - 60_000),
+  };
+  await withTenant(scopeProvisionerPool, tenantId, async (client) => {
+    await transitionEstablishmentRegulatoryJurisdiction(client, {
+      ...common,
+      status: "verified",
+    });
+    await transitionCredentialServiceScope(client, {
+      ...common,
+      serviceNature: "establishment",
+      status: "enabled",
+    });
+  });
+}
+
 beforeAll(async () => {
   adminPool = createPool(urls.admin, { max: 2 });
   appPool = createPool(urls.app, { max: 8 });
@@ -224,6 +255,9 @@ beforeAll(async () => {
     max: 1,
   });
   migratorPool = createPool(urls.migrator, { max: 8 });
+  scopeProvisionerPool = createPool(urls.credentialScopeProvisioner, {
+    max: 2,
+  });
   tenantA = await provisionTenant(migratorPool, {
     displayName: "Principal Resolution A",
     slug: "principal-resolution-a",
@@ -293,6 +327,7 @@ beforeAll(async () => {
     setLinkStatus(tenantA.id, storeRejectedLinkA.id, "rejected"),
     setLinkStatus(tenantB.id, storeB.id, "enabled"),
   ]);
+  await authorizeStockEntry(tenantA.id, storeA.id);
   await Promise.all([
     seedOperatorProfile(tenantA.id, READY, "verified", "ready-a"),
     seedOperatorProfile(tenantA.id, PENDING, "pending", "pending-a"),
@@ -385,6 +420,7 @@ afterAll(async () => {
     appPool?.end(),
     racePool?.end(),
     migratorPool?.end(),
+    scopeProvisionerPool?.end(),
   ]);
 });
 

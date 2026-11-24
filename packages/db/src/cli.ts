@@ -2,6 +2,7 @@ import { bootstrapRoles } from "./bootstrap.js";
 import {
   APP_ROLE,
   ConfigError,
+  CREDENTIAL_SCOPE_PROVISIONER_ROLE,
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
@@ -35,9 +36,10 @@ import { createPool } from "./tenant-context.js";
 
 const USAGE = `Uso: pnpm --filter @seu-renave/db cli <comando>
 
-  bootstrap    Cria/atualiza ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE}, ${PROFILE_READER_ROLE}, ${PLATFORM_PROVISIONER_ROLE} e ${PLATFORM_READER_ROLE} (idempotente; rotaciona senhas).
+  bootstrap    Cria/atualiza ${MIGRATOR_ROLE}, ${APP_ROLE}, ${CREDENTIAL_SCOPE_PROVISIONER_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE}, ${PROFILE_READER_ROLE}, ${PLATFORM_PROVISIONER_ROLE} e ${PLATFORM_READER_ROLE} (idempotente; rotaciona senhas).
                Requer: DATABASE_ADMIN_URL, RENAVE_DB_MIGRATOR_PASSWORD,
                RENAVE_DB_APP_PASSWORD, RENAVE_DB_IDENTITY_APP_PASSWORD,
+               RENAVE_DB_CREDENTIAL_SCOPE_PROVISIONER_PASSWORD,
                RENAVE_DB_MAINTENANCE_APP_PASSWORD,
                RENAVE_DB_OPERATION_WORKER_PASSWORD,
                RENAVE_DB_PROFILE_PROVISIONER_PASSWORD,
@@ -247,6 +249,9 @@ async function main(command: string | undefined): Promise<void> {
         adminUrl: requireEnv("DATABASE_ADMIN_URL"),
         migratorPassword: requireEnv("RENAVE_DB_MIGRATOR_PASSWORD"),
         appPassword: requireEnv("RENAVE_DB_APP_PASSWORD"),
+        credentialScopeProvisionerPassword: requireEnv(
+          "RENAVE_DB_CREDENTIAL_SCOPE_PROVISIONER_PASSWORD",
+        ),
         identityAppPassword: requireEnv("RENAVE_DB_IDENTITY_APP_PASSWORD"),
         maintenanceAppPassword: requireEnv(
           "RENAVE_DB_MAINTENANCE_APP_PASSWORD",
@@ -266,7 +271,7 @@ async function main(command: string | undefined): Promise<void> {
         ),
       });
       console.log(
-        `Papéis ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE}, ${PROFILE_READER_ROLE}, ${PLATFORM_PROVISIONER_ROLE} e ${PLATFORM_READER_ROLE} prontos.`,
+        `Papéis ${MIGRATOR_ROLE}, ${APP_ROLE}, ${CREDENTIAL_SCOPE_PROVISIONER_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE}, ${PROFILE_READER_ROLE}, ${PLATFORM_PROVISIONER_ROLE} e ${PLATFORM_READER_ROLE} prontos.`,
       );
       return;
     }
@@ -379,6 +384,8 @@ async function main(command: string | undefined): Promise<void> {
         adminUrl,
         migratorPassword: LOCAL_DEFAULTS.migratorPassword,
         appPassword: LOCAL_DEFAULTS.appPassword,
+        credentialScopeProvisionerPassword:
+          LOCAL_DEFAULTS.credentialScopeProvisionerPassword,
         identityAppPassword: LOCAL_DEFAULTS.identityAppPassword,
         maintenanceAppPassword: LOCAL_DEFAULTS.maintenanceAppPassword,
         operationWorkerPassword: LOCAL_DEFAULTS.operationWorkerPassword,
@@ -400,6 +407,9 @@ async function main(command: string | undefined): Promise<void> {
       );
       console.log(
         `DATABASE_URL=${withCredentials(adminUrl, APP_ROLE, LOCAL_DEFAULTS.appPassword)}`,
+      );
+      console.log(
+        `DATABASE_CREDENTIAL_SCOPE_PROVISIONER_URL=${withCredentials(adminUrl, CREDENTIAL_SCOPE_PROVISIONER_ROLE, LOCAL_DEFAULTS.credentialScopeProvisionerPassword)}`,
       );
       console.log(
         `IDENTITY_DATABASE_URL=${withCredentials(adminUrl, IDENTITY_APP_ROLE, LOCAL_DEFAULTS.identityAppPassword)}`,

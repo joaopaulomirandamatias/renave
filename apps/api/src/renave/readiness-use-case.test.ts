@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   getAuthorizationContext: vi.fn(),
   getCredentialLink: vi.fn(),
+  getCredentialServiceScope: vi.fn(),
   getEstablishment: vi.fn(),
   getEstablishmentRenaveProfileStatus: vi.fn(),
   getOperatorIdentityProfileStatus: vi.fn(),
@@ -42,6 +43,10 @@ beforeEach(() => {
     tenantId: TENANT_ID,
   });
   db.getCredentialLink.mockResolvedValue({ status: "confirmed" });
+  db.getCredentialServiceScope.mockResolvedValue({
+    serviceNature: "establishment",
+    status: "enabled",
+  });
   db.getOperatorIdentityProfileStatus.mockResolvedValue("verified");
   db.getEstablishmentRenaveProfileStatus.mockResolvedValue("verified");
 });
@@ -67,6 +72,7 @@ describe("prontidão RENAVE sanitizada", () => {
         link: "not_started",
         operatorIdentity: "pending",
         queryLimiterConfigured: false,
+        serviceScopeActive: false,
       }),
     ).toEqual({
       certificate: "unavailable",
@@ -91,6 +97,7 @@ describe("prontidão RENAVE sanitizada", () => {
           link,
           operatorIdentity: "verified",
           queryLimiterConfigured: true,
+          serviceScopeActive: true,
         }),
       ).toEqual({
         certificate: "warning",
@@ -120,6 +127,7 @@ describe("prontidão RENAVE sanitizada", () => {
           link,
           operatorIdentity: "pending",
           queryLimiterConfigured,
+          serviceScopeActive: true,
         }).queries,
       ).toBe("blocked");
     },
@@ -151,6 +159,11 @@ describe("prontidão RENAVE sanitizada", () => {
     expect(db.getAuthorizationContext).toHaveBeenCalledOnce();
     expect(db.getEstablishment).toHaveBeenCalledOnce();
     expect(db.getCredentialLink).toHaveBeenCalledOnce();
+    expect(db.getCredentialServiceScope).toHaveBeenCalledWith(
+      expect.anything(),
+      ESTABLISHMENT_ID,
+      "establishment",
+    );
     expect(db.getOperatorIdentityProfileStatus).toHaveBeenCalledWith(
       expect.anything(),
       SUBJECT,
@@ -302,6 +315,7 @@ describe("prontidão RENAVE sanitizada", () => {
     });
     expect(db.getEstablishment).not.toHaveBeenCalled();
     expect(db.getCredentialLink).not.toHaveBeenCalled();
+    expect(db.getCredentialServiceScope).not.toHaveBeenCalled();
     expect(db.getOperatorIdentityProfileStatus).not.toHaveBeenCalled();
     expect(db.getEstablishmentRenaveProfileStatus).not.toHaveBeenCalled();
     expect(temporalStatus).not.toHaveBeenCalled();
@@ -333,6 +347,7 @@ describe("prontidão RENAVE sanitizada", () => {
     ).rejects.toMatchObject({ code: "AUTHORIZATION_DENIED" });
     expect(db.getEstablishment).not.toHaveBeenCalled();
     expect(db.getCredentialLink).not.toHaveBeenCalled();
+    expect(db.getCredentialServiceScope).not.toHaveBeenCalled();
     expect(db.getOperatorIdentityProfileStatus).not.toHaveBeenCalled();
     expect(db.getEstablishmentRenaveProfileStatus).not.toHaveBeenCalled();
   });
@@ -363,5 +378,28 @@ describe("prontidão RENAVE sanitizada", () => {
       operatorIdentity: "verified",
       queries: "blocked",
     });
+  });
+
+  it("bloqueia consultas quando o escopo establishment efetivo está ausente", async () => {
+    db.getCredentialServiceScope.mockResolvedValueOnce(null);
+    const useCase = new PostgresRenaveReadinessUseCase({
+      certificateTemporalStatus: () => "healthy",
+      integrationConfigured: true,
+      pool: {} as never,
+      queryLimiterConfigured: true,
+    });
+
+    await expect(
+      useCase.execute({
+        establishmentId: ESTABLISHMENT_ID,
+        subject: SUBJECT,
+        tenantId: TENANT_ID,
+      }),
+    ).resolves.toMatchObject({ link: "confirmed", queries: "blocked" });
+    expect(db.getCredentialServiceScope).toHaveBeenCalledWith(
+      expect.anything(),
+      ESTABLISHMENT_ID,
+      "establishment",
+    );
   });
 });

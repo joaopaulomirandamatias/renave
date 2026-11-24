@@ -4,6 +4,7 @@ import type { TestProject } from "vitest/node";
 import { bootstrapRoles } from "../../src/bootstrap.js";
 import {
   APP_ROLE,
+  CREDENTIAL_SCOPE_PROVISIONER_ROLE,
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
@@ -22,6 +23,7 @@ export interface DbUrls {
   admin: string;
   migrator: string;
   app: string;
+  credentialScopeProvisioner: string;
   identity: string;
   maintenance: string;
   operationWorker: string;
@@ -48,6 +50,8 @@ function withDatabase(connectionString: string, database: string): string {
 // porque o setup recusa qualquer host fora de loopback.
 const TEST_MIGRATOR_PASSWORD = "renave_migrator_it";
 const TEST_APP_PASSWORD = "renave_app_it";
+const TEST_CREDENTIAL_SCOPE_PROVISIONER_PASSWORD =
+  "renave_credential_scope_provisioner_it";
 const TEST_IDENTITY_APP_PASSWORD = "renave_identity_app_it";
 const TEST_MAINTENANCE_APP_PASSWORD = "renave_maintenance_app_it";
 const TEST_OPERATION_WORKER_PASSWORD = "renave_operation_worker_it";
@@ -84,6 +88,8 @@ export default async function setup(
     adminUrl: admin,
     migratorPassword: TEST_MIGRATOR_PASSWORD,
     appPassword: TEST_APP_PASSWORD,
+    credentialScopeProvisionerPassword:
+      TEST_CREDENTIAL_SCOPE_PROVISIONER_PASSWORD,
     identityAppPassword: TEST_IDENTITY_APP_PASSWORD,
     maintenanceAppPassword: TEST_MAINTENANCE_APP_PASSWORD,
     operationWorkerPassword: TEST_OPERATION_WORKER_PASSWORD,
@@ -98,6 +104,11 @@ export default async function setup(
     TEST_MIGRATOR_PASSWORD,
   );
   const app = withCredentials(admin, APP_ROLE, TEST_APP_PASSWORD);
+  const credentialScopeProvisioner = withCredentials(
+    admin,
+    CREDENTIAL_SCOPE_PROVISIONER_ROLE,
+    TEST_CREDENTIAL_SCOPE_PROVISIONER_PASSWORD,
+  );
   const identity = withCredentials(
     admin,
     IDENTITY_APP_ROLE,
@@ -139,6 +150,7 @@ export default async function setup(
     admin,
     migrator,
     app,
+    credentialScopeProvisioner,
     identity,
     maintenance: maintenanceApp,
     operationWorker,

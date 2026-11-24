@@ -31,6 +31,15 @@ interface StockQueryBody {
   plate: string;
 }
 
+const CLIENT_AUTHORITY_KEYS = new Set([
+  "jurisdictionuf",
+  "renavejurisdictionuf",
+  "renaveservicenature",
+  "servicenature",
+  "xrenavejurisdictionuf",
+  "xrenaveservicenature",
+]);
+
 export interface StockQueryUseCase {
   authorize(input: {
     establishmentId: string;
@@ -104,10 +113,26 @@ function errorCode(error: unknown): string | undefined {
   return undefined;
 }
 
+function hasClientAuthorityOverride(request: FastifyRequest): boolean {
+  const containsAuthorityKey = (value: unknown): boolean =>
+    typeof value === "object" &&
+    value !== null &&
+    Object.keys(value).some((key) =>
+      CLIENT_AUTHORITY_KEYS.has(key.replaceAll(/[-_]/gu, "").toLowerCase()),
+    );
+
+  return (
+    containsAuthorityKey(request.body) ||
+    containsAuthorityKey(request.query) ||
+    containsAuthorityKey(request.headers)
+  );
+}
+
 function safeInput(
   request: FastifyRequest,
 ): { body: RouteBody; params: RouteParams } | undefined {
   if (
+    hasClientAuthorityOverride(request) ||
     typeof request.params !== "object" ||
     request.params === null ||
     typeof request.body !== "object" ||
@@ -143,7 +168,11 @@ function safeInput(
 }
 
 function safeParams(request: FastifyRequest): RouteParams | undefined {
-  if (typeof request.params !== "object" || request.params === null) {
+  if (
+    hasClientAuthorityOverride(request) ||
+    typeof request.params !== "object" ||
+    request.params === null
+  ) {
     return undefined;
   }
   const params = request.params as Record<string, unknown>;

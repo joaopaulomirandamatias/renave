@@ -227,6 +227,15 @@ export async function resolveVerifiedRenavePrincipals(
 
   let row: VerifiedPrincipalRow | undefined;
   try {
+    await client.query(
+      `select pg_catalog.pg_advisory_xact_lock(
+         pg_catalog.hashtextextended(
+           renave.current_tenant_id()::text || ':' || $1::uuid::text,
+           700069
+         )
+       )`,
+      [input.establishmentId],
+    );
     const result = await client.query<VerifiedPrincipalRow>(
       `select *
          from renave.resolve_verified_renave_principals($1, $2, $3)`,

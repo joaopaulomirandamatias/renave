@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { Client } from "pg";
 import {
   APP_ROLE,
+  CREDENTIAL_SCOPE_PROVISIONER_ROLE,
   DEFAULT_MIGRATIONS_DIR,
   IDENTITY_APP_ROLE,
   PLATFORM_PROVISIONER_ROLE,
@@ -87,6 +88,7 @@ export async function runMigrations(
       [
         [
           APP_ROLE,
+          CREDENTIAL_SCOPE_PROVISIONER_ROLE,
           IDENTITY_APP_ROLE,
           PROFILE_PROVISIONER_ROLE,
           PROFILE_READER_ROLE,
@@ -98,6 +100,7 @@ export async function runMigrations(
     const existingRoles = new Set(roles.rows.map(({ rolname }) => rolname));
     const missingRoles = [
       APP_ROLE,
+      CREDENTIAL_SCOPE_PROVISIONER_ROLE,
       IDENTITY_APP_ROLE,
       PROFILE_PROVISIONER_ROLE,
       PROFILE_READER_ROLE,

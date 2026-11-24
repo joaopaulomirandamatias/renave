@@ -10,6 +10,7 @@ import type { Pool } from "pg";
 const database = vi.hoisted(() => ({
   getAuthorizationContext: vi.fn(),
   getCredentialLink: vi.fn(),
+  getCredentialServiceScope: vi.fn(),
   getEstablishment: vi.fn(),
   withTenant: vi.fn(),
 }));
@@ -18,6 +19,7 @@ vi.mock("@seu-renave/db/api-runtime", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@seu-renave/db/api-runtime")>()),
   getAuthorizationContext: database.getAuthorizationContext,
   getCredentialLink: database.getCredentialLink,
+  getCredentialServiceScope: database.getCredentialServiceScope,
   getEstablishment: database.getEstablishment,
   withTenant: database.withTenant,
 }));
@@ -58,6 +60,10 @@ beforeEach(() => {
     status: "active",
   });
   database.getCredentialLink.mockResolvedValue({ status: "confirmed" });
+  database.getCredentialServiceScope.mockResolvedValue({
+    serviceNature: "establishment",
+    status: "enabled",
+  });
 });
 
 describe("PostgresVehicleLookupUseCase.authorize", () => {
@@ -87,6 +93,11 @@ describe("PostgresVehicleLookupUseCase.authorize", () => {
       expect.anything(),
       ESTABLISHMENT_ID,
     );
+    expect(database.getCredentialServiceScope).toHaveBeenCalledWith(
+      expect.anything(),
+      ESTABLISHMENT_ID,
+      "establishment",
+    );
   });
 
   it("nega BOLA antes de consultar estabelecimento ou vínculo", async () => {
@@ -110,6 +121,7 @@ describe("PostgresVehicleLookupUseCase.authorize", () => {
     ).rejects.toMatchObject({ code: "AUTHORIZATION_DENIED" });
     expect(database.getEstablishment).not.toHaveBeenCalled();
     expect(database.getCredentialLink).not.toHaveBeenCalled();
+    expect(database.getCredentialServiceScope).not.toHaveBeenCalled();
   });
 
   it.each([null, { status: "pending" }, { status: "rejected" }])(
@@ -125,6 +137,17 @@ describe("PostgresVehicleLookupUseCase.authorize", () => {
       ).rejects.toMatchObject({ code: "RENAVE_LINK_NOT_READY" });
     },
   );
+
+  it("recusa quando o escopo establishment efetivo está ausente", async () => {
+    database.getCredentialServiceScope.mockResolvedValue(null);
+    await expect(
+      useCase().authorize({
+        establishmentId: ESTABLISHMENT_ID,
+        subject: SUBJECT,
+        tenantId: TENANT_ID,
+      }),
+    ).rejects.toMatchObject({ code: "RENAVE_LINK_NOT_READY" });
+  });
 
   it("recusa estabelecimento inativo", async () => {
     database.getEstablishment.mockResolvedValue({

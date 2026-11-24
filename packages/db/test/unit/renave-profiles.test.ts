@@ -113,7 +113,10 @@ describe("renave profile status repository", () => {
       idempotencyKeyDigest,
       subject: "oidc|operator-1",
     });
-    const queryDigest = query.mock.calls[0]?.[1]?.[2] as Buffer;
+    const resolutionCall = query.mock.calls.find(([sql]) =>
+      String(sql).includes("resolve_verified_renave_principals"),
+    );
+    const queryDigest = resolutionCall?.[1]?.[2] as Buffer;
     expect(queryDigest).not.toBe(idempotencyKeyDigest);
     expect(queryDigest.equals(Buffer.alloc(32))).toBe(true);
     expect(idempotencyKeyDigest.equals(Buffer.alloc(32, 11))).toBe(true);

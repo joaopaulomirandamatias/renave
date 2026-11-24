@@ -6,6 +6,7 @@ import {
   appendAuditEvent,
   getAuthorizationContext,
   getCredentialLink,
+  getCredentialServiceScope,
   getEstablishment,
   withTenant,
 } from "@seu-renave/db/api-runtime";
@@ -21,6 +22,7 @@ import type { Pool } from "pg";
 
 import type { EvidenceCipher } from "@seu-renave/protected-evidence";
 import { RenaveLinkNotReadyError } from "./stock-query-use-case.js";
+import { ESTABLISHMENT_SERVICE_NATURE } from "./service-scope.js";
 
 export interface EligibilityUseCase {
   authorize(input: VehicleEligibilityInput): Promise<void>;
@@ -84,16 +86,24 @@ export class PostgresVehicleEligibilityUseCase implements EligibilityUseCase {
       if (!decision.allowed) {
         throw new AuthorizationDeniedError(decision.reason);
       }
-      const [establishment, link] = await Promise.all([
+      const [establishment, link, serviceScope] = await Promise.all([
         getEstablishment(client, input.establishmentId),
         getCredentialLink(client, input.establishmentId),
+        getCredentialServiceScope(
+          client,
+          input.establishmentId,
+          ESTABLISHMENT_SERVICE_NATURE,
+        ),
       ]);
       if (!establishment || establishment.status !== "active") {
         throw Object.assign(new Error("Estabelecimento indisponível"), {
           code: "ESTABLISHMENT_UNAVAILABLE",
         });
       }
-      if (link?.status !== "confirmed" && link?.status !== "enabled") {
+      if (
+        (link?.status !== "confirmed" && link?.status !== "enabled") ||
+        serviceScope === null
+      ) {
         throw new RenaveLinkNotReadyError();
       }
     });

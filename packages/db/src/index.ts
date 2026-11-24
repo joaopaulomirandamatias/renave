@@ -34,7 +34,24 @@ export {
   type TransitionCredentialLinkInput,
 } from "./credential-links.js";
 export {
+  credentialServiceNatures,
+  credentialServiceScopeIsActive,
+  credentialServiceScopeStatuses,
+  getCredentialServiceScope,
+  transitionEstablishmentRegulatoryJurisdiction,
+  transitionCredentialServiceScope,
+  type CredentialServiceNature,
+  type CredentialServiceScope,
+  type CredentialServiceScopeStatus,
+  type BrazilianJurisdictionUf,
+  type EstablishmentRegulatoryJurisdiction,
+  type EstablishmentRegulatoryJurisdictionStatus,
+  type TransitionEstablishmentRegulatoryJurisdictionInput,
+  type TransitionCredentialServiceScopeInput,
+} from "./credential-service-scopes.js";
+export {
   APP_ROLE,
+  CREDENTIAL_SCOPE_PROVISIONER_ROLE,
   DEFAULT_MIGRATIONS_DIR,
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,

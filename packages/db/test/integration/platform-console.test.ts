@@ -64,7 +64,7 @@ describe.sequential("console global da integradora", () => {
     );
     expect(result.rows[0]).toEqual({
       fingerprint:
-        "3d842166e4e52ee35599d836a1dcd161c15f04a0fb582bba2c56cc03fd66e644",
+        "a5c46b031ea30cd7671348eff6243f74491c33d19bdc053a79c1b987cba39012",
       recent_mfa_fingerprint:
         "5fb9ec168abf86dfb5ae23478309808242244b5070ce46c981a76ba84c9b3f09",
       rate_fingerprint:

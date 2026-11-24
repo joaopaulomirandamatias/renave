@@ -6,6 +6,7 @@ import {
   appendAuditEvent,
   getAuthorizationContext,
   getCredentialLink,
+  getCredentialServiceScope,
   getEstablishment,
   withTenant,
 } from "@seu-renave/db/api-runtime";
@@ -23,6 +24,8 @@ import type {
   StockSummary,
 } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
+
+import { ESTABLISHMENT_SERVICE_NATURE } from "./service-scope.js";
 
 const ACTION = "renave.stock.read" as const;
 
@@ -90,16 +93,24 @@ export class PostgresStockQueryUseCase {
       if (!decision.allowed) {
         throw new AuthorizationDeniedError(decision.reason);
       }
-      const [establishment, link] = await Promise.all([
+      const [establishment, link, serviceScope] = await Promise.all([
         getEstablishment(client, input.establishmentId),
         getCredentialLink(client, input.establishmentId),
+        getCredentialServiceScope(
+          client,
+          input.establishmentId,
+          ESTABLISHMENT_SERVICE_NATURE,
+        ),
       ]);
       if (!establishment || establishment.status !== "active") {
         throw Object.assign(new Error("Estabelecimento indisponível"), {
           code: "ESTABLISHMENT_UNAVAILABLE",
         });
       }
-      if (link?.status !== "confirmed" && link?.status !== "enabled") {
+      if (
+        (link?.status !== "confirmed" && link?.status !== "enabled") ||
+        serviceScope === null
+      ) {
         throw new RenaveLinkNotReadyError();
       }
     });

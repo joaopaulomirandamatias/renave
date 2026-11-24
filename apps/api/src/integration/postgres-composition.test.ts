@@ -20,15 +20,19 @@ import {
   createPool,
   computeCnpjCheckDigits,
   getCredentialLink,
+  getCredentialServiceScope,
   grantTenantUserAccess,
   listAuditEvents,
   listCredentialLinkHistory,
   PostgresTenantAdminRateLimiter,
   provisionTenant,
   transitionCredentialLink,
+  transitionCredentialServiceScope,
+  transitionEstablishmentRegulatoryJurisdiction,
   withTenant,
   type CreateOperationInput,
   type CredentialLinkStatus,
+  type CredentialServiceNature,
   type Establishment,
   type TenantClient,
   type Tenant,
@@ -51,6 +55,7 @@ import { PostgresTenantEstablishmentAdministration } from "../tenant/postgres-ad
 interface DbUrls {
   admin: string;
   app: string;
+  credentialScopeProvisioner: string;
   identity: string;
   maintenance: string;
   migrator: string;
@@ -71,6 +76,7 @@ const INTEGRATOR_CNPJ = "12ABC34501DE35";
 let adminPool: Pool;
 let appPool: Pool;
 let migratorPool: Pool;
+let credentialScopeProvisionerPool: Pool;
 let tenant: Tenant;
 let operatorStore: Establishment;
 let otherStore: Establishment;
@@ -190,8 +196,65 @@ async function prepareCredentialLink(
         status: nextStatus,
       }),
     );
-    if (nextStatus === status) return;
+    if (nextStatus === status) {
+      if (status === "confirmed" || status === "enabled") {
+        await enableEstablishmentServiceScope(scenario);
+      }
+      return;
+    }
   }
+}
+
+async function enableEstablishmentServiceScope(
+  scenario: PreflightScenario,
+  options: {
+    expiresAt?: Date;
+    serviceNature?: CredentialServiceNature;
+    validFrom?: Date;
+  } = {},
+): Promise<void> {
+  const now = Date.now();
+  const validFrom = options.validFrom ?? new Date(now - 60_000);
+  const expiresAt = options.expiresAt ?? new Date(now + 86_400_000);
+  await withTenant(
+    credentialScopeProvisionerPool,
+    scenario.tenant.id,
+    async (client) => {
+      await transitionEstablishmentRegulatoryJurisdiction(client, {
+        changedByDigest: createHash("sha256")
+          .update(`jurisdiction-actor:${scenario.tenant.id}`)
+          .digest(),
+        decisionTicketDigest: createHash("sha256")
+          .update(`jurisdiction-ticket:${scenario.store.id}`)
+          .digest(),
+        establishmentId: scenario.store.id,
+        evidenceDigest: createHash("sha256")
+          .update(`jurisdiction-evidence:${scenario.store.id}`)
+          .digest(),
+        expiresAt,
+        jurisdictionUf: "PA",
+        status: "verified",
+        validFrom,
+      });
+      await transitionCredentialServiceScope(client, {
+        changedByDigest: createHash("sha256")
+          .update(`scope-actor:${scenario.tenant.id}`)
+          .digest(),
+        decisionTicketDigest: createHash("sha256")
+          .update(`scope-ticket:${scenario.store.id}`)
+          .digest(),
+        establishmentId: scenario.store.id,
+        evidenceDigest: createHash("sha256")
+          .update(`scope-evidence:${scenario.store.id}`)
+          .digest(),
+        expiresAt,
+        jurisdictionUf: "PA",
+        serviceNature: options.serviceNature ?? "establishment",
+        status: "enabled",
+        validFrom,
+      });
+    },
+  );
 }
 
 async function evidenceState(
@@ -514,6 +577,9 @@ beforeAll(async () => {
     max: 6,
   });
   migratorPool = createPool(urls.migrator, { max: 2 });
+  credentialScopeProvisionerPool = createPool(urls.credentialScopeProvisioner, {
+    max: 2,
+  });
   tenant = await provisionTenant(migratorPool, {
     displayName: "Composição API",
     slug: "api-composition",
@@ -557,7 +623,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await Promise.all([adminPool?.end(), appPool?.end(), migratorPool?.end()]);
+  await Promise.all([
+    adminPool?.end(),
+    appPool?.end(),
+    migratorPool?.end(),
+    credentialScopeProvisionerPool?.end(),
+  ]);
 });
 
 describe("composição PostgreSQL real da API", () => {
@@ -1160,6 +1231,100 @@ describe("composição PostgreSQL real da API", () => {
     },
   );
 
+  it("não usa escopo ITE para autorizar consulta de estabelecimento", async () => {
+    const scenario = await createPreflightScenario("eligibility-scope-ite");
+    await prepareCredentialLink(scenario, "pending");
+    await withTenant(appPool, scenario.tenant.id, (client) =>
+      transitionCredentialLink(client, {
+        changedBySubject: ADMIN,
+        establishmentId: scenario.store.id,
+        source: "manual",
+        status: "confirmed",
+      }),
+    );
+    await enableEstablishmentServiceScope(scenario, {
+      serviceNature: "ite",
+    });
+    const connectorCall = vi.fn(async () => eligibilityResponse(scenario));
+
+    await expect(
+      createEligibilityUseCase(connectorCall).execute(
+        eligibilityInput(scenario, "eligibility-scope-ite-trace"),
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_LINK_NOT_READY" });
+    expect(connectorCall).not.toHaveBeenCalled();
+  });
+
+  it.each(["absent", "expired"] as const)(
+    "bloqueia consulta quando o escopo de estabelecimento está %s",
+    async (scopeState) => {
+      const scenario = await createPreflightScenario(
+        `eligibility-scope-${scopeState}`,
+      );
+      await prepareCredentialLink(scenario, "pending");
+      await withTenant(appPool, scenario.tenant.id, (client) =>
+        transitionCredentialLink(client, {
+          changedBySubject: ADMIN,
+          establishmentId: scenario.store.id,
+          source: "manual",
+          status: "confirmed",
+        }),
+      );
+      if (scopeState === "expired") {
+        const now = Date.now();
+        await enableEstablishmentServiceScope(scenario, {
+          expiresAt: new Date(now - 86_400_000),
+          validFrom: new Date(now - 172_800_000),
+        });
+      }
+      const connectorCall = vi.fn(async () => eligibilityResponse(scenario));
+
+      await expect(
+        createEligibilityUseCase(connectorCall).execute(
+          eligibilityInput(scenario, `eligibility-scope-${scopeState}-trace`),
+        ),
+      ).rejects.toMatchObject({ code: "RENAVE_LINK_NOT_READY" });
+      expect(connectorCall).not.toHaveBeenCalled();
+    },
+  );
+
+  it("nega quando há duas UFs regulatórias vigentes, mesmo com escopo em uma delas", async () => {
+    const scenario = await createPreflightScenario(
+      "eligibility-ambiguous-jurisdiction",
+    );
+    await prepareCredentialLink(scenario, "confirmed");
+    const now = Date.now();
+    await withTenant(
+      credentialScopeProvisionerPool,
+      scenario.tenant.id,
+      (client) =>
+        transitionEstablishmentRegulatoryJurisdiction(client, {
+          changedByDigest: createHash("sha256")
+            .update(`jurisdiction-actor-sp:${scenario.tenant.id}`)
+            .digest(),
+          decisionTicketDigest: createHash("sha256")
+            .update(`jurisdiction-ticket-sp:${scenario.store.id}`)
+            .digest(),
+          establishmentId: scenario.store.id,
+          evidenceDigest: createHash("sha256")
+            .update(`jurisdiction-evidence-sp:${scenario.store.id}`)
+            .digest(),
+          expiresAt: new Date(now + 86_400_000),
+          jurisdictionUf: "SP",
+          status: "verified",
+          validFrom: new Date(now - 60_000),
+        }),
+    );
+    const connectorCall = vi.fn(async () => eligibilityResponse(scenario));
+
+    await expect(
+      createEligibilityUseCase(connectorCall).execute(
+        eligibilityInput(scenario, "eligibility-ambiguous-jurisdiction-trace"),
+      ),
+    ).rejects.toMatchObject({ code: "RENAVE_LINK_NOT_READY" });
+    expect(connectorCall).not.toHaveBeenCalled();
+  });
+
   it("confirma o vínculo após preflight sem expor o subject no histórico", async () => {
     const connector = {
       verifyIdentity: vi.fn(async () => ({
@@ -1208,6 +1373,11 @@ describe("composição PostgreSQL real da API", () => {
       "confirmed",
     ]);
     expect(JSON.stringify(history)).not.toContain(OPERATOR);
+    await expect(
+      withTenant(appPool, tenant.id, (client) =>
+        getCredentialServiceScope(client, operatorStore.id, "establishment"),
+      ),
+    ).resolves.toBeNull();
 
     const statusUseCase = new PostgresRenaveLinkStatusUseCase(appPool);
     await expect(

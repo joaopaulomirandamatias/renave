@@ -356,12 +356,41 @@ describe("rota autenticada de aptidão", () => {
     });
     expect(csrf.statusCode).toBe(403);
 
-    const invalid = await request(app, {
-      plate: "ABC1D23",
-      crvType: "DIGITAL",
-      tenantOverride: TENANT_ID,
+    for (const attemptedAuthority of [
+      { tenantOverride: TENANT_ID },
+      { serviceNature: "ite" },
+      { jurisdictionUf: "SP" },
+    ]) {
+      const invalid = await request(app, {
+        plate: "ABC1D23",
+        crvType: "DIGITAL",
+        ...attemptedAuthority,
+      });
+      expect(invalid.statusCode).toBe(400);
+    }
+
+    const queryOverride = await app.inject({
+      method: "POST",
+      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/vehicle-eligibility?serviceNature=ite`,
+      headers: {
+        cookie: "renave_session=opaque-session",
+        origin: ORIGIN,
+      },
+      payload: { plate: "ABC1D23", crvType: "DIGITAL" },
     });
-    expect(invalid.statusCode).toBe(400);
+    expect(queryOverride.statusCode).toBe(400);
+
+    const headerOverride = await app.inject({
+      method: "POST",
+      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/vehicle-eligibility`,
+      headers: {
+        cookie: "renave_session=opaque-session",
+        origin: ORIGIN,
+        "x-renave-service-nature": "ite",
+      },
+      payload: { plate: "ABC1D23", crvType: "DIGITAL" },
+    });
+    expect(headerOverride.statusCode).toBe(400);
     expect(execute).not.toHaveBeenCalled();
   });
 

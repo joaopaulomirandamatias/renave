@@ -18,6 +18,16 @@ export {
   type CredentialLinkQueueEntry,
   type CredentialLinkQueuePage,
 } from "./credential-links.js";
+export {
+  brazilianJurisdictionUfs,
+  credentialServiceNatures,
+  credentialServiceScopeIsActive,
+  getCredentialServiceScope,
+  type CredentialServiceNature,
+  type CredentialServiceScope,
+  type CredentialServiceScopeStatus,
+  type BrazilianJurisdictionUf,
+} from "./credential-service-scopes.js";
 export { APP_ROLE, IDENTITY_APP_ROLE, PLATFORM_READER_ROLE } from "./config.js";
 export {
   decodePlatformOperatorHmacKeyBase64,

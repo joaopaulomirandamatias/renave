@@ -31,10 +31,11 @@ a senha do superusuário no `compose.yaml` é um padrão local descartável
 existem depois do `bootstrap`.
 
 O setup local também imprime `DATABASE_PROFILE_PROVISIONER_URL` e
-`DATABASE_PROFILE_READER_URL` com credenciais locais descartáveis. Em ambientes
-reais, forneça URLs distintas pelo cofre: a primeira serve somente aos comandos
-mutantes de perfis e a segunda somente ao `profile-status`. Não existe fallback
-entre elas.
+`DATABASE_PROFILE_READER_URL` com credenciais locais descartáveis. Também
+imprime `DATABASE_CREDENTIAL_SCOPE_PROVISIONER_URL`, exclusiva da cerimônia
+offline que verifica a UF regulatória e concede natureza de serviço. Em
+ambientes reais, forneça URLs distintas pelo cofre: nenhuma delas tem fallback
+para `DATABASE_URL`, e o runtime não pode conceder escopo.
 
 Para o console global, o setup também imprime
 `DATABASE_PLATFORM_PROVISIONER_URL` e `DATABASE_PLATFORM_READER_URL`. Em
@@ -89,6 +90,7 @@ cerimônia de backup e restauração em
 | `renave_maintenance_app` | Job operacional de lote.                                                    | `NOSUPERUSER`, `NOBYPASSRLS`, `NOINHERIT`; sem leitura de tabelas, possui somente `EXECUTE` em rotinas fechadas de manutenção. |
 | `renave_operation_worker` | Worker fenced de operações RENAVE.                                         | `NOSUPERUSER`, `NOBYPASSRLS`, `NOINHERIT`; zero ACL de tabela, somente `EXECUTE` nas rotinas fechadas de claim, lease, begin e completion. |
 | `renave_profile_provisioner` | Job administrativo de staging e suspensão de perfis RENAVE.             | Sem acesso direto a tabelas; somente `EXECUTE` nas quatro mutações fechadas. Não consulta status. |
+| `renave_credential_scope_provisioner` | Cerimônia offline de jurisdição e natureza Credencia.            | Sem acesso direto às tabelas RENAVE; somente `EXECUTE` nas duas transições fechadas do schema `renave_admin`. Não entra no runtime HTTP. |
 | `renave_profile_reader` | Job operacional global de consulta sanitizada de perfis RENAVE.               | Sem acesso direto a tabelas; somente `EXECUTE` nas duas funções de status. Não cria nem suspende perfis. |
 | `renave_platform_provisioner` | Job administrativo offline do console global.                         | Sem acesso direto a tabelas nem à fila; somente `EXECUTE` nas funções fechadas de grant/revoke. |
 | `renave_platform_reader` | Runtime isolado do console global.                                         | Sem acesso direto a tabelas; somente `EXECUTE` na consulta sanitizada e auditada. Não concede nem revoga operadores. |

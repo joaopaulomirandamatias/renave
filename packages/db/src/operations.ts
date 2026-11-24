@@ -279,7 +279,9 @@ function mapCreateError(error: unknown): never {
   }
   if (
     code === "55000" &&
-    message === "operation: vínculo credencial não habilitado"
+    (message === "operation: vínculo credencial não habilitado" ||
+      message === "operation: escopo credencial não habilitado" ||
+      message === "operation: jurisdição regulatória não verificada")
   ) {
     throw new OperationCredentialLinkNotEnabledError();
   }

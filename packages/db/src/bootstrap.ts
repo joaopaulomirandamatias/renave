@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import {
   APP_ROLE,
+  CREDENTIAL_SCOPE_PROVISIONER_ROLE,
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
@@ -16,6 +17,7 @@ export interface BootstrapOptions {
   adminUrl: string;
   migratorPassword: string;
   appPassword: string;
+  credentialScopeProvisionerPassword: string;
   identityAppPassword: string;
   maintenanceAppPassword: string;
   operationWorkerPassword: string;
@@ -37,6 +39,8 @@ export interface BootstrapOptions {
  *    apenas EXECUTE em rotinas operacionais fechadas pelas migrations.
  *  - `renave_operation_worker`: LOGIN isolado, sem leitura direta; recebe
  *    somente EXECUTE nas rotinas fenced de operações pelas migrations.
+ *  - `renave_credential_scope_provisioner`: LOGIN offline isolado; somente
+ *    EXECUTE nas duas rotinas fechadas de jurisdição e escopo Credencia.
  *  - `renave_platform_reader`: LOGIN isolado; consulta apenas a projeção
  *    sanitizada do console global por funções fechadas.
  *  - `renave_platform_provisioner`: LOGIN isolado; concede e revoga operadores
@@ -49,6 +53,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
   if (
     options.migratorPassword === "" ||
     options.appPassword === "" ||
+    options.credentialScopeProvisionerPassword === "" ||
     options.identityAppPassword === "" ||
     options.maintenanceAppPassword === "" ||
     options.operationWorkerPassword === "" ||
@@ -74,6 +79,10 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
     for (const [role, password] of [
       [MIGRATOR_ROLE, options.migratorPassword],
       [APP_ROLE, options.appPassword],
+      [
+        CREDENTIAL_SCOPE_PROVISIONER_ROLE,
+        options.credentialScopeProvisionerPassword,
+      ],
       [IDENTITY_APP_ROLE, options.identityAppPassword],
       [MAINTENANCE_APP_ROLE, options.maintenanceAppPassword],
       [OPERATION_WORKER_ROLE, options.operationWorkerPassword],
@@ -94,6 +103,9 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
       await client.query(rows[0]!.sql);
     }
 
+    await client.query(
+      `alter role ${CREDENTIAL_SCOPE_PROVISIONER_ROLE} set idle_in_transaction_session_timeout = '30s'`,
+    );
     await client.query(
       `alter role ${APP_ROLE} set idle_in_transaction_session_timeout = '30s'`,
     );
@@ -127,6 +139,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
         execute format('revoke all on database %I from public', db);
         execute format('grant connect, create on database %I to ${MIGRATOR_ROLE}', db);
         execute format('revoke all on database %I from ${APP_ROLE}', db);
+        execute format('revoke all on database %I from ${CREDENTIAL_SCOPE_PROVISIONER_ROLE}', db);
         execute format('revoke all on database %I from ${IDENTITY_APP_ROLE}', db);
         execute format('revoke all on database %I from ${MAINTENANCE_APP_ROLE}', db);
         execute format('revoke all on database %I from ${OPERATION_WORKER_ROLE}', db);
@@ -135,6 +148,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
         execute format('revoke all on database %I from ${PLATFORM_PROVISIONER_ROLE}', db);
         execute format('revoke all on database %I from ${PLATFORM_READER_ROLE}', db);
         execute format('grant connect on database %I to ${APP_ROLE}', db);
+        execute format('grant connect on database %I to ${CREDENTIAL_SCOPE_PROVISIONER_ROLE}', db);
         execute format('grant connect on database %I to ${IDENTITY_APP_ROLE}', db);
         execute format('grant connect on database %I to ${MAINTENANCE_APP_ROLE}', db);
         execute format('grant connect on database %I to ${OPERATION_WORKER_ROLE}', db);
@@ -145,6 +159,9 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
       end $$`);
     await client.query("revoke all on schema public from public");
     await client.query(`revoke all on schema public from ${APP_ROLE}`);
+    await client.query(
+      `revoke all on schema public from ${CREDENTIAL_SCOPE_PROVISIONER_ROLE}`,
+    );
     await client.query(`revoke all on schema public from ${IDENTITY_APP_ROLE}`);
     await client.query(
       `revoke all on schema public from ${MAINTENANCE_APP_ROLE}`,
@@ -166,6 +183,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
     );
     for (const member of [
       APP_ROLE,
+      CREDENTIAL_SCOPE_PROVISIONER_ROLE,
       IDENTITY_APP_ROLE,
       MAINTENANCE_APP_ROLE,
       OPERATION_WORKER_ROLE,
@@ -177,6 +195,7 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
       for (const parent of [
         MIGRATOR_ROLE,
         APP_ROLE,
+        CREDENTIAL_SCOPE_PROVISIONER_ROLE,
         IDENTITY_APP_ROLE,
         MAINTENANCE_APP_ROLE,
         OPERATION_WORKER_ROLE,
@@ -200,9 +219,11 @@ export async function bootstrapRoles(options: BootstrapOptions): Promise<void> {
             join pg_catalog.pg_roles parent on parent.oid=edge.roleid
             join pg_catalog.pg_roles member on member.oid=edge.member
            where parent.rolname in (
+                   '${CREDENTIAL_SCOPE_PROVISIONER_ROLE}',
                    '${PLATFORM_PROVISIONER_ROLE}', '${PLATFORM_READER_ROLE}'
                  )
               or member.rolname in (
+                   '${CREDENTIAL_SCOPE_PROVISIONER_ROLE}',
                    '${PLATFORM_PROVISIONER_ROLE}', '${PLATFORM_READER_ROLE}'
                  )
         loop

@@ -12,6 +12,9 @@ export const MAINTENANCE_APP_ROLE = "renave_maintenance_app";
 export const OPERATION_WORKER_ROLE = "renave_operation_worker";
 /** Papel administrativo mínimo: somente EXECUTE nas rotinas de perfis RENAVE. */
 export const PROFILE_PROVISIONER_ROLE = "renave_profile_provisioner";
+/** Papel offline exclusivo para jurisdição e escopos Credencia. */
+export const CREDENTIAL_SCOPE_PROVISIONER_ROLE =
+  "renave_credential_scope_provisioner";
 /** Papel global somente leitura para consultar status sanitizado de perfis. */
 export const PROFILE_READER_ROLE = "renave_profile_reader";
 /** Leitor isolado do console global; somente EXECUTE em consultas fechadas. */

@@ -5,6 +5,7 @@ import {
 import {
   getAuthorizationContext,
   getCredentialLink,
+  getCredentialServiceScope,
   getEstablishment,
   getEstablishmentRenaveProfileStatus,
   getOperatorIdentityProfileStatus,
@@ -17,6 +18,7 @@ import type { MtlsCertificateTemporalStatus } from "@seu-renave/renave-connector
 import type { Pool } from "pg";
 
 import type { PublicRenaveLinkStatus } from "./link-status-use-case.js";
+import { ESTABLISHMENT_SERVICE_NATURE } from "./service-scope.js";
 
 const ACTION = "renave.identity.verify" as const;
 const READY_LINK_STATUSES = new Set<CredentialLinkStatus>([
@@ -65,6 +67,7 @@ export function summarizeRenaveReadiness(input: {
   link: PublicRenaveLinkStatus;
   operatorIdentity: PublicPrincipalReadiness;
   queryLimiterConfigured: boolean;
+  serviceScopeActive: boolean;
 }): RenaveHomologationReadiness {
   const certificate = publicCertificateReadiness(
     input.integrationConfigured,
@@ -74,7 +77,8 @@ export function summarizeRenaveReadiness(input: {
     input.integrationConfigured &&
     input.queryLimiterConfigured &&
     (certificate === "ready" || certificate === "warning") &&
-    READY_LINK_STATUSES.has(input.link as CredentialLinkStatus);
+    READY_LINK_STATUSES.has(input.link as CredentialLinkStatus) &&
+    input.serviceScopeActive;
 
   return {
     certificate,
@@ -158,6 +162,11 @@ export class PostgresRenaveReadinessUseCase implements RenaveReadinessUseCase {
           throw new AuthorizationDeniedError("ESTABLISHMENT_SCOPE_DENIED");
         }
         const link = await getCredentialLink(client, input.establishmentId);
+        const serviceScope = await getCredentialServiceScope(
+          client,
+          input.establishmentId,
+          ESTABLISHMENT_SERVICE_NATURE,
+        );
         const operatorIdentity = await readProfileWithinSavepoint(
           client,
           "renave_readiness_operator",
@@ -173,7 +182,7 @@ export class PostgresRenaveReadinessUseCase implements RenaveReadinessUseCase {
               input.establishmentId,
             ),
         );
-        return { establishmentContact, link, operatorIdentity };
+        return { establishmentContact, link, operatorIdentity, serviceScope };
       },
     );
 
@@ -191,6 +200,7 @@ export class PostgresRenaveReadinessUseCase implements RenaveReadinessUseCase {
       link: localState.link?.status ?? "not_started",
       operatorIdentity: localState.operatorIdentity,
       queryLimiterConfigured: this.options.queryLimiterConfigured,
+      serviceScopeActive: localState.serviceScope !== null,
     });
   }
 }

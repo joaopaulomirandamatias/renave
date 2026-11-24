@@ -606,7 +606,8 @@ describe("guard do banco de runtime", () => {
     ).rows[0]!.quoted;
     await adminPool.query(
       `grant temporary on database ${database} to
-         renave_app,renave_identity_app,renave_maintenance_app,
+         renave_app,renave_credential_scope_provisioner,
+         renave_identity_app,renave_maintenance_app,
          renave_operation_worker,renave_profile_provisioner,
          renave_profile_reader,renave_platform_provisioner,
          renave_platform_reader`,
@@ -615,18 +616,20 @@ describe("guard do banco de runtime", () => {
       `grant create on database ${database} to renave_operation_worker`,
     );
     await adminPool.query(
-      "drop role if exists platform_bootstrap_parent_probe, platform_bootstrap_member_probe",
+      "drop role if exists platform_bootstrap_parent_probe, platform_bootstrap_member_probe, credential_scope_parent_probe, credential_scope_member_probe",
     );
     await adminPool.query(
-      "create role platform_bootstrap_parent_probe nologin; create role platform_bootstrap_member_probe nologin",
+      "create role platform_bootstrap_parent_probe nologin; create role platform_bootstrap_member_probe nologin; create role credential_scope_parent_probe nologin; create role credential_scope_member_probe nologin",
     );
     await adminPool.query(
-      "grant platform_bootstrap_parent_probe to renave_platform_reader; grant renave_platform_provisioner to platform_bootstrap_member_probe",
+      "grant platform_bootstrap_parent_probe to renave_platform_reader; grant renave_platform_provisioner to platform_bootstrap_member_probe; grant credential_scope_parent_probe to renave_credential_scope_provisioner; grant renave_credential_scope_provisioner to credential_scope_member_probe",
     );
 
     const options = {
       adminUrl: urls.admin,
       appPassword: "renave_app_it",
+      credentialScopeProvisionerPassword:
+        "renave_credential_scope_provisioner_it",
       identityAppPassword: "renave_identity_app_it",
       maintenanceAppPassword: "renave_maintenance_app_it",
       migratorPassword: "renave_migrator_it",
@@ -661,6 +664,7 @@ describe("guard do banco de runtime", () => {
       [
         [
           "renave_app",
+          "renave_credential_scope_provisioner",
           "renave_identity_app",
           "renave_maintenance_app",
           "renave_operation_worker",
@@ -671,7 +675,7 @@ describe("guard do banco de runtime", () => {
         ],
       ],
     );
-    expect(privileges.rows).toHaveLength(8);
+    expect(privileges.rows).toHaveLength(9);
     for (const privilege of privileges.rows) {
       expect(privilege).toMatchObject({
         can_connect: true,
@@ -694,9 +698,15 @@ describe("guard do banco de runtime", () => {
          from pg_catalog.pg_roles
         where rolname=any($1::text[])
         order by rolname`,
-      [["renave_platform_provisioner", "renave_platform_reader"]],
+      [
+        [
+          "renave_credential_scope_provisioner",
+          "renave_platform_provisioner",
+          "renave_platform_reader",
+        ],
+      ],
     );
-    expect(platformRoles.rows).toHaveLength(2);
+    expect(platformRoles.rows).toHaveLength(3);
     for (const role of platformRoles.rows) {
       expect(role).toMatchObject({
         rolbypassrls: false,
@@ -715,11 +725,17 @@ describe("guard do banco de runtime", () => {
          join pg_catalog.pg_roles parent on parent.oid=membership.roleid
         where member.rolname=any($1::text[])
            or parent.rolname=any($1::text[])`,
-      [["renave_platform_provisioner", "renave_platform_reader"]],
+      [
+        [
+          "renave_credential_scope_provisioner",
+          "renave_platform_provisioner",
+          "renave_platform_reader",
+        ],
+      ],
     );
     expect(platformMembership.rows[0]?.count).toBe("0");
     await adminPool.query(
-      "drop role platform_bootstrap_parent_probe, platform_bootstrap_member_probe",
+      "drop role platform_bootstrap_parent_probe, platform_bootstrap_member_probe, credential_scope_parent_probe, credential_scope_member_probe",
     );
     await expectWorkerContractReady();
   });

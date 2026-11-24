@@ -15,6 +15,7 @@ import { PostgresRenaveLinkStatusUseCase } from "../renave/link-status-use-case.
 interface DbUrls {
   admin: string;
   app: string;
+  credentialScopeProvisioner: string;
   identity: string;
   maintenance: string;
   migrator: string;
