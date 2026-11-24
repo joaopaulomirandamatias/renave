@@ -72,6 +72,23 @@ export {
   type MigrationResult,
 } from "./migrate.js";
 export {
+  createOrReplayOperation,
+  getOperation,
+  operationKinds,
+  operationMutationFamilies,
+  operationStatuses,
+  OperationActiveConflictError,
+  OperationIdempotencyConflictError,
+  OperationInputError,
+  OperationStorageError,
+  type CreateOperationInput,
+  type CreateOperationResult,
+  type OperationKind,
+  type OperationMutationFamily,
+  type OperationRecord,
+  type OperationStatus,
+} from "./operations.js";
+export {
   assertRuntimeDatabase,
   RuntimeDatabaseContractError,
   type RuntimeDatabaseGuardOptions,
