@@ -1471,4 +1471,92 @@ describe("guard do banco de runtime", () => {
     expect(rows[0]?.legacy).toBeNull();
     await expectAppContractReady();
   });
+
+  it("recusa adulteração transacional do checksum da garantia de identidade", async () => {
+    const client = await adminPool.connect();
+    try {
+      await client.query("begin");
+      await client.query(
+        `update renave.schema_migrations set checksum = $1
+          where version = '0045_identity_authentication_assurance'`,
+        ["0".repeat(64)],
+      );
+      const result = await client.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      );
+      expect(result.rows[0]?.ready).toBe(false);
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa adulteração transacional da constraint de contexto OIDC", async () => {
+    const client = await adminPool.connect();
+    try {
+      await client.query("begin");
+      await client.query(`
+        alter table renave_identity.auth_session
+          drop constraint auth_session_authentication_context_valid,
+          add constraint auth_session_authentication_context_valid
+            check (authentication_context is null or authentication_context <> '')
+      `);
+      const result = await client.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      );
+      expect(result.rows[0]?.ready).toBe(false);
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa adulteração transacional do corpo ou volatilidade da sessão", async () => {
+    const client = await adminPool.connect();
+    try {
+      await client.query("begin");
+      await client.query(`
+        create or replace function renave_identity.save_auth_session(
+          p_key_hash text, p_subject text, p_display_name text,
+          p_email text, p_roles text[], p_authentication_context text,
+          p_mfa_verified_at_login boolean, p_created_at_ms bigint,
+          p_last_seen_at_ms bigint, p_idle_expires_at_ms bigint,
+          p_absolute_expires_at_ms bigint
+        ) returns void language sql stable security definer
+          set search_path = pg_catalog as 'select'
+      `);
+      const result = await client.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      );
+      expect(result.rows[0]?.ready).toBe(false);
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa ACL extra transacional nas funções de sessão", async () => {
+    const client = await adminPool.connect();
+    try {
+      await client.query("begin");
+      await client.query("create role identity_assurance_acl_probe nologin");
+      await client.query(`
+        grant execute on function renave_identity.save_auth_session(
+          text, text, text, text, text[], text, boolean,
+          bigint, bigint, bigint, bigint
+        ) to identity_assurance_acl_probe
+      `);
+      const result = await client.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      );
+      expect(result.rows[0]?.ready).toBe(false);
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+    await expectAppContractReady();
+  });
 });

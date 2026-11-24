@@ -57,6 +57,46 @@ describe("primitivas OIDC", () => {
     ).toThrow(/proibido em produção/);
   });
 
+  it("normaliza a allowlist acr e recusa política ambígua", () => {
+    const base = {
+      OIDC_ISSUER: "https://idp.test",
+      OIDC_CLIENT_ID: "client",
+      OIDC_REDIRECT_URI: "https://app.test/callback",
+    };
+    expect(
+      loadOidcConfig(
+        {
+          ...base,
+          OIDC_MFA_ACCEPTED_ACR_VALUES:
+            "urn:example:loa:2 urn:example:loa:2 urn:example:loa:3",
+        },
+        "homologation",
+      ).mfaAcceptedAcrValues,
+    ).toEqual(["urn:example:loa:2", "urn:example:loa:3"]);
+
+    expect(() =>
+      loadOidcConfig(
+        {
+          ...base,
+          OIDC_MFA_ACCEPTED_ACR_VALUES: Array.from(
+            { length: 17 },
+            (_, index) => `urn:example:loa:${index}`,
+          ).join(" "),
+        },
+        "homologation",
+      ),
+    ).toThrow(/OIDC_MFA_ACCEPTED_ACR_VALUES/u);
+    expect(() =>
+      loadOidcConfig(
+        {
+          ...base,
+          OIDC_MFA_ACCEPTED_ACR_VALUES: "urn:example:nível:2",
+        },
+        "homologation",
+      ),
+    ).toThrow(/OIDC_MFA_ACCEPTED_ACR_VALUES/u);
+  });
+
   it("consome tentativa em memória uma única vez e descarta expirada", async () => {
     const store = new InMemorySessionStore({ environment: "test" });
     const attempt = {

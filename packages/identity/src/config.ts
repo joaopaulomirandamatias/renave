@@ -8,6 +8,8 @@ export interface OidcConfig {
   redirectUri: string;
   postLogoutRedirectUri: string | undefined;
   scopes: readonly string[];
+  /** Valores `acr` exatos que o contrato deste IdP reconhece como MFA. */
+  mfaAcceptedAcrValues: readonly string[];
   /** Origem pública da aplicação (derivada de `redirectUri`), usada no CSRF do logout. */
   publicOrigin: string;
   loginAttemptTtlSeconds: number;
@@ -77,6 +79,24 @@ function seconds(
     );
   }
   return value;
+}
+
+function exactAcrValues(value: string | undefined): readonly string[] {
+  const raw = text(value);
+  if (!raw) return [];
+  const values = [...new Set(raw.split(/\s+/u).filter(Boolean))];
+  if (
+    values.length > 16 ||
+    values.some(
+      (candidate) =>
+        candidate.length > 512 || !/^[\u0021-\u007e]+$/u.test(candidate),
+    )
+  ) {
+    throw new OidcConfigError(
+      "OIDC_MFA_ACCEPTED_ACR_VALUES deve conter até 16 valores sem espaços, com no máximo 512 caracteres cada",
+    );
+  }
+  return values;
 }
 
 /**
@@ -149,6 +169,7 @@ export function loadOidcConfig(
     redirectUri: redirect.href,
     postLogoutRedirectUri: logout?.href,
     scopes,
+    mfaAcceptedAcrValues: exactAcrValues(env.OIDC_MFA_ACCEPTED_ACR_VALUES),
     publicOrigin: redirect.origin,
     loginAttemptTtlSeconds: seconds(
       env,

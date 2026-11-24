@@ -11,6 +11,8 @@ export interface VerifiedIdentity {
   subject: string;
   /** Claim `nonce` exatamente como veio no ID token. */
   nonce: string | undefined;
+  /** Claim `acr` validado e normalizado; nunca implica MFA sem política local. */
+  authenticationContext?: string;
   name?: string;
   email?: string;
   roles: readonly string[];
@@ -55,6 +57,10 @@ export interface LoginAttempt {
 
 export interface SessionRecord {
   subject: string;
+  /** Evidência `acr` mínima; o serviço reavalia a política a cada leitura. */
+  authenticationContext?: string;
+  /** A política vigente no callback aceitou o contexto; nunca elevar depois. */
+  mfaVerifiedAtLogin: boolean;
   name?: string;
   email?: string;
   roles: readonly string[];

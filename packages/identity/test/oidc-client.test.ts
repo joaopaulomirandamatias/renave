@@ -119,10 +119,16 @@ async function exchange(token: string, jwks: unknown[]) {
 describe("cliente OIDC", () => {
   it("monta authorization code + PKCE e valida um ID token assinado", async () => {
     const signing = key("key-1");
-    const token = jwt(signing.privateKey, "key-1", claims());
+    const token = jwt(
+      signing.privateKey,
+      "key-1",
+      claims({ acr: "urn:example:loa:2" }),
+    );
     const fake = provider({ token, jwks: [signing.publicJwk] });
     const client = createOidcClient({
-      config: testConfig(),
+      config: testConfig({
+        mfaAcceptedAcrValues: ["urn:example:loa:2", "urn:example:loa:3"],
+      }),
       fetch: fake.fetch,
       now: () => NOW,
     });
@@ -138,6 +144,9 @@ describe("cliente OIDC", () => {
     expect(authorization.searchParams.get("code_challenge_method")).toBe(
       "S256",
     );
+    expect(authorization.searchParams.get("acr_values")).toBe(
+      "urn:example:loa:2 urn:example:loa:3",
+    );
 
     await expect(
       client.exchangeCode({
@@ -145,7 +154,35 @@ describe("cliente OIDC", () => {
         codeVerifier: "v".repeat(43),
         redirectUri: "https://app.test/api/auth/callback",
       }),
-    ).resolves.toMatchObject({ subject: "subject-1", nonce: "nonce-1" });
+    ).resolves.toMatchObject({
+      authenticationContext: "urn:example:loa:2",
+      subject: "subject-1",
+      nonce: "nonce-1",
+    });
+  });
+
+  it.each([
+    ["vazio", ""],
+    ["array", ["urn:example:loa:2"]],
+    ["longo", "a".repeat(513)],
+    ["com controle", "urn:example:\nloa:2"],
+    ["com espaço", "urn:example:loa 2"],
+    ["com unicode", "urn:example:nível:2"],
+    ["com borda em branco", " urn:example:loa:2"],
+  ])("recusa claim acr malformado: %s", async (_label, acr) => {
+    const signing = key("key-1");
+    await expect(
+      exchange(jwt(signing.privateKey, "key-1", claims({ acr })), [
+        signing.publicJwk,
+      ]),
+    ).rejects.toBeInstanceOf(OidcClientError);
+  });
+
+  it("mantém acr ausente como ausência de evidência", async () => {
+    const signing = key("key-1");
+    await expect(
+      exchange(jwt(signing.privateKey, "key-1", claims()), [signing.publicJwk]),
+    ).resolves.not.toHaveProperty("authenticationContext");
   });
 
   it.each([

@@ -106,6 +106,19 @@ function claimText(value: unknown): string | undefined {
   return text && text.length <= MAX_CLAIM_LENGTH ? text : undefined;
 }
 
+function authenticationContext(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > MAX_CLAIM_LENGTH ||
+    !/^[\u0021-\u007e]+$/u.test(value)
+  ) {
+    throw new OidcClientError("ID token: acr inválido");
+  }
+  return value;
+}
+
 function extractRoles(claims: Record<string, unknown>): string[] {
   const roles = new Set<string>();
   const add = (value: unknown) => {
@@ -377,10 +390,12 @@ export function createOidcClient(options: OidcClientOptions): OidcClient {
 
     const name = claimText(claims.name);
     const email = claimText(claims.email);
+    const acr = authenticationContext(claims.acr);
     return {
       subject,
       nonce: claimText(claims.nonce),
       roles: extractRoles(claims),
+      ...(acr !== undefined ? { authenticationContext: acr } : {}),
       ...(name !== undefined ? { name } : {}),
       ...(email !== undefined ? { email } : {}),
     };
@@ -398,6 +413,12 @@ export function createOidcClient(options: OidcClientOptions): OidcClient {
       url.searchParams.set("nonce", request.nonce);
       url.searchParams.set("code_challenge", request.codeChallenge);
       url.searchParams.set("code_challenge_method", "S256");
+      if (config.mfaAcceptedAcrValues.length > 0) {
+        url.searchParams.set(
+          "acr_values",
+          config.mfaAcceptedAcrValues.join(" "),
+        );
+      }
       return url.href;
     },
 

@@ -19,6 +19,7 @@ const config: AppConfig = {
     redirectUri: "https://app.test/api/auth/callback",
     postLogoutRedirectUri: undefined,
     scopes: ["openid"],
+    mfaAcceptedAcrValues: [],
     publicOrigin: "https://app.test",
     loginAttemptTtlSeconds: 300,
     sessionIdleTtlSeconds: 1_800,
@@ -282,6 +283,7 @@ describe("rotas OIDC", () => {
         name: "Maria",
         email: "maria@example.invalid",
         roles: ["untrusted-idp-role"],
+        mfaVerified: false,
         expiresAt: Date.now() + 60_000,
       })),
     });

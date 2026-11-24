@@ -55,6 +55,8 @@ export interface AuthenticatedSession {
   name?: string;
   email?: string;
   roles: readonly string[];
+  /** Garantia derivada da política local atual; nunca serializar `acr`. */
+  mfaVerified: boolean;
   expiresAt: number;
 }
 
@@ -188,10 +190,16 @@ export function createIdentityService(
     const record: SessionRecord = {
       subject: identity.subject,
       roles: identity.roles,
+      mfaVerifiedAtLogin:
+        identity.authenticationContext !== undefined &&
+        config.mfaAcceptedAcrValues.includes(identity.authenticationContext),
       createdAt: now,
       lastSeenAt: now,
       idleExpiresAt: now + config.sessionIdleTtlSeconds * 1000,
       absoluteExpiresAt: now + config.sessionAbsoluteTtlSeconds * 1000,
+      ...(identity.authenticationContext !== undefined
+        ? { authenticationContext: identity.authenticationContext }
+        : {}),
       ...(identity.name !== undefined ? { name: identity.name } : {}),
       ...(identity.email !== undefined ? { email: identity.email } : {}),
     };
@@ -224,6 +232,10 @@ export function createIdentityService(
     return {
       subject: record.subject,
       roles: record.roles,
+      mfaVerified:
+        record.mfaVerifiedAtLogin &&
+        record.authenticationContext !== undefined &&
+        config.mfaAcceptedAcrValues.includes(record.authenticationContext),
       expiresAt: idleExpiresAt,
       ...(record.name !== undefined ? { name: record.name } : {}),
       ...(record.email !== undefined ? { email: record.email } : {}),

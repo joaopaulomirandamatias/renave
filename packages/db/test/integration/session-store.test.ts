@@ -46,6 +46,7 @@ function session(overrides: Partial<SessionFixture> = {}): SessionFixture {
     email: "operador@example.invalid",
     idleExpiresAt: NOW + 1_800_000,
     lastSeenAt: NOW,
+    mfaVerifiedAtLogin: false,
     name: "Operador de Teste",
     roles: ["renave_operator"],
     subject: "oidc|session-store-test",
@@ -129,6 +130,67 @@ describe("PostgresIdentitySessionStore", () => {
     await store.deleteSession(key);
     await store.deleteSession(key);
     await expect(store.getSession(key, NOW + 120_002)).resolves.toBeUndefined();
+  });
+
+  it("preserva somente o contexto de autenticação normalizado e mantém sessão legada sem garantia", async () => {
+    const assuredKey = hash("session-mfa-assurance");
+    const assured = session({
+      authenticationContext: "urn:example:assurance:mfa",
+      mfaVerifiedAtLogin: true,
+    });
+    await store.saveSession(assuredKey, assured);
+    await expect(store.getSession(assuredKey, NOW + 1)).resolves.toEqual(
+      assured,
+    );
+
+    const baselineKey = hash("session-baseline-assurance");
+    const baseline = session();
+    await adminPool.query(
+      `insert into renave_identity.auth_session (
+         key_hash, subject, display_name, email, roles,
+         created_at_ms, last_seen_at_ms,
+         idle_expires_at_ms, absolute_expires_at_ms
+       ) values ($1, $2, $3, $4, $5, $6, $6, $7, $8)`,
+      [
+        baselineKey,
+        baseline.subject,
+        baseline.name,
+        baseline.email,
+        [...baseline.roles],
+        baseline.createdAt,
+        baseline.idleExpiresAt,
+        baseline.absoluteExpiresAt,
+      ],
+    );
+    await expect(store.getSession(baselineKey, NOW + 1)).resolves.toEqual(
+      baseline,
+    );
+
+    const { rows } = await adminPool.query<{
+      authentication_context: string | null;
+      key_hash: string;
+      mfa_verified_at_login: boolean;
+    }>(
+      `select key_hash, authentication_context, mfa_verified_at_login
+         from renave_identity.auth_session
+        where key_hash = any ($1::text[])
+        order by key_hash`,
+      [[assuredKey, baselineKey]],
+    );
+    expect(rows).toEqual(
+      [
+        {
+          authentication_context: "urn:example:assurance:mfa",
+          key_hash: assuredKey,
+          mfa_verified_at_login: true,
+        },
+        {
+          authentication_context: null,
+          key_hash: baselineKey,
+          mfa_verified_at_login: false,
+        },
+      ].sort((left, right) => left.key_hash.localeCompare(right.key_hash)),
+    );
   });
 
   it("touch não ressuscita sessão expirada nem perde corrida com logout", async () => {
@@ -385,13 +447,21 @@ describe("PostgresIdentitySessionStore", () => {
         NOW,
       ]),
     ).rejects.toMatchObject({ code: "42501" });
+
+    const signatures = await adminPool.query<{ old_signature: string | null }>(
+      `select pg_catalog.to_regprocedure(
+         'renave_identity.save_auth_session(text,text,text,text,text[],bigint,bigint,bigint,bigint)'
+       )::text as old_signature`,
+    );
+    expect(signatures.rows[0]?.old_signature).toBeNull();
   });
 
   it("faz a CHECK SQL recusar papéis vazios, longos e multidimensionais", async () => {
     const call = (roles: string[] | string[][]) =>
       identityPool.query(
         `select renave_identity.save_auth_session(
-           $1, 'subject', null, null, $2::text[], $3, $3, $4, $5
+           $1, 'subject', null, null, $2::text[], null, false,
+           $3, $3, $4, $5
          )`,
         [
           hash(`invalid-roles-${JSON.stringify(roles)}`),
@@ -411,6 +481,43 @@ describe("PostgresIdentitySessionStore", () => {
     await expect(call(["role\nadmin"])).rejects.toMatchObject({
       code: "23514",
     });
+  });
+
+  it("faz a CHECK SQL recusar contexto de autenticação com whitespace, controle, Unicode ou excesso", async () => {
+    const call = (authenticationContext: string) =>
+      identityPool.query(
+        `select renave_identity.save_auth_session(
+           $1, 'subject', null, null, '{}'::text[], $2, false,
+           $3, $3, $4, $5
+         )`,
+        [
+          hash(`invalid-auth-context-${authenticationContext}`),
+          authenticationContext,
+          NOW,
+          NOW + 1,
+          NOW + 2,
+        ],
+      );
+
+    for (const invalid of [
+      " acr",
+      "acr value",
+      "acr\nvalue",
+      "nível-mfa",
+      "a".repeat(513),
+    ]) {
+      await expect(call(invalid)).rejects.toMatchObject({ code: "23514" });
+    }
+
+    await expect(
+      identityPool.query(
+        `select renave_identity.save_auth_session(
+           $1, 'subject', null, null, '{}'::text[], null, true,
+           $2, $2, $3, $4
+         )`,
+        [hash("mfa-snapshot-without-context"), NOW, NOW + 1, NOW + 2],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
   });
 
   it("recusa chaves, janelas e claims inválidos antes de consultar o banco", async () => {
@@ -433,6 +540,24 @@ describe("PostgresIdentitySessionStore", () => {
       store.saveSession(
         hash("session-whitespace-role"),
         session({ roles: [" role"] }),
+      ),
+    ).rejects.toBeInstanceOf(IdentitySessionStoreInputError);
+    await expect(
+      store.saveSession(
+        hash("session-invalid-auth-context"),
+        session({ authenticationContext: "acr value" }),
+      ),
+    ).rejects.toBeInstanceOf(IdentitySessionStoreInputError);
+    await expect(
+      store.saveSession(
+        hash("session-invalid-mfa-snapshot"),
+        session({ mfaVerifiedAtLogin: undefined as never }),
+      ),
+    ).rejects.toBeInstanceOf(IdentitySessionStoreInputError);
+    await expect(
+      store.saveSession(
+        hash("session-mfa-snapshot-without-context"),
+        session({ mfaVerifiedAtLogin: true }),
       ),
     ).rejects.toBeInstanceOf(IdentitySessionStoreInputError);
   });

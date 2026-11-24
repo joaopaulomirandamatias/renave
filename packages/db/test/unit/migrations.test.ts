@@ -6,8 +6,9 @@ import { loadMigrations, MigrationError } from "../../src/migrate.js";
 
 describe("loadMigrations", () => {
   it("lê as migrations versionadas em ordem, com checksum estável", async () => {
-    const first = await loadMigrations();
-    const second = await loadMigrations();
+    const all = await loadMigrations();
+    const first = all.slice(0, -2);
+    const second = (await loadMigrations()).slice(0, -2);
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
     expect(first.at(-21)?.version).toBe("0024_runtime_contract_stock_query");
@@ -140,6 +141,19 @@ describe("loadMigrations", () => {
     expect(first.at(-1)?.sql).toContain(first.at(-2)?.checksum);
     expect(first.at(-1)?.sql).toContain(first.at(-3)?.checksum);
     expect(first.at(-1)?.sql).toContain("select pg_catalog.count(*) = 11");
+    expect(all.at(-2)?.version).toBe("0045_identity_authentication_assurance");
+    expect(all.at(-2)?.sql).toContain("authentication_context");
+    expect(all.at(-2)?.sql).toContain(
+      "mfa_verified_at_login boolean not null default false",
+    );
+    expect(all.at(-2)?.sql).toContain("authentication_context ~ '^[!-~]+$'");
+    expect(all.at(-1)?.version).toBe(
+      "0046_runtime_contract_identity_assurance",
+    );
+    expect(all.at(-1)?.sql).toContain(all.at(-2)?.checksum);
+    expect(all.at(-1)?.sql).toContain(
+      "reconciliation_projection_preflight_contract_ready_v0044",
+    );
   });
 
   it("recusa lacuna na sequência e nome fora do padrão", async () => {

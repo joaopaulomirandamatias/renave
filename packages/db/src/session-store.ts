@@ -20,11 +20,13 @@ interface LoginAttemptRow {
 
 interface SessionRow {
   absolute_expires_at_ms: string;
+  authentication_context: string | null;
   created_at_ms: string;
   display_name: string | null;
   email: string | null;
   idle_expires_at_ms: string;
   last_seen_at_ms: string;
+  mfa_verified_at_login: boolean;
   roles: string[];
   subject: string;
 }
@@ -93,6 +95,23 @@ function assertSession(session: SessionRecord): void {
     }
   }
   if (
+    session.authenticationContext !== undefined &&
+    !/^[\u0021-\u007e]{1,512}$/u.test(session.authenticationContext)
+  ) {
+    throw new IdentitySessionStoreInputError("authenticationContext inválido.");
+  }
+  if (typeof session.mfaVerifiedAtLogin !== "boolean") {
+    throw new IdentitySessionStoreInputError("mfaVerifiedAtLogin inválido.");
+  }
+  if (
+    session.mfaVerifiedAtLogin &&
+    session.authenticationContext === undefined
+  ) {
+    throw new IdentitySessionStoreInputError(
+      "mfaVerifiedAtLogin exige authenticationContext.",
+    );
+  }
+  if (
     session.roles.length > 100 ||
     session.roles.some(
       (role) =>
@@ -147,8 +166,12 @@ function toSession(row: SessionRow): SessionRecord {
     createdAt: toNumber(row.created_at_ms),
     idleExpiresAt: toNumber(row.idle_expires_at_ms),
     lastSeenAt: toNumber(row.last_seen_at_ms),
+    mfaVerifiedAtLogin: row.mfa_verified_at_login,
     roles: row.roles,
     subject: row.subject,
+    ...(row.authentication_context === null
+      ? {}
+      : { authenticationContext: row.authentication_context }),
     ...(row.display_name === null ? {} : { name: row.display_name }),
     ...(row.email === null ? {} : { email: row.email }),
   };
@@ -204,7 +227,7 @@ export class PostgresIdentitySessionStore implements SessionStore {
     assertSession(session);
     await this.pool.query(
       `select renave_identity.save_auth_session(
-         $1, $2, $3, $4, $5, $6, $7, $8, $9
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
        )`,
       [
         key,
@@ -212,6 +235,8 @@ export class PostgresIdentitySessionStore implements SessionStore {
         session.name ?? null,
         session.email ?? null,
         [...session.roles],
+        session.authenticationContext ?? null,
+        session.mfaVerifiedAtLogin,
         session.createdAt,
         session.lastSeenAt,
         session.idleExpiresAt,
@@ -227,7 +252,8 @@ export class PostgresIdentitySessionStore implements SessionStore {
     assertHash(key);
     assertEpoch(now, "now");
     const { rows } = await this.pool.query<SessionRow>(
-      `select subject, display_name, email, roles, created_at_ms::text,
+      `select subject, display_name, email, roles, authentication_context,
+              mfa_verified_at_login, created_at_ms::text,
               last_seen_at_ms::text, idle_expires_at_ms::text,
               absolute_expires_at_ms::text
          from renave_identity.get_auth_session($1, $2)`,

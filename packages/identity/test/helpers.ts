@@ -15,6 +15,7 @@ export function testConfig(overrides: Partial<OidcConfig> = {}): OidcConfig {
     redirectUri: "https://app.test/api/auth/callback",
     postLogoutRedirectUri: undefined,
     scopes: ["openid", "profile", "email"],
+    mfaAcceptedAcrValues: [],
     publicOrigin: "https://app.test",
     loginAttemptTtlSeconds: 300,
     sessionIdleTtlSeconds: 1_800,
