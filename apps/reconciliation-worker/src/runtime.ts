@@ -1,5 +1,4 @@
 import { timingSafeEqual } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import {
@@ -8,7 +7,7 @@ import {
   decodeSerproQueryHmacKeyBase64,
   OPERATION_WORKER_ROLE,
   PostgresSerproQueryLimiter,
-} from "@seu-renave/db";
+} from "@seu-renave/db/operation-worker";
 import {
   decryptOperationReconciliationProjection,
   hasOperationReconciliationProjectionKey,
@@ -49,9 +48,7 @@ export interface OperationalRuntimeFactories {
 }
 
 async function defaultPool(config: EnabledWorkerConfig): Promise<Pool> {
-  const ca = config.databaseTlsCaFile
-    ? await readFile(config.databaseTlsCaFile, "utf8")
-    : undefined;
+  const ca = config.databaseTlsCa;
   return createPool(config.databaseUrl, {
     application_name: "seu-renave-reconciliation-worker",
     connectionTimeoutMillis: 5_000,
@@ -68,15 +65,10 @@ async function defaultPool(config: EnabledWorkerConfig): Promise<Pool> {
 async function defaultMaterial(
   config: EnabledWorkerConfig,
 ): Promise<PemMtlsMaterial> {
-  const [ca, cert, key] = await Promise.all([
-    readFile(config.mtlsCaFile, "utf8"),
-    readFile(config.mtlsCertificateFile, "utf8"),
-    readFile(config.mtlsKeyFile, "utf8"),
-  ]);
   return {
-    ca,
-    cert,
-    key,
+    ca: config.mtlsCa,
+    cert: config.mtlsCertificate,
+    key: config.mtlsKey,
     ...(config.mtlsKeyPassphrase === undefined
       ? {}
       : { passphrase: config.mtlsKeyPassphrase }),

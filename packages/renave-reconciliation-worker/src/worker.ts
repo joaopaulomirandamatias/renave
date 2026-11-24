@@ -5,7 +5,7 @@ import {
   type OperationReconciliationFence,
   type ReconciliationManualReviewReason,
   type ReconciliationRemoteState,
-} from "@seu-renave/db";
+} from "@seu-renave/db/operation-worker";
 import {
   decryptOperationReconciliationProjection,
   hasOperationReconciliationProjectionKey,

@@ -1,3 +1,8 @@
+import {
+  readReconciliationWorkerSecretFiles,
+  type ReconciliationWorkerSecretFiles,
+} from "./secret-files.js";
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const KEY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
@@ -9,7 +14,7 @@ export interface DisabledWorkerConfig {
 export interface EnabledWorkerConfig {
   activeProjectionKeyId: string;
   appEnvironment: "homologation";
-  databaseTlsCaFile: string | undefined;
+  databaseTlsCa: string | undefined;
   databaseUrl: string;
   dryRun: boolean;
   healthPort: number;
@@ -17,9 +22,9 @@ export interface EnabledWorkerConfig {
   integratorCnpj: string;
   leaseOwner: string;
   limiterHmacKeyBase64: string;
-  mtlsCaFile: string;
-  mtlsCertificateFile: string;
-  mtlsKeyFile: string;
+  mtlsCa: string;
+  mtlsCertificate: string;
+  mtlsKey: string;
   mtlsKeyPassphrase: string | undefined;
   mode: "enabled";
   pollIntervalMs: number;
@@ -128,10 +133,7 @@ function projectionKeys(
   );
 }
 
-function validateDatabaseUrl(
-  value: string,
-  tlsCaFile: string | undefined,
-): void {
+function validateDatabaseUrl(value: string, tlsCa: string | undefined): void {
   let url: URL;
   try {
     url = new URL(value);
@@ -147,72 +149,125 @@ function validateDatabaseUrl(
   const loopback = ["127.0.0.1", "localhost", "::1", "[::1]"].includes(
     url.hostname,
   );
-  if (!loopback && !tlsCaFile) {
+  if (!loopback && !tlsCa) {
     throw new ReconciliationWorkerAppConfigError();
   }
 }
 
-export function loadReconciliationWorkerAppConfig(
-  env: NodeJS.ProcessEnv = process.env,
-): ReconciliationWorkerAppConfig {
-  if (!booleanValue(env.RENAVE_RECONCILIATION_WORKER_ENABLED, false)) {
-    return Object.freeze({ mode: "disabled" });
-  }
-  if (env.APP_ENVIRONMENT !== "homologation") {
+const RAW_SECRET_ENV_NAMES = Object.freeze([
+  "RENAVE_RECONCILIATION_DATABASE_URL",
+  "RENAVE_RECONCILIATION_DATABASE_TLS_CA_FILE",
+  "RENAVE_RECONCILIATION_PROJECTION_KEYS_JSON",
+  "SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64",
+  "RENAVE_MTLS_CA_FILE",
+  "RENAVE_MTLS_CERT_FILE",
+  "RENAVE_MTLS_KEY_FILE",
+  "RENAVE_MTLS_KEY_PASSPHRASE",
+] as const);
+
+const NON_SECRET_ENV_NAMES = Object.freeze([
+  "APP_ENVIRONMENT",
+  "RENAVE_INTEGRATOR_CNPJ",
+  "RENAVE_RECONCILIATION_ACTIVE_PROJECTION_KEY_ID",
+  "RENAVE_RECONCILIATION_HEALTH_PORT",
+  "RENAVE_RECONCILIATION_HEARTBEAT_MS",
+  "RENAVE_RECONCILIATION_LEASE_OWNER",
+  "RENAVE_RECONCILIATION_POLL_MS",
+  "RENAVE_RECONCILIATION_TENANT_ALLOWLIST",
+  "RENAVE_RECONCILIATION_WORKER_DRY_RUN",
+  "RENAVE_RECONCILIATION_WORKER_ENABLED",
+] as const);
+
+function snapshotEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  try {
+    let rawSecretPresent = false;
+    for (const name of RAW_SECRET_ENV_NAMES) {
+      if (Object.hasOwn(env, name)) rawSecretPresent = true;
+    }
+    if (rawSecretPresent) throw new ReconciliationWorkerAppConfigError();
+
+    const snapshot: NodeJS.ProcessEnv = {};
+    for (const name of NON_SECRET_ENV_NAMES) {
+      const value = env[name];
+      if (value !== undefined) {
+        if (typeof value !== "string") {
+          throw new ReconciliationWorkerAppConfigError();
+        }
+        snapshot[name] = value;
+      }
+    }
+    return Object.freeze(snapshot);
+  } catch (error) {
+    if (error instanceof ReconciliationWorkerAppConfigError) throw error;
     throw new ReconciliationWorkerAppConfigError();
   }
-  const databaseUrl = required(env, "RENAVE_RECONCILIATION_DATABASE_URL");
-  const databaseTlsCaFile = env.RENAVE_RECONCILIATION_DATABASE_TLS_CA_FILE;
-  validateDatabaseUrl(databaseUrl, databaseTlsCaFile);
-  const keys = projectionKeys(
-    required(env, "RENAVE_RECONCILIATION_PROJECTION_KEYS_JSON"),
-  );
+}
+
+export async function loadReconciliationWorkerAppConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  loadSecrets: () => Promise<ReconciliationWorkerSecretFiles> = readReconciliationWorkerSecretFiles,
+): Promise<ReconciliationWorkerAppConfig> {
+  const snapshot = snapshotEnvironment(env);
+  if (!booleanValue(snapshot.RENAVE_RECONCILIATION_WORKER_ENABLED, false)) {
+    return Object.freeze({ mode: "disabled" });
+  }
+  if (snapshot.APP_ENVIRONMENT !== "homologation") {
+    throw new ReconciliationWorkerAppConfigError();
+  }
+  let secrets: ReconciliationWorkerSecretFiles;
+  try {
+    secrets = await loadSecrets();
+  } catch {
+    throw new ReconciliationWorkerAppConfigError();
+  }
+  validateDatabaseUrl(secrets.databaseUrl, secrets.databaseCa);
+  const keys = projectionKeys(secrets.projectionKeysJson);
   const activeProjectionKeyId = required(
-    env,
+    snapshot,
     "RENAVE_RECONCILIATION_ACTIVE_PROJECTION_KEY_ID",
   );
   if (!keys.some(({ keyId }) => keyId === activeProjectionKeyId)) {
     throw new ReconciliationWorkerAppConfigError();
   }
-  const leaseOwner = required(env, "RENAVE_RECONCILIATION_LEASE_OWNER");
+  const leaseOwner = required(snapshot, "RENAVE_RECONCILIATION_LEASE_OWNER");
   if (!UUID_PATTERN.test(leaseOwner)) {
     throw new ReconciliationWorkerAppConfigError();
   }
   return Object.freeze({
     activeProjectionKeyId,
     appEnvironment: "homologation" as const,
-    databaseTlsCaFile,
-    databaseUrl,
-    dryRun: booleanValue(env.RENAVE_RECONCILIATION_WORKER_DRY_RUN, true),
+    databaseTlsCa: secrets.databaseCa,
+    databaseUrl: secrets.databaseUrl,
+    dryRun: booleanValue(snapshot.RENAVE_RECONCILIATION_WORKER_DRY_RUN, true),
     healthPort: integerValue(
-      env.RENAVE_RECONCILIATION_HEALTH_PORT,
+      snapshot.RENAVE_RECONCILIATION_HEALTH_PORT,
       9464,
       1,
       65_535,
     ),
     heartbeatIntervalMs: integerValue(
-      env.RENAVE_RECONCILIATION_HEARTBEAT_MS,
+      snapshot.RENAVE_RECONCILIATION_HEARTBEAT_MS,
       30_000,
       1_000,
       60_000,
     ),
-    integratorCnpj: required(env, "RENAVE_INTEGRATOR_CNPJ"),
+    integratorCnpj: required(snapshot, "RENAVE_INTEGRATOR_CNPJ"),
     leaseOwner,
-    limiterHmacKeyBase64: required(env, "SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64"),
+    limiterHmacKeyBase64: secrets.limiterHmacKeyBase64,
     mode: "enabled" as const,
-    mtlsCaFile: required(env, "RENAVE_MTLS_CA_FILE"),
-    mtlsCertificateFile: required(env, "RENAVE_MTLS_CERT_FILE"),
-    mtlsKeyFile: required(env, "RENAVE_MTLS_KEY_FILE"),
-    mtlsKeyPassphrase: env.RENAVE_MTLS_KEY_PASSPHRASE,
+    mtlsCa: secrets.mtlsCa,
+    mtlsCertificate: secrets.mtlsCertificate,
+    mtlsKey: secrets.mtlsKey,
+    mtlsKeyPassphrase: secrets.mtlsKeyPassphrase,
     pollIntervalMs: integerValue(
-      env.RENAVE_RECONCILIATION_POLL_MS,
+      snapshot.RENAVE_RECONCILIATION_POLL_MS,
       5_000,
       250,
       300_000,
     ),
     projectionKeysBase64: keys,
     tenantAllowlist: tenantAllowlist(
-      required(env, "RENAVE_RECONCILIATION_TENANT_ALLOWLIST"),
+      required(snapshot, "RENAVE_RECONCILIATION_TENANT_ALLOWLIST"),
     ),
   });
 }

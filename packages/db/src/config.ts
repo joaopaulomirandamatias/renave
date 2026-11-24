@@ -35,16 +35,6 @@ export function requireEnv(
   return value;
 }
 
-/** Valores de desenvolvimento local: não secretos, válidos só em loopback. */
-export const LOCAL_DEFAULTS = {
-  adminUrl: "postgres://postgres:renave_local_dev@127.0.0.1:54317/renave",
-  migratorPassword: "renave_migrator_local",
-  appPassword: "renave_app_local",
-  identityAppPassword: "renave_identity_app_local",
-  maintenanceAppPassword: "renave_maintenance_app_local",
-  operationWorkerPassword: "renave_operation_worker_local",
-} as const;
-
 export function isLoopbackUrl(connectionString: string): boolean {
   const { hostname } = new URL(connectionString);
   return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname);

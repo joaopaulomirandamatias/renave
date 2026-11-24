@@ -12,6 +12,173 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  reconciliation-worker-image-smoke:
+    # Pendente: SBOM/vulnerability scan somente após escolher uma ferramenta
+    # com binário/action pinado por digest e baseline de exceções versionado.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26.13.1
+
+      - name: Validate release policy
+        run: |
+          node --test scripts/check-reconciliation-worker-release.test.mjs
+          node scripts/check-reconciliation-worker-release.mjs
+
+      - name: Build local worker image
+        run: >-
+          docker build
+          --tag seu-renave/reconciliation-worker:ci
+          --file apps/reconciliation-worker/Dockerfile
+          .
+
+      - name: Inspect immutable runtime metadata
+        run: |
+          docker image inspect seu-renave/reconciliation-worker:ci > /tmp/reconciliation-worker-image.json
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { readFileSync } from "node:fs";
+
+          const [image] = JSON.parse(
+            readFileSync("/tmp/reconciliation-worker-image.json", "utf8"),
+          );
+          assert.match(image.Config.User, /^[1-9][0-9]*(?::[1-9][0-9]*)?$/);
+          assert.equal(image.Config.Entrypoint.length, 2);
+          assert.match(image.Config.Entrypoint[0], /^\/(?:[^/]+\/)+node$/);
+          assert.match(image.Config.Entrypoint[1], /(?:^|\/)dist\/main\.js$/);
+          assert.deepEqual(image.Config.Cmd ?? null, null);
+          const health = image.Config.Healthcheck?.Test;
+          assert.equal(health?.[0], "CMD");
+          assert.match(health?.[1], /^\/(?:[^/]+\/)+node$/);
+          assert.match(health?.[2], /(?:^|\/)dist\/health-probe\.js$/);
+          assert.equal(health?.[3], "ready");
+          const environment = new Map(
+            (image.Config.Env ?? []).map((item) => {
+              const separator = item.indexOf("=");
+              return [item.slice(0, separator), item.slice(separator + 1)];
+            }),
+          );
+          assert.equal(
+            environment.get("RENAVE_RECONCILIATION_WORKER_ENABLED"),
+            "false",
+          );
+          assert.equal(
+            environment.get("RENAVE_RECONCILIATION_WORKER_DRY_RUN"),
+            "true",
+          );
+          for (const forbidden of [
+            "RENAVE_MTLS_KEY_PASSPHRASE",
+            "RENAVE_RECONCILIATION_DATABASE_URL",
+            "RENAVE_RECONCILIATION_PROJECTION_KEYS_JSON",
+            "SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64",
+          ]) {
+            assert.equal(environment.has(forbidden), false);
+          }
+          NODE
+
+      - name: Inspect layers and runtime filesystem
+        run: |
+          set -euo pipefail
+          docker history --no-trunc --format '{{.CreatedBy}}' \
+            seu-renave/reconciliation-worker:ci > /tmp/reconciliation-worker-history.txt
+          if rg -n -i 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|RENAVE_RELEASE_SENTINEL_DO_NOT_SHIP' /tmp/reconciliation-worker-history.txt; then
+            exit 1
+          fi
+
+          docker create --name reconciliation-worker-rootfs \
+            seu-renave/reconciliation-worker:ci >/dev/null
+          docker export reconciliation-worker-rootfs \
+            --output /tmp/reconciliation-worker-rootfs.tar
+          workdir="$(docker image inspect --format '{{.Config.WorkingDir}}' seu-renave/reconciliation-worker:ci)"
+          workdir="${workdir#/}"
+          tar --list --file /tmp/reconciliation-worker-rootfs.tar > /tmp/reconciliation-worker-files.txt
+          if rg -n '^(?:bin/(?:sh|bash)|usr/bin/(?:apt|apt-get|dpkg)|usr/local/bin/(?:npm|npx|pnpm|corepack)|nodejs/bin/(?:npm|npx|pnpm|corepack))$' /tmp/reconciliation-worker-files.txt; then
+            exit 1
+          fi
+          if rg -n -i '(^|/)(\.env(?:\.|$)|[^/]+\.(?:key|pem|p12|pfx))' /tmp/reconciliation-worker-files.txt; then
+            exit 1
+          fi
+          rootfs=/tmp/reconciliation-worker-rootfs
+          mkdir --parents "$rootfs"
+          tar --extract --file /tmp/reconciliation-worker-rootfs.tar --directory "$rootfs"
+          application_root="$rootfs/$workdir"
+          if find "$application_root" -type f \
+            \( -name '*.ts' -o -name '*.tsx' -o -name '*.mts' -o -name '*.cts' \
+            -o -name '*.map' -o -name '*.test.*' -o -name '*.spec.*' \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if find "$application_root" -type d \
+            \( -name test -o -name tests -o -name __tests__ \) \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if find "$application_root" -type d -name src \
+            -print -quit | grep -q .; then
+            exit 1
+          fi
+          if rg -uuu -l -i 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|RENAVE_RELEASE_SENTINEL_DO_NOT_SHIP' "$application_root"; then
+            exit 1
+          fi
+          own_code=("$application_root/dist")
+          while IFS= read -r package_dist; do
+            own_code+=("$package_dist")
+          done < <(
+            find "$application_root/node_modules/.pnpm" -type d \
+              -path '*/node_modules/@seu-renave/*/dist'
+          )
+          if rg -uuu -l -i \
+            'postgres(?:ql)?://[^[:space:]@/:]+:[^[:space:]@/]+@' \
+            "${own_code[@]}"; then
+            exit 1
+          fi
+
+      - name: Run disabled image in hardened sandbox
+        run: |
+          set -euo pipefail
+          set +e
+          docker run --name reconciliation-worker-disabled \
+            --network none \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            seu-renave/reconciliation-worker:ci
+          status="$?"
+          set -e
+          test "$status" -eq 0
+          test "$(docker logs reconciliation-worker-disabled)" = \
+            '{"component":"renave-reconciliation-worker","event":"disabled"}'
+          test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' reconciliation-worker-disabled)" = none
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' reconciliation-worker-disabled)" = true
+          test "$(docker inspect --format '{{.HostConfig.Privileged}}' reconciliation-worker-disabled)" = false
+          docker inspect --format '{{json .HostConfig.CapDrop}}' reconciliation-worker-disabled | \
+            jq -e 'index("ALL") != null'
+          docker inspect --format '{{json .HostConfig.SecurityOpt}}' reconciliation-worker-disabled | \
+            jq -e 'index("no-new-privileges") != null'
+
+      - name: Remove local worker smoke artifacts
+        if: always()
+        run: |
+          docker rm --force reconciliation-worker-disabled reconciliation-worker-rootfs 2>/dev/null || true
+          docker image rm --force seu-renave/reconciliation-worker:ci 2>/dev/null || true
+          rm -f /tmp/reconciliation-worker-image.json \
+            /tmp/reconciliation-worker-history.txt \
+            /tmp/reconciliation-worker-rootfs.tar \
+            /tmp/reconciliation-worker-files.txt
+          if test -d /tmp/reconciliation-worker-rootfs; then
+            chmod --recursive u+w /tmp/reconciliation-worker-rootfs
+            find /tmp/reconciliation-worker-rootfs -depth -delete
+          fi
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -22,7 +189,7 @@ jobs:
       - name: Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 26.13.0
+          node-version: 26.13.1
 
       - name: pnpm
         run: |

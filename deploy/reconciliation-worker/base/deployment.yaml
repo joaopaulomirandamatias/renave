@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: renave-reconciliation-worker
+  labels:
+    app.kubernetes.io/component: reconciliation-worker
+    app.kubernetes.io/name: seu-renave
+spec:
+  # A base nunca inicia Pods. Somente o overlay canary pode ativar uma replica.
+  replicas: 0
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: reconciliation-worker
+      app.kubernetes.io/name: seu-renave
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: reconciliation-worker
+        app.kubernetes.io/name: seu-renave
+      annotations:
+        linkerd.io/inject: disabled
+        sidecar.istio.io/inject: "false"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Always
+      serviceAccountName: renave-reconciliation-worker
+      shareProcessNamespace: false
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/REPLACE_OWNER/seu-renave-reconciliation-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: renave-reconciliation-worker
+          env:
+            # O UID do Pod e unico por processo e nao e segredo.
+            - name: RENAVE_RECONCILIATION_LEASE_OWNER
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+          startupProbe:
+            exec:
+              command:
+                - /nodejs/bin/node
+                - dist/health-probe.js
+                - health
+            failureThreshold: 60
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            exec:
+              command:
+                - /nodejs/bin/node
+                - dist/health-probe.js
+                - health
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 2
+          readinessProbe:
+            exec:
+              command:
+                - /nodejs/bin/node
+                - dist/health-probe.js
+                - ready
+            failureThreshold: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: worker-secrets
+              mountPath: /run/secrets/seu-renave/reconciliation-worker
+              readOnly: true
+      volumes:
+        - name: worker-secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: renave-reconciliation-worker-database
+                  items:
+                    - key: database-url
+                      path: database-url
+              - secret:
+                  name: renave-reconciliation-worker-postgres-ca
+                  items:
+                    - key: database-ca.pem
+                      path: database-ca.pem
+              - secret:
+                  name: renave-reconciliation-worker-crypto
+                  items:
+                    - key: projection-keys.json
+                      path: projection-keys.json
+                    - key: limiter-hmac-key
+                      path: limiter-hmac-key
+              - secret:
+                  name: renave-reconciliation-worker-mtls
+                  items:
+                    - key: mtls-ca.pem
+                      path: mtls-ca.pem
+                    - key: mtls-cert.pem
+                      path: mtls-cert.pem
+                    - key: mtls-key.pem
+                      path: mtls-key.pem
+              - secret:
+                  name: renave-reconciliation-worker-mtls-passphrase
+                  optional: true
+                  items:
+                    - key: mtls-passphrase
+                      path: mtls-passphrase

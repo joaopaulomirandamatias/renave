@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { withTenant, type TenantClient } from "@seu-renave/db";
+import { withTenant, type TenantClient } from "@seu-renave/db/operation-worker";
 import type { Pool } from "pg";
 
 import { EvidenceCipher, type EvidenceBinding } from "./crypto.js";

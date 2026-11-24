@@ -9,6 +9,11 @@
       "types": "./src/index.ts",
       "production": "./dist/index.js",
       "default": "./src/index.ts"
+    },
+    "./operation-worker": {
+      "types": "./src/operation-worker.ts",
+      "production": "./dist/operation-worker.js",
+      "default": "./src/operation-worker.ts"
     }
   },
   "scripts": {

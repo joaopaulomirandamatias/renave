@@ -31,7 +31,7 @@ function enabled(
   return {
     activeProjectionKeyId: "projection-k2",
     appEnvironment: "homologation",
-    databaseTlsCaFile: undefined,
+    databaseTlsCa: undefined,
     databaseUrl: "postgres://worker:redacted@127.0.0.1/renave",
     dryRun: false,
     healthPort: 9464,
@@ -40,9 +40,9 @@ function enabled(
     leaseOwner: LEASE_OWNER,
     limiterHmacKeyBase64: LIMITER_KEY.toString("base64"),
     mode: "enabled",
-    mtlsCaFile: "/ca",
-    mtlsCertificateFile: "/cert",
-    mtlsKeyFile: "/key",
+    mtlsCa: "ca",
+    mtlsCertificate: "certificate",
+    mtlsKey: "private-key",
     mtlsKeyPassphrase: undefined,
     pollIntervalMs: 5_000,
     projectionKeysBase64: [

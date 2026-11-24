@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: renave-reconciliation-worker-default-deny
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: reconciliation-worker
+      app.kubernetes.io/name: seu-renave
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: renave-reconciliation-worker-dns
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: reconciliation-worker
+      app.kubernetes.io/name: seu-renave
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: renave-reconciliation-worker-postgres
+  annotations:
+    seu-renave.io/replace-before-use: database-cidr
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: reconciliation-worker
+      app.kubernetes.io/name: seu-renave
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        # TEST-NET-1 e deliberadamente inoperante. Substitua pelo CIDR exato do DB.
+        - ipBlock:
+            cidr: 192.0.2.10/32
+      ports:
+        - port: 5432
+          protocol: TCP
+
+# Nao existe regra SERPRO aqui. NetworkPolicy Kubernetes nativa nao filtra FQDN.
+# O live exige controle externo fail-closed para somente:
+# hom.renave.estaleiro.serpro.gov.br:443, com TLS/mTLS ponta a ponta.

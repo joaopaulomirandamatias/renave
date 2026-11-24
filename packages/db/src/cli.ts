@@ -3,7 +3,6 @@ import {
   APP_ROLE,
   ConfigError,
   IDENTITY_APP_ROLE,
-  LOCAL_DEFAULTS,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
@@ -11,6 +10,7 @@ import {
   requireEnv,
   withCredentials,
 } from "./config.js";
+import { LOCAL_DEFAULTS } from "./local-defaults.js";
 import {
   evidenceMonitorNeedsAttention,
   getEvidenceMonitorStatus,

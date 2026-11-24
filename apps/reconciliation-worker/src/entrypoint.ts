@@ -13,7 +13,7 @@ export interface ReconciliationWorkerProcessPort {
 }
 
 export interface ReconciliationWorkerMainDependencies {
-  loadConfig(env: NodeJS.ProcessEnv): ReconciliationWorkerAppConfig;
+  loadConfig(env: NodeJS.ProcessEnv): Promise<ReconciliationWorkerAppConfig>;
   process: ReconciliationWorkerProcessPort;
   runApp(
     config: ReconciliationWorkerAppConfig,
@@ -41,7 +41,7 @@ export async function runReconciliationWorkerMain(
   dependencies.process.once("SIGTERM", shutdown);
   try {
     try {
-      const config = dependencies.loadConfig(dependencies.process.env);
+      const config = await dependencies.loadConfig(dependencies.process.env);
       await dependencies.runApp(config, stop.signal);
     } catch {
       if (stop.signal.aborted) return;

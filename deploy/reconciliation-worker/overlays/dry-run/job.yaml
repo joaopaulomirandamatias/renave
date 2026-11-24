@@ -1,0 +1,107 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: renave-reconciliation-worker-dry-run
+  labels:
+    app.kubernetes.io/component: reconciliation-worker
+    app.kubernetes.io/name: seu-renave
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: reconciliation-worker
+        app.kubernetes.io/name: seu-renave
+      annotations:
+        linkerd.io/inject: disabled
+        sidecar.istio.io/inject: "false"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      serviceAccountName: renave-reconciliation-worker
+      shareProcessNamespace: false
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/REPLACE_OWNER/seu-renave-reconciliation-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: renave-reconciliation-worker
+          env:
+            - name: RENAVE_RECONCILIATION_LEASE_OWNER
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: RENAVE_RECONCILIATION_WORKER_ENABLED
+              value: "true"
+            - name: RENAVE_RECONCILIATION_WORKER_DRY_RUN
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 10001
+            runAsNonRoot: true
+            runAsUser: 10001
+          volumeMounts:
+            - name: worker-secrets
+              mountPath: /run/secrets/seu-renave/reconciliation-worker
+              readOnly: true
+      volumes:
+        - name: worker-secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: renave-reconciliation-worker-database
+                  items:
+                    - key: database-url
+                      path: database-url
+              - secret:
+                  name: renave-reconciliation-worker-postgres-ca
+                  items:
+                    - key: database-ca.pem
+                      path: database-ca.pem
+              - secret:
+                  name: renave-reconciliation-worker-crypto
+                  items:
+                    - key: projection-keys.json
+                      path: projection-keys.json
+                    - key: limiter-hmac-key
+                      path: limiter-hmac-key
+              - secret:
+                  name: renave-reconciliation-worker-mtls
+                  items:
+                    - key: mtls-ca.pem
+                      path: mtls-ca.pem
+                    - key: mtls-cert.pem
+                      path: mtls-cert.pem
+                    - key: mtls-key.pem
+                      path: mtls-key.pem
+              - secret:
+                  name: renave-reconciliation-worker-mtls-passphrase
+                  optional: true
+                  items:
+                    - key: mtls-passphrase
+                      path: mtls-passphrase

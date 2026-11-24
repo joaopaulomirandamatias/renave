@@ -32,10 +32,11 @@ describe("entrypoint", () => {
       },
     );
     const running = runReconciliationWorkerMain({
-      loadConfig: () => ({ mode: "disabled" }),
+      loadConfig: async () => ({ mode: "disabled" }),
       process: target.port,
       runApp,
     });
+    await vi.waitFor(() => expect(runApp).toHaveBeenCalledOnce());
     target.events.emit("SIGTERM");
     await running;
     expect(runApp.mock.calls[0]?.[1].aborted).toBe(true);
@@ -47,7 +48,7 @@ describe("entrypoint", () => {
   it("falha com saída sanitizada e exitCode 1", async () => {
     const target = processPort();
     await runReconciliationWorkerMain({
-      loadConfig: () => {
+      loadConfig: async () => {
         throw new Error("postgres://secret@host/cpf=12345678901");
       },
       process: target.port,
@@ -73,10 +74,11 @@ describe("entrypoint", () => {
       },
     );
     const running = runReconciliationWorkerMain({
-      loadConfig: () => ({ mode: "disabled" }),
+      loadConfig: async () => ({ mode: "disabled" }),
       process: target.port,
       runApp,
     });
+    await vi.waitFor(() => expect(runApp).toHaveBeenCalledOnce());
     target.events.emit("SIGTERM");
     await running;
     expect(target.writes).toEqual([]);

@@ -6,7 +6,7 @@ import type { EnabledWorkerConfig } from "./config.js";
 const enabled = {
   activeProjectionKeyId: "key-1",
   appEnvironment: "homologation",
-  databaseTlsCaFile: undefined,
+  databaseTlsCa: undefined,
   databaseUrl: "postgres://redacted@localhost/db",
   dryRun: true,
   healthPort: 9464,
@@ -15,9 +15,9 @@ const enabled = {
   leaseOwner: "22222222-2222-4222-8222-222222222222",
   limiterHmacKeyBase64: Buffer.alloc(32).toString("base64"),
   mode: "enabled",
-  mtlsCaFile: "/ca",
-  mtlsCertificateFile: "/cert",
-  mtlsKeyFile: "/key",
+  mtlsCa: "ca",
+  mtlsCertificate: "certificate",
+  mtlsKey: "private-key",
   mtlsKeyPassphrase: undefined,
   pollIntervalMs: 5_000,
   projectionKeysBase64: [

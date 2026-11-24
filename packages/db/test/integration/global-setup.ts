@@ -5,13 +5,13 @@ import { bootstrapRoles } from "../../src/bootstrap.js";
 import {
   APP_ROLE,
   IDENTITY_APP_ROLE,
-  LOCAL_DEFAULTS,
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
   isLoopbackUrl,
   withCredentials,
 } from "../../src/config.js";
+import { LOCAL_DEFAULTS } from "../../src/local-defaults.js";
 import { runMigrations } from "../../src/migrate.js";
 
 export interface DbUrls {

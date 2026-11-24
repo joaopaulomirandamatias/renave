@@ -10,7 +10,7 @@ import {
   releaseOperationReconciliationLease,
   renewOperationReconciliationLease,
   withTenant,
-} from "@seu-renave/db";
+} from "@seu-renave/db/operation-worker";
 import type { Pool } from "pg";
 
 import type {

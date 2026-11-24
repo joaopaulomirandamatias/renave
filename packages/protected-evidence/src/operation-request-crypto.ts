@@ -5,7 +5,10 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 
-import type { OperationKind, OperationMutationFamily } from "@seu-renave/db";
+import type {
+  OperationKind,
+  OperationMutationFamily,
+} from "@seu-renave/db/operation-worker";
 import {
   restorePreparedRenaveMutation,
   type PreparedRenaveMutation,

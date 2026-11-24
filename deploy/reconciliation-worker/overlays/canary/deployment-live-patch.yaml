@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: renave-reconciliation-worker
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: worker
+          env:
+            - name: RENAVE_RECONCILIATION_WORKER_ENABLED
+              value: "true"
+            - name: RENAVE_RECONCILIATION_WORKER_DRY_RUN
+              value: "false"
