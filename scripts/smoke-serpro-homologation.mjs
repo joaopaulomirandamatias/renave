@@ -69,9 +69,10 @@ export async function runHomologationSmoke(
     readMaterial(config.keyFile, "key", reader),
   ]);
   const {
+    createHomologationRenaveReadOnlyRequest,
     createHomologationPemMtlsClient,
-    HttpRenaveTransport,
-    RenaveConnector,
+    HttpRenaveReadOnlyTransport,
+    RenaveQueryConnector,
   } = await loadConnector();
   const mtls = createHomologationPemMtlsClient("homologation", {
     ca,
@@ -82,10 +83,13 @@ export async function runHomologationSmoke(
       : { passphrase: config.keyPassphrase }),
   });
   try {
-    const connector = new RenaveConnector(
-      new HttpRenaveTransport({
+    const connector = new RenaveQueryConnector(
+      new HttpRenaveReadOnlyTransport({
         environment: "homologation",
-        request: mtls.request,
+        request: createHomologationRenaveReadOnlyRequest(
+          "homologation",
+          mtls.request,
+        ),
       }),
     );
     await connector.verifyIdentity({

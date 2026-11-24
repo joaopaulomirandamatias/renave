@@ -7,6 +7,7 @@ import type { RenaveHttpRequest } from "./http-transport.js";
 
 const HOMOLOGATION_ORIGIN = "https://hom.renave.estaleiro.serpro.gov.br";
 const HOMOLOGATION_IDENTITY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/cliente-autenticado`;
+const HOMOLOGATION_ELIGIBILITY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/aptidao-veiculo-estoque`;
 const HOMOLOGATION_STOCKS_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/estoques`;
 const ALLOWED_PATHS = new Set([
   "/renave-ws/api/aptidao-veiculo-estoque",
@@ -167,6 +168,26 @@ function isAllowedReadUrl(input: string): boolean {
     return false;
   }
   if (input === HOMOLOGATION_IDENTITY_URL) return true;
+  if (url.pathname === "/renave-ws/api/aptidao-veiculo-estoque") {
+    const entries = [...url.searchParams.entries()];
+    if (entries.length !== 2 || entries[0]?.[0] !== "tipoCrv") return false;
+
+    const crvType = entries[0][1];
+    if (!["AZUL", "VERDE", "BRANCO", "DIGITAL"].includes(crvType)) {
+      return false;
+    }
+    const identifier = entries[1];
+    if (!identifier) return false;
+    const identifierIsValid =
+      (identifier[0] === "placa" && /^[A-Z0-9]{7}$/.test(identifier[1])) ||
+      (identifier[0] === "renavam" && /^\d{11}$/.test(identifier[1])) ||
+      (identifier[0] === "numeroCrv" && /^\d{12}$/.test(identifier[1]));
+    if (!identifierIsValid) return false;
+
+    const canonical = new URLSearchParams({ tipoCrv: crvType });
+    canonical.set(identifier[0], identifier[1]);
+    return input === `${HOMOLOGATION_ELIGIBILITY_URL}?${canonical.toString()}`;
+  }
   if (url.pathname !== "/renave-ws/api/estoques") return false;
 
   const entries = [...url.searchParams.entries()];

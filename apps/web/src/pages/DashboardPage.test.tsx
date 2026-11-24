@@ -147,7 +147,7 @@ describe("DashboardPage", () => {
     expect(onRunPreflight).toHaveBeenCalledOnce();
   });
 
-  it("só mostra consultas RENAVE com seleção e vínculo confirmado", () => {
+  it("só mostra consultas RENAVE com seleção, vínculo e prontidão confirmados", () => {
     const onSearchStocks = vi.fn(async () => []);
     const onCheckEligibility = vi.fn(async () => ({
       detranUnavailable: false,
@@ -182,6 +182,42 @@ describe("DashboardPage", () => {
         onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
         onSearchStocks={onSearchStocks}
+        readiness={{
+          certificate: "blocked",
+          environment: "homologation",
+          integration: "configured",
+          link: "confirmed",
+          mutations: "blocked",
+          queries: "blocked",
+        }}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Localizar estoque por placa" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: "Consultar aptidão do veículo" }),
+    ).toBeNull();
+
+    view.rerender(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="confirmed"
+        onCheckEligibility={onCheckEligibility}
+        onLogout={vi.fn()}
+        onSearchStocks={onSearchStocks}
+        readiness={{
+          certificate: "ready",
+          environment: "homologation",
+          integration: "configured",
+          link: "confirmed",
+          mutations: "blocked",
+          queries: "ready",
+        }}
         selectedEstablishmentId="store-belem"
         selectedTenantId="tenant-a"
         userDisplayName="Operador"
@@ -255,5 +291,152 @@ describe("DashboardPage", () => {
       "role",
       "status",
     );
+  });
+
+  it("expõe o checklist de prontidão sem confundir consulta com mutação", () => {
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="confirmed"
+        onLogout={vi.fn()}
+        readiness={{
+          certificate: "warning",
+          environment: "homologation",
+          integration: "configured",
+          link: "confirmed",
+          mutations: "blocked",
+          queries: "ready",
+        }}
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+
+    const readiness = screen.getByRole("region", {
+      name: "Prontidão da integração",
+    });
+    expect(readiness).toHaveTextContent("Homologação");
+    expect(readiness).toHaveTextContent("Configurada");
+    expect(readiness).toHaveTextContent("Atenção");
+    expect(readiness).toHaveTextContent("Liberadas");
+    expect(readiness).toHaveTextContent("Mutações RENAVE");
+    expect(readiness).toHaveTextContent("Protegidas");
+  });
+
+  it("bloqueia preflight com certificado indisponível e preserva aviso como permitido", () => {
+    const onRunPreflight = vi.fn();
+    const view = render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="pending"
+        onLogout={vi.fn()}
+        onRunPreflight={onRunPreflight}
+        preflightAvailable
+        readiness={{
+          certificate: "unavailable",
+          environment: "homologation",
+          integration: "configured",
+          link: "pending",
+          mutations: "blocked",
+          queries: "blocked",
+        }}
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Verificar vínculo" }),
+    ).toBeDisabled();
+
+    view.rerender(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="pending"
+        onLogout={vi.fn()}
+        onRunPreflight={onRunPreflight}
+        preflightAvailable
+        readiness={{
+          certificate: "warning",
+          environment: "homologation",
+          integration: "configured",
+          link: "pending",
+          mutations: "blocked",
+          queries: "blocked",
+        }}
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Verificar vínculo" }));
+    expect(onRunPreflight).toHaveBeenCalledOnce();
+  });
+
+  it("preserva o vínculo quando o diagnóstico de prontidão falha", () => {
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="confirmed"
+        onLogout={vi.fn()}
+        readinessError
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(screen.getByText("Confirmado")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /o vínculo já exibido foi preservado/i,
+    );
+  });
+
+  it("mantém preflight bloqueado enquanto verifica a prontidão", () => {
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="pending"
+        onLogout={vi.fn()}
+        onRunPreflight={vi.fn()}
+        preflightAvailable
+        readinessLoading
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(
+      screen.getByText(/verificando controles locais de prontidão/i),
+    ).toHaveAttribute("role", "status");
+    expect(
+      screen.getByRole("button", { name: "Verificar vínculo" }),
+    ).toBeDisabled();
+  });
+
+  it("permite recarregar o vínculo mesmo se a prontidão estiver indisponível", () => {
+    const onReloadLinkStatus = vi.fn();
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatusError
+        onLogout={vi.fn()}
+        onReloadLinkStatus={onReloadLinkStatus}
+        readinessError
+        selectedEstablishmentId="store-belem"
+        userDisplayName="Operador"
+      />,
+    );
+
+    const reload = screen.getByRole("button", {
+      name: "Tentar carregar vínculo",
+    });
+    expect(reload).toBeEnabled();
+    fireEvent.click(reload);
+    expect(onReloadLinkStatus).toHaveBeenCalledOnce();
   });
 });

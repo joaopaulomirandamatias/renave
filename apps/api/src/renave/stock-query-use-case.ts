@@ -19,7 +19,7 @@ import {
   type StockQueryInput,
 } from "@seu-renave/renave-application";
 import type {
-  RenaveConnector,
+  RenaveQueryConnector,
   StockSummary,
 } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
@@ -38,7 +38,7 @@ export class RenaveLinkNotReadyError extends Error {
 export interface PostgresStockQueryUseCaseOptions {
   certificateThumbprintSha256: string;
   cipher: EvidenceCipher;
-  connector: RenaveConnector;
+  connector: Pick<RenaveQueryConnector, "getStocksByPlate">;
   integratorCnpj: string;
   pool: Pool;
 }

@@ -2,8 +2,8 @@ import type {
   AuthenticatedClientIdentity,
   EstablishmentHeaders,
   RenaveEnvironment,
+  RenaveQueryTransport,
   RenaveReadOptions,
-  RenaveReadOnlyTransport,
   RenaveTransport,
 } from "./connector.js";
 import { RenaveProductionBlockedError } from "./connector.js";
@@ -646,8 +646,8 @@ export class HttpRenaveTransport implements RenaveTransport {
   }
 }
 
-/** Transporte nominal que não possui superfícies de aptidão ou mutação. */
-export class HttpRenaveReadOnlyTransport implements RenaveReadOnlyTransport {
+/** Transporte nominal de consultas que não possui superfície de mutação. */
+export class HttpRenaveReadOnlyTransport implements RenaveQueryTransport {
   constructor(options: HttpRenaveReadOnlyTransportOptions) {
     if (new.target !== HttpRenaveReadOnlyTransport) {
       throw new RenaveProtocolError("get-authenticated-client");
@@ -704,6 +704,38 @@ export class HttpRenaveReadOnlyTransport implements RenaveReadOnlyTransport {
       throw new RenaveHttpError(response.status, "get-authenticated-client");
     }
     return identityFrom(await parseJson(response, "get-authenticated-client"));
+  }
+
+  async getVehicleEligibility(
+    headers: EstablishmentHeaders,
+    query: VehicleEligibilityQuery,
+  ): Promise<VehicleEligibilityResponse> {
+    const state = httpReadOnlyTransportState(this, "get-vehicle-eligibility");
+    const search = new URLSearchParams({ tipoCrv: query.tipoCrv });
+    if (query.placa !== undefined) search.set("placa", query.placa);
+    if (query.renavam !== undefined) search.set("renavam", query.renavam);
+    if (query.numeroCrv !== undefined) search.set("numeroCrv", query.numeroCrv);
+
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls.homologation}/api/aptidao-veiculo-estoque?${search.toString()}`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "get-vehicle-eligibility");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "get-vehicle-eligibility");
+    }
+    return vehicleEligibilityFrom(
+      await parseJson(response, "get-vehicle-eligibility"),
+    );
   }
 
   async findStocksByPlate(

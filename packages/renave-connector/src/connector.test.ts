@@ -5,6 +5,7 @@ import {
   prepareRenaveMutation,
   RenaveConnector,
   RenaveIdentityMismatchError,
+  RenaveQueryConnector,
   type AuthenticatedClientIdentity,
   type EstablishmentHeaders,
   type RenaveServerContext,
@@ -43,6 +44,35 @@ function transportWithIdentity(identity: AuthenticatedClientIdentity) {
   };
   return { getAuthenticatedClient, mutate, transport };
 }
+
+describe("RenaveQueryConnector", () => {
+  it("expõe somente consultas e preserva a confirmação de identidade", async () => {
+    const fake = transportWithIdentity({
+      cnpj: "85106037000585",
+      cnpjIntegradora: "69418503000188",
+    });
+    const { mutate: _mutate, ...queryTransport } = fake.transport;
+    const connector = new RenaveQueryConnector(queryTransport);
+
+    await expect(
+      connector.getVehicleEligibility(context, {
+        placa: "qtp4h82",
+        tipoCrv: "DIGITAL",
+      }),
+    ).resolves.toMatchObject({
+      result: { diagnostico: { veiculoApto: true } },
+      verifiedIdentity: {
+        confirmedEstablishmentCnpj: "85106037000585",
+        confirmedIntegratorCnpj: "69418503000188",
+      },
+    });
+
+    expect("mutate" in connector).toBe(false);
+    expect("executeMutation" in connector).toBe(false);
+    expect("requestStockEntry" in connector).toBe(false);
+    expect(fake.mutate).not.toHaveBeenCalled();
+  });
+});
 
 describe("RenaveConnector", () => {
   it("confirma o vínculo sem executar consulta ou mutação", async () => {

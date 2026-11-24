@@ -17,9 +17,10 @@ import {
   EvidenceCipher,
 } from "@seu-renave/protected-evidence";
 import {
+  createHomologationRenaveReadOnlyRequest,
   createHomologationPemMtlsClient,
-  HttpRenaveTransport,
-  RenaveConnector,
+  HttpRenaveReadOnlyTransport,
+  RenaveQueryConnector,
   type HomologationMtlsClient,
   type MtlsCertificateTemporalStatus,
 } from "@seu-renave/renave-connector";
@@ -37,6 +38,7 @@ import { PostgresVehicleEligibilityUseCase } from "./renave/use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
 import { readRenaveMtlsMaterial } from "./renave/mtls-material.js";
 import { PostgresRenaveLinkPreflightUseCase } from "./renave/preflight-use-case.js";
+import { PostgresRenaveReadinessUseCase } from "./renave/readiness-use-case.js";
 import type { SerproQueryLimiter } from "./renave/routes.js";
 import { PostgresStockQueryUseCase } from "./renave/stock-query-use-case.js";
 import { createPostgresTenantDirectory } from "./tenant/directory.js";
@@ -54,6 +56,7 @@ export interface AppRuntime {
   eligibility?: PostgresVehicleEligibilityUseCase;
   linkStatus?: PostgresRenaveLinkStatusUseCase;
   preflight?: PostgresRenaveLinkPreflightUseCase;
+  renaveReadiness?: PostgresRenaveReadinessUseCase;
   identity?: ReturnType<typeof composeIdentity>;
   loginRateLimiter?: LoginRateLimiter;
   sessionLookupGate?: SessionLookupGate;
@@ -224,10 +227,13 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
           ],
         ]),
       });
-      const connector = new RenaveConnector(
-        new HttpRenaveTransport({
+      const connector = new RenaveQueryConnector(
+        new HttpRenaveReadOnlyTransport({
           environment: "homologation",
-          request: mtls.request,
+          request: createHomologationRenaveReadOnlyRequest(
+            "homologation",
+            mtls.request,
+          ),
         }),
       );
       eligibility = new PostgresVehicleEligibilityUseCase({
@@ -252,6 +258,19 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         pool: businessPool,
       });
     }
+    const renaveReadiness = businessPool
+      ? new PostgresRenaveReadinessUseCase({
+          ...(mtls
+            ? {
+                certificateTemporalStatus: () =>
+                  mtls!.getCertificateTemporalStatus(),
+              }
+            : {}),
+          integrationConfigured: Boolean(config.renave),
+          pool: businessPool,
+          queryLimiterConfigured: Boolean(serproQueryLimiter),
+        })
+      : undefined;
 
     return {
       ...(mtls
@@ -262,6 +281,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         : {}),
       ...(eligibility ? { eligibility } : {}),
       ...(preflight ? { preflight } : {}),
+      ...(renaveReadiness ? { renaveReadiness } : {}),
       ...(identity ? { identity } : {}),
       ...(linkStatus ? { linkStatus } : {}),
       ...(loginRateLimiter ? { loginRateLimiter } : {}),

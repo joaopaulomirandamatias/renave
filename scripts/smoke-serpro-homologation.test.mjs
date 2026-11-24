@@ -47,10 +47,15 @@ describe("smoke SERPRO mTLS", () => {
       closed: false,
       context: undefined,
       environment: undefined,
+      readOnlyEnvironment: undefined,
     };
     await runHomologationSmoke(config, {
       reader: async (path) => `material:${path.split("/").at(-1)}`,
       loadConnector: async () => ({
+        createHomologationRenaveReadOnlyRequest: (targetEnvironment) => {
+          observed.readOnlyEnvironment = targetEnvironment;
+          return Object.freeze({ capability: "read-only" });
+        },
         createHomologationPemMtlsClient: (targetEnvironment) => {
           observed.environment = targetEnvironment;
           return {
@@ -60,10 +65,10 @@ describe("smoke SERPRO mTLS", () => {
             request: async () => new Response(),
           };
         },
-        HttpRenaveTransport: class {
+        HttpRenaveReadOnlyTransport: class {
           constructor() {}
         },
-        RenaveConnector: class {
+        RenaveQueryConnector: class {
           async verifyIdentity(context) {
             observed.context = context;
           }
@@ -72,6 +77,7 @@ describe("smoke SERPRO mTLS", () => {
     });
 
     assert.equal(observed.environment, "homologation");
+    assert.equal(observed.readOnlyEnvironment, "homologation");
     assert.equal(observed.context.environment, "homologation");
     assert.equal(observed.context.establishmentCnpj, "11222333000181");
     assert.equal(observed.closed, true);
@@ -84,14 +90,16 @@ describe("smoke SERPRO mTLS", () => {
       runHomologationSmoke(config, {
         reader: async () => "material",
         loadConnector: async () => ({
+          createHomologationRenaveReadOnlyRequest: () =>
+            Object.freeze({ capability: "read-only" }),
           createHomologationPemMtlsClient: () => ({
             close: () => {
               closed = true;
             },
             request: async () => new Response(),
           }),
-          HttpRenaveTransport: class {},
-          RenaveConnector: class {
+          HttpRenaveReadOnlyTransport: class {},
+          RenaveQueryConnector: class {
             async verifyIdentity() {
               throw Object.assign(new Error("dados sensíveis"), {
                 code: "RENAVE_IDENTITY_MISMATCH",

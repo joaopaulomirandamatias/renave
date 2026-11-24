@@ -7,6 +7,7 @@ import type { AppConfig } from "../config.js";
 import type { RenaveLinkStatusUseCase } from "./link-status-use-case.js";
 import type { EligibilityUseCase } from "./use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./preflight-use-case.js";
+import type { RenaveReadinessUseCase } from "./readiness-use-case.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const PLATE = /^[A-Z0-9]{7}$/u;
@@ -50,6 +51,7 @@ export interface RenaveRoutesOptions {
   linkStatus?: RenaveLinkStatusUseCase;
   preflight?: RenaveLinkPreflightUseCase;
   queryLimiter?: SerproQueryLimiter;
+  readiness?: RenaveReadinessUseCase;
   stockQuery?: StockQueryUseCase;
 }
 
@@ -199,6 +201,35 @@ export function registerRenaveRoutes(
   app: FastifyInstance,
   options: RenaveRoutesOptions,
 ): void {
+  app.get(
+    "/api/tenants/:tenantId/establishments/:establishmentId/renave-readiness",
+    async (request, reply) => {
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
+      if (!sessionResult.ok) return;
+      if (!options.readiness) {
+        return reply.code(503).send({ code: "RENAVE_STATUS_NOT_CONFIGURED" });
+      }
+      const params = safeParams(request);
+      if (!params) return reply.code(400).send({ code: "INVALID_REQUEST" });
+      try {
+        return await options.readiness.execute({
+          establishmentId: params.establishmentId,
+          subject: sessionResult.session.subject,
+          tenantId: params.tenantId,
+        });
+      } catch (error) {
+        const code = errorCode(error);
+        const status = mappedStatus(code);
+        return reply.code(status).send({
+          code: status === 500 ? "INTERNAL_ERROR" : (code ?? "INTERNAL_ERROR"),
+        });
+      }
+    },
+  );
+
   app.get(
     "/api/tenants/:tenantId/establishments/:establishmentId/renave-link",
     async (request, reply) => {

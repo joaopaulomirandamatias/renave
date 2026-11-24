@@ -7,6 +7,7 @@ import type { SerproQueryLimiter, StockQueryUseCase } from "./routes.js";
 import type { EligibilityUseCase } from "./use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./preflight-use-case.js";
 import type { RenaveLinkStatusUseCase } from "./link-status-use-case.js";
+import type { RenaveReadinessUseCase } from "./readiness-use-case.js";
 
 const TENANT_ID = "11111111-1111-4111-8111-111111111111";
 const ESTABLISHMENT_ID = "22222222-2222-4222-8222-222222222222";
@@ -67,6 +68,16 @@ function setup(
   const linkStatusExecute = vi.fn<RenaveLinkStatusUseCase["execute"]>(
     async () => ({ status: "not_started" }),
   );
+  const readinessExecute = vi.fn<RenaveReadinessUseCase["execute"]>(
+    async () => ({
+      certificate: "warning",
+      environment: "homologation",
+      integration: "configured",
+      link: "confirmed",
+      mutations: "blocked",
+      queries: "ready",
+    }),
+  );
   const release = vi.fn(async () => undefined);
   const acquire = vi.fn<SerproQueryLimiter["acquire"]>(async () => ({
     allowed: true,
@@ -79,6 +90,7 @@ function setup(
     logger: false,
     linkStatus: { execute: linkStatusExecute },
     preflight: { authorize: authorizePreflight, execute: preflightExecute },
+    renaveReadiness: { execute: readinessExecute },
     serproQueryLimiter: { acquire },
     stockQuery: {
       authorize: authorizeStockQuery,
@@ -99,6 +111,7 @@ function setup(
     getSession,
     linkStatusExecute,
     preflightExecute,
+    readinessExecute,
     release,
     stockQueryExecute,
   };
@@ -136,6 +149,48 @@ async function stockRequest(
 }
 
 describe("rota autenticada de aptidão", () => {
+  it("expõe prontidão local sanitizada sem consultar o SERPRO", async () => {
+    const { app, preflightExecute, readinessExecute, stockQueryExecute } =
+      setup();
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/renave-readiness`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      certificate: "warning",
+      environment: "homologation",
+      integration: "configured",
+      link: "confirmed",
+      mutations: "blocked",
+      queries: "ready",
+    });
+    expect(response.body).not.toMatch(
+      /cnpj|thumbprint|fingerprint|serial|expires|notAfter|\.pem|\/run\/secrets/iu,
+    );
+    expect(readinessExecute).toHaveBeenCalledWith({
+      establishmentId: ESTABLISHMENT_ID,
+      subject: "oidc|operator-1",
+      tenantId: TENANT_ID,
+    });
+    expect(preflightExecute).not.toHaveBeenCalled();
+    expect(stockQueryExecute).not.toHaveBeenCalled();
+  });
+
+  it("recusa prontidão sem sessão antes de executar o caso de uso", async () => {
+    const { app, readinessExecute } = setup({ authenticated: false });
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/renave-readiness`,
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ code: "AUTHENTICATION_REQUIRED" });
+    expect(readinessExecute).not.toHaveBeenCalled();
+  });
+
   it("lê somente o estado público do vínculo autorizado", async () => {
     const { app, linkStatusExecute } = setup();
     const response = await app.inject({

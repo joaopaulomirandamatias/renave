@@ -13,6 +13,7 @@ import {
   EstablishmentCreationClientError,
   type BrowserEstablishment,
   type BrowserEstablishmentCollection,
+  type BrowserRenaveReadiness,
   type BrowserSession,
   type BrowserTenant,
   type SessionClient,
@@ -54,6 +55,14 @@ function clientFor(
     loadRenaveLinkStatus: vi.fn(async () => ({
       preflightAvailable: false,
       status: "not_started" as const,
+    })),
+    loadRenaveReadiness: vi.fn(async () => ({
+      certificate: "ready" as const,
+      environment: "homologation" as const,
+      integration: "configured" as const,
+      link: "not_started" as const,
+      mutations: "blocked" as const,
+      queries: "blocked" as const,
     })),
     loadTenants: vi.fn(async () => tenants),
     logout: vi.fn(async () => ({})),
@@ -349,6 +358,43 @@ describe("App session boundary", () => {
     ).rejects.toThrow("Resposta de estabelecimentos inválida");
   });
 
+  it("aceita somente o contrato fechado de prontidão RENAVE", async () => {
+    const valid: BrowserRenaveReadiness = {
+      certificate: "warning",
+      environment: "homologation",
+      integration: "configured",
+      link: "confirmed",
+      mutations: "blocked",
+      queries: "ready",
+    };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(valid))
+      .mockResolvedValueOnce(Response.json({ ...valid, thumbprint: "secret" }))
+      .mockResolvedValueOnce(
+        Response.json({ ...valid, certificate: "unknown" }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.loadRenaveReadiness("tenant-a", "store-a"),
+    ).resolves.toEqual(valid);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/tenants/tenant-a/establishments/store-a/renave-readiness",
+      expect.objectContaining({
+        cache: "no-store",
+        credentials: "same-origin",
+      }),
+    );
+    await expect(
+      browserSessionClient.loadRenaveReadiness("tenant-a", "store-a"),
+    ).rejects.toThrow("Resposta de prontidão RENAVE inválida");
+    await expect(
+      browserSessionClient.loadRenaveReadiness("tenant-a", "store-a"),
+    ).rejects.toThrow("Resposta de prontidão RENAVE inválida");
+  });
+
   it("não mostra login nem painel enquanto verifica a sessão", () => {
     const client: SessionClient = {
       checkVehicleEligibility: vi.fn(async () => ({
@@ -365,6 +411,14 @@ describe("App session boundary", () => {
       loadRenaveLinkStatus: vi.fn(async () => ({
         preflightAvailable: false,
         status: "not_started" as const,
+      })),
+      loadRenaveReadiness: vi.fn(async () => ({
+        certificate: "ready" as const,
+        environment: "homologation" as const,
+        integration: "configured" as const,
+        link: "not_started" as const,
+        mutations: "blocked" as const,
+        queries: "blocked" as const,
       })),
       loadTenants: vi.fn(async () => []),
       logout: vi.fn(async () => ({})),
@@ -903,6 +957,68 @@ describe("App session boundary", () => {
 
     oldLink.resolve({ preflightAvailable: true, status: "rejected" });
     await waitFor(() => expect(screen.queryByText("Rejeitado")).toBeNull());
+  });
+
+  it("ignora prontidão atrasada da loja anterior sem apagar o vínculo atual", async () => {
+    const oldReadiness = deferred<BrowserRenaveReadiness>();
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: {},
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([
+        { id: "store-a", tradeName: "Loja A" },
+        { id: "store-b", tradeName: "Loja B" },
+      ]),
+    );
+    vi.mocked(client.loadRenaveLinkStatus).mockResolvedValue({
+      preflightAvailable: true,
+      status: "confirmed",
+    });
+    vi.mocked(client.loadRenaveReadiness).mockImplementation(
+      async (_tenantId, establishmentId) =>
+        establishmentId === "store-a"
+          ? oldReadiness.promise
+          : {
+              certificate: "warning",
+              environment: "homologation",
+              integration: "configured",
+              link: "confirmed",
+              mutations: "blocked",
+              queries: "ready",
+            },
+    );
+    render(<App client={client} />);
+
+    const establishment = await screen.findByRole("combobox", {
+      name: "Estabelecimento ativo",
+    });
+    fireEvent.change(establishment, { target: { value: "store-b" } });
+    const readiness = await screen.findByRole("region", {
+      name: "Prontidão da integração",
+    });
+    expect(readiness).toHaveTextContent("Atenção");
+    expect(screen.getByText("Confirmado")).toBeVisible();
+
+    oldReadiness.resolve({
+      certificate: "blocked",
+      environment: "homologation",
+      integration: "disabled",
+      link: "rejected",
+      mutations: "blocked",
+      queries: "blocked",
+    });
+    await waitFor(() => {
+      expect(readiness).toHaveTextContent("Atenção");
+      expect(readiness).not.toHaveTextContent("Desabilitada");
+    });
+    expect(screen.getByText("Confirmado")).toBeVisible();
   });
 
   it("preserva o estado e permite repetir quando o preflight falha", async () => {

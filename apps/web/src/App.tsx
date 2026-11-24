@@ -68,6 +68,15 @@ export interface BrowserRenaveLink {
   status: BrowserRenaveLinkStatus;
 }
 
+export interface BrowserRenaveReadiness {
+  certificate: "ready" | "warning" | "blocked" | "unavailable";
+  environment: "homologation";
+  integration: "configured" | "disabled";
+  link: BrowserRenaveLinkStatus;
+  mutations: "blocked";
+  queries: "ready" | "blocked";
+}
+
 export type BrowserStockState =
   "SOLICITADO" | "TRANSFERIDO" | "CONFIRMADO" | "FINALIZADO";
 
@@ -124,6 +133,10 @@ export interface SessionClient {
     tenantId: string,
     establishmentId: string,
   ): Promise<BrowserRenaveLink>;
+  loadRenaveReadiness(
+    tenantId: string,
+    establishmentId: string,
+  ): Promise<BrowserRenaveReadiness>;
   logout(): Promise<{ endSessionUrl?: string }>;
   runRenaveLinkPreflight(
     tenantId: string,
@@ -297,6 +310,59 @@ function parseRenaveLink(value: unknown): BrowserRenaveLink {
   return {
     preflightAvailable: value.preflightAvailable,
     status: value.status as BrowserRenaveLinkStatus,
+  };
+}
+
+const renaveCertificateReadiness = new Set<
+  BrowserRenaveReadiness["certificate"]
+>(["ready", "warning", "blocked", "unavailable"]);
+const renaveIntegrationReadiness = new Set<
+  BrowserRenaveReadiness["integration"]
+>(["configured", "disabled"]);
+const renaveQueryReadiness = new Set<BrowserRenaveReadiness["queries"]>([
+  "ready",
+  "blocked",
+]);
+
+function parseRenaveReadiness(value: unknown): BrowserRenaveReadiness {
+  const expectedKeys = new Set([
+    "certificate",
+    "environment",
+    "integration",
+    "link",
+    "mutations",
+    "queries",
+  ]);
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== expectedKeys.size ||
+    Object.keys(value).some((key) => !expectedKeys.has(key)) ||
+    value.environment !== "homologation" ||
+    typeof value.integration !== "string" ||
+    !renaveIntegrationReadiness.has(
+      value.integration as BrowserRenaveReadiness["integration"],
+    ) ||
+    typeof value.certificate !== "string" ||
+    !renaveCertificateReadiness.has(
+      value.certificate as BrowserRenaveReadiness["certificate"],
+    ) ||
+    typeof value.link !== "string" ||
+    !renaveLinkStatuses.has(value.link as BrowserRenaveLinkStatus) ||
+    typeof value.queries !== "string" ||
+    !renaveQueryReadiness.has(
+      value.queries as BrowserRenaveReadiness["queries"],
+    ) ||
+    value.mutations !== "blocked"
+  ) {
+    throw new Error("Resposta de prontidão RENAVE inválida");
+  }
+  return {
+    certificate: value.certificate as BrowserRenaveReadiness["certificate"],
+    environment: "homologation",
+    integration: value.integration as BrowserRenaveReadiness["integration"],
+    link: value.link as BrowserRenaveLinkStatus,
+    mutations: "blocked",
+    queries: value.queries as BrowserRenaveReadiness["queries"],
   };
 }
 
@@ -535,6 +601,20 @@ export const browserSessionClient: SessionClient = {
     if (!response.ok) throw new Error("Não foi possível carregar o vínculo");
     return parseRenaveLink(await response.json());
   },
+  async loadRenaveReadiness(tenantId, establishmentId) {
+    const response = await fetch(
+      `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/renave-readiness`,
+      {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { accept: "application/json" },
+      },
+    );
+    if (!response.ok) {
+      throw new Error("Não foi possível carregar a prontidão RENAVE");
+    }
+    return parseRenaveReadiness(await response.json());
+  },
   async logout() {
     const response = await fetch("/api/auth/logout", {
       method: "POST",
@@ -669,6 +749,10 @@ type RenaveLinkView =
   | { status: "idle" | "loading" | "error" }
   | { link: BrowserRenaveLink; status: "ready" };
 
+type RenaveReadinessView =
+  | { status: "idle" | "loading" | "error" }
+  | { readiness: BrowserRenaveReadiness; status: "ready" };
+
 export function App({
   client = browserSessionClient,
   locationSearch = window.location.search,
@@ -686,7 +770,10 @@ export function App({
   const [renaveLinkView, setRenaveLinkView] = useState<RenaveLinkView>({
     status: "idle",
   });
+  const [renaveReadinessView, setRenaveReadinessView] =
+    useState<RenaveReadinessView>({ status: "idle" });
   const [linkReloadVersion, setLinkReloadVersion] = useState(0);
+  const [readinessReloadVersion, setReadinessReloadVersion] = useState(0);
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const [establishmentManagement, setEstablishmentManagement] =
     useState<EstablishmentManagementCapability>("denied");
@@ -698,6 +785,7 @@ export function App({
   const tenantRequestVersion = useRef(0);
   const loadRequestVersion = useRef(0);
   const linkLoadVersion = useRef(0);
+  const readinessLoadVersion = useRef(0);
   const activeSelectionKeyRef = useRef("");
   const selectedTenantIdRef = useRef("");
   selectedTenantIdRef.current = selectedTenantId;
@@ -794,6 +882,42 @@ export function App({
     view,
   ]);
 
+  useEffect(() => {
+    const authenticated = view.status === "ready" && view.session.authenticated;
+    if (!authenticated || !selectedTenantId || !activeEstablishmentId) {
+      readinessLoadVersion.current += 1;
+      setRenaveReadinessView({ status: "idle" });
+      return;
+    }
+    const selectionKey = `${selectedTenantId}:${activeEstablishmentId}`;
+    const requestVersion = ++readinessLoadVersion.current;
+    setRenaveReadinessView({ status: "loading" });
+    void client
+      .loadRenaveReadiness(selectedTenantId, activeEstablishmentId)
+      .then((readiness) => {
+        if (
+          readinessLoadVersion.current === requestVersion &&
+          activeSelectionKeyRef.current === selectionKey
+        ) {
+          setRenaveReadinessView({ readiness, status: "ready" });
+        }
+      })
+      .catch(() => {
+        if (
+          readinessLoadVersion.current === requestVersion &&
+          activeSelectionKeyRef.current === selectionKey
+        ) {
+          setRenaveReadinessView({ status: "error" });
+        }
+      });
+  }, [
+    activeEstablishmentId,
+    client,
+    readinessReloadVersion,
+    selectedTenantId,
+    view,
+  ]);
+
   if (view.status === "loading") {
     return (
       <main className="session-state" aria-busy="true">
@@ -868,6 +992,7 @@ export function App({
       tenantRequestVersion.current += 1;
       loadRequestVersion.current += 1;
       linkLoadVersion.current += 1;
+      readinessLoadVersion.current += 1;
       if (result.endSessionUrl) redirect(result.endSessionUrl);
     } catch {
       setLogoutError(true);
@@ -892,6 +1017,7 @@ export function App({
       }
     } finally {
       if (activeSelectionKeyRef.current === selectionKey) {
+        setReadinessReloadVersion((current) => current + 1);
         const requestVersion = ++linkLoadVersion.current;
         setRenaveLinkView({ status: "loading" });
         try {
@@ -1050,6 +1176,7 @@ export function App({
       [tenantId]: result.establishment.id,
     }));
     linkLoadVersion.current += 1;
+    readinessLoadVersion.current += 1;
     setRenaveLinkView({
       link: { preflightAvailable: false, status: "not_started" },
       status: "ready",
@@ -1075,6 +1202,11 @@ export function App({
         : {})}
       linkStatusError={renaveLinkView.status === "error"}
       linkStatusLoading={renaveLinkView.status === "loading"}
+      {...(renaveReadinessView.status === "ready"
+        ? { readiness: renaveReadinessView.readiness }
+        : {})}
+      readinessError={renaveReadinessView.status === "error"}
+      readinessLoading={renaveReadinessView.status === "loading"}
       onCheckEligibility={(plate, crvType) =>
         client.checkVehicleEligibility(
           selectedTenantId,
@@ -1095,7 +1227,11 @@ export function App({
       onReloadLinkStatus={() => setLinkReloadVersion((current) => current + 1)}
       preflightAvailable={
         renaveLinkView.status === "ready" &&
-        renaveLinkView.link.preflightAvailable
+        renaveLinkView.link.preflightAvailable &&
+        renaveReadinessView.status === "ready" &&
+        renaveReadinessView.readiness.integration === "configured" &&
+        (renaveReadinessView.readiness.certificate === "ready" ||
+          renaveReadinessView.readiness.certificate === "warning")
       }
       preflightError={
         preflightErrorKey ===

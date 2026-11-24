@@ -20,6 +20,7 @@ import {
 import type { EligibilityUseCase } from "./renave/use-case.js";
 import type { RenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./renave/preflight-use-case.js";
+import type { RenaveReadinessUseCase } from "./renave/readiness-use-case.js";
 import type {
   TenantEstablishmentAdministration,
   TenantMutationRateLimiter,
@@ -43,6 +44,8 @@ export interface BuildAppOptions {
   linkStatus?: RenaveLinkStatusUseCase;
   /** Verificação read-only do vínculo CNPJ/certificado em homologação. */
   preflight?: RenaveLinkPreflightUseCase;
+  /** Diagnóstico local e sanitizado da prontidão por estabelecimento. */
+  renaveReadiness?: RenaveReadinessUseCase;
   /** Limite distribuído obrigatório quando a consulta RENAVE está composta. */
   serproQueryLimiter?: SerproQueryLimiter;
   /** Consulta pontual e minimizada de estoque por placa. */
@@ -185,6 +188,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       ...(options.eligibility ? { eligibility: options.eligibility } : {}),
       ...(options.linkStatus ? { linkStatus: options.linkStatus } : {}),
       ...(options.preflight ? { preflight: options.preflight } : {}),
+      ...(options.renaveReadiness
+        ? { readiness: options.renaveReadiness }
+        : {}),
       ...(options.stockQuery ? { stockQuery: options.stockQuery } : {}),
       ...(options.serproQueryLimiter
         ? { queryLimiter: options.serproQueryLimiter }

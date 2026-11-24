@@ -531,14 +531,16 @@ describe("HttpRenaveReadOnlyTransport", () => {
     return createHomologationRenaveReadOnlyRequest("homologation", request);
   }
 
-  it("expõe somente identidade e estoques pela capability mTLS", async () => {
+  it("expõe somente identidade, aptidão e estoques pela capability mTLS", async () => {
     const baseRequest = vi.fn<RenaveHttpRequest>(async (url: string) =>
       url.endsWith("/cliente-autenticado")
         ? Response.json({
             cnpj: "85106037000585",
             cnpjIntegradora: "69418503000188",
           })
-        : Response.json([{ id: 7, placa: "QTP4H82" }]),
+        : url.includes("/aptidao-veiculo-estoque?")
+          ? Response.json({ diagnostico: { veiculoApto: true } })
+          : Response.json([{ id: 7, placa: "QTP4H82" }]),
     );
     const transport = new HttpRenaveReadOnlyTransport({
       environment: "homologation",
@@ -555,14 +557,20 @@ describe("HttpRenaveReadOnlyTransport", () => {
     await expect(
       transport.findStocksByPlate(headers, " qtp4h82 "),
     ).resolves.toEqual([{ id: 7, placa: "QTP4H82" }]);
+    await expect(
+      transport.getVehicleEligibility(headers, {
+        placa: "QTP4H82",
+        tipoCrv: "DIGITAL",
+      }),
+    ).resolves.toEqual({ diagnostico: { veiculoApto: true } });
 
     expect(transport.environment).toBe("homologation");
     expect("mutate" in transport).toBe(false);
-    expect("getVehicleEligibility" in transport).toBe(false);
-    expect(baseRequest).toHaveBeenCalledTimes(2);
+    expect(baseRequest).toHaveBeenCalledTimes(3);
     expect(baseRequest.mock.calls.map(([url]) => url)).toEqual([
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/cliente-autenticado",
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque?tipoCrv=DIGITAL&placa=QTP4H82",
     ]);
     for (const [, init] of baseRequest.mock.calls) {
       expect(init).toMatchObject({ method: "GET", redirect: "error" });

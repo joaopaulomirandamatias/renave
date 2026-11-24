@@ -18,7 +18,7 @@ import {
 } from "@seu-renave/protected-evidence";
 import {
   normalizeCnpj,
-  type RenaveConnector,
+  type RenaveQueryConnector,
   type RenaveServerContext,
 } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
@@ -50,7 +50,7 @@ export class PostgresRenaveLinkPreflightUseCase implements RenaveLinkPreflightUs
     private readonly options: {
       certificateThumbprintSha256: string;
       cipher: EvidenceCipher;
-      connector: RenaveConnector;
+      connector: Pick<RenaveQueryConnector, "verifyIdentity">;
       integratorCnpj: string;
       pool: Pool;
     },
@@ -65,35 +65,38 @@ export class PostgresRenaveLinkPreflightUseCase implements RenaveLinkPreflightUs
   private async authorizedEstablishment(
     input: Omit<RenaveLinkPreflightInput, "actorIp" | "traceId">,
   ) {
-    const context = await withTenant(
+    return await withTenant(
       this.options.pool,
       input.tenantId,
-      (client) => getAuthorizationContext(client, input.subject),
-    );
-    const decision = authorize(
-      context ?? {
-        grants: [],
-        subject: input.subject,
-        tenantId: input.tenantId,
+      async (client) => {
+        const context = await getAuthorizationContext(client, input.subject);
+        const decision = authorize(
+          context ?? {
+            grants: [],
+            subject: input.subject,
+            tenantId: input.tenantId,
+          },
+          {
+            action: ACTION,
+            establishmentId: input.establishmentId,
+            tenantId: input.tenantId,
+          },
+        );
+        if (!decision.allowed) {
+          throw new AuthorizationDeniedError(decision.reason);
+        }
+        const establishment = await getEstablishment(
+          client,
+          input.establishmentId,
+        );
+        if (!establishment || establishment.status !== "active") {
+          throw Object.assign(new Error("Estabelecimento indisponível"), {
+            code: "ESTABLISHMENT_UNAVAILABLE",
+          });
+        }
+        return establishment;
       },
-      {
-        action: ACTION,
-        establishmentId: input.establishmentId,
-        tenantId: input.tenantId,
-      },
     );
-    if (!decision.allowed) throw new AuthorizationDeniedError(decision.reason);
-    const establishment = await withTenant(
-      this.options.pool,
-      input.tenantId,
-      (client) => getEstablishment(client, input.establishmentId),
-    );
-    if (!establishment || establishment.status !== "active") {
-      throw Object.assign(new Error("Estabelecimento indisponível"), {
-        code: "ESTABLISHMENT_UNAVAILABLE",
-      });
-    }
-    return establishment;
   }
 
   async execute(

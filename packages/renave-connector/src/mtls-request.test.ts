@@ -293,10 +293,17 @@ describe("createHomologationPemMtlsClient", () => {
 describe("createHomologationRenaveReadOnlyRequest", () => {
   const identityUrl =
     "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/cliente-autenticado";
+  const eligibilityBaseUrl =
+    "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque";
+  const eligibilityUrls = [
+    `${eligibilityBaseUrl}?tipoCrv=DIGITAL&placa=QTP4H82`,
+    `${eligibilityBaseUrl}?tipoCrv=VERDE&renavam=00607701676`,
+    `${eligibilityBaseUrl}?tipoCrv=AZUL&numeroCrv=123456789012`,
+  ] as const;
   const stocksUrl =
     "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82";
 
-  it("delega somente GETs canônicos de identidade e estoque sem corpo", async () => {
+  it("delega somente GETs canônicos de identidade, aptidão e estoque sem corpo", async () => {
     const baseRequest = vi.fn<RenaveHttpRequest>(async () => Response.json([]));
     const capability = createHomologationRenaveReadOnlyRequest(
       "homologation",
@@ -312,8 +319,11 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       method: "GET",
       redirect: "error",
     });
+    for (const url of eligibilityUrls) {
+      await capability.request(url, { method: "GET", redirect: "error" });
+    }
 
-    expect(baseRequest).toHaveBeenCalledTimes(2);
+    expect(baseRequest).toHaveBeenCalledTimes(5);
     for (const [, init] of baseRequest.mock.calls) {
       expect(init).toMatchObject({ method: "GET", redirect: "error" });
       expect(init.body).toBeUndefined();
@@ -335,8 +345,28 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       { method: "GET", redirect: "error" },
     ],
     [
-      "aptidão",
-      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque",
+      "aptidão sem query",
+      eligibilityBaseUrl,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "aptidão com ordem não canônica",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque?placa=QTP4H82&tipoCrv=DIGITAL",
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "aptidão com tipo inválido",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque?tipoCrv=PRETO&placa=QTP4H82",
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "aptidão com dois identificadores",
+      `${eligibilityUrls[0]}&renavam=00607701676`,
+      { method: "GET", redirect: "error" },
+    ],
+    [
+      "aptidão com placa inválida",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque?tipoCrv=DIGITAL&placa=ABC-1234",
       { method: "GET", redirect: "error" },
     ],
     [

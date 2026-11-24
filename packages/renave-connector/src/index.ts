@@ -43,6 +43,7 @@ export {
 export {
   InvalidVehicleEligibilityQueryError,
   RenaveConnector,
+  RenaveQueryConnector,
   RenaveEnvironmentMismatchError,
   RenaveIdentityMismatchError,
   RenaveProductionBlockedError,
@@ -58,6 +59,7 @@ export {
   type MutationExecutionResult,
   type RenaveEnvironment,
   type RenaveReadOnlyTransport,
+  type RenaveQueryTransport,
   type RenaveReadOptions,
   type RenaveReconciliationReaderOptions,
   type RenaveServerContext,

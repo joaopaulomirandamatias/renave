@@ -16,7 +16,7 @@ import {
   type VehicleEligibilityInput,
   type VehicleEligibilitySummary,
 } from "@seu-renave/renave-application";
-import type { RenaveConnector } from "@seu-renave/renave-connector";
+import type { RenaveQueryConnector } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
 
 import type { EvidenceCipher } from "@seu-renave/protected-evidence";
@@ -30,7 +30,7 @@ export interface EligibilityUseCase {
 export interface PostgresEligibilityUseCaseOptions {
   certificateThumbprintSha256: string;
   cipher: EvidenceCipher;
-  connector: RenaveConnector;
+  connector: Pick<RenaveQueryConnector, "getVehicleEligibility">;
   integratorCnpj: string;
   pool: Pool;
 }

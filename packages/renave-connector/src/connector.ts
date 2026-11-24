@@ -78,15 +78,71 @@ export interface RenaveReadOnlyTransport {
   ): Promise<RenaveStockRecord[]>;
 }
 
-export interface RenaveTransport extends RenaveReadOnlyTransport {
+export interface RenaveQueryTransport extends RenaveReadOnlyTransport {
   getVehicleEligibility(
     headers: EstablishmentHeaders,
     query: VehicleEligibilityQuery,
   ): Promise<VehicleEligibilityResponse>;
+}
+
+export interface RenaveTransport extends RenaveQueryTransport {
   mutate<TResult>(
     headers: EstablishmentHeaders,
     prepared: PreparedRenaveMutation,
   ): Promise<TResult>;
+}
+
+/** Conector para processos de consulta: não possui qualquer método de mutação. */
+export class RenaveQueryConnector {
+  constructor(private readonly transport: RenaveQueryTransport) {}
+
+  private async authorize(context: RenaveServerContext): Promise<{
+    headers: EstablishmentHeaders;
+    verifiedIdentity: VerifiedRenaveIdentity;
+  }> {
+    return authorizeRead(this.transport, context);
+  }
+
+  async verifyIdentity(
+    context: RenaveServerContext,
+  ): Promise<VerifiedRenaveIdentity> {
+    return (await this.authorize(context)).verifiedIdentity;
+  }
+
+  async getVehicleEligibility(
+    context: RenaveServerContext,
+    query: VehicleEligibilityQuery,
+  ): Promise<MutationResult<VehicleEligibilityResponse>> {
+    const validatedQuery = validateVehicleEligibilityQuery(query);
+    const { headers, verifiedIdentity } = await this.authorize(context);
+    const result = await this.transport.getVehicleEligibility(
+      headers,
+      validatedQuery,
+    );
+    return { result, verifiedIdentity };
+  }
+
+  async getStocksByPlate(
+    context: RenaveServerContext,
+    plate: string,
+  ): Promise<MutationResult<StockQueryResult>> {
+    const normalizedPlate = normalizeStockPlate(plate);
+    const { headers, verifiedIdentity } = await this.authorize(context);
+    const records = await this.transport.findStocksByPlate(
+      headers,
+      normalizedPlate,
+    );
+    const publicResult = records.map((record) =>
+      stockSummaryFrom(record, normalizedPlate),
+    );
+    return {
+      result: {
+        evidence: Object.freeze(records),
+        publicResult: Object.freeze(publicResult),
+      },
+      verifiedIdentity,
+    };
+  }
 }
 
 export type ReconciliationReadErrorCategory =

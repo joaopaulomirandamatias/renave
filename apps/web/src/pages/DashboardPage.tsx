@@ -16,6 +16,7 @@ import type {
   AuthFeedback,
   BrowserCrvType,
   BrowserEligibilitySummary,
+  BrowserRenaveReadiness,
   BrowserRenaveLinkStatus,
   CreateEstablishmentInput,
   CreateEstablishmentResult,
@@ -23,6 +24,7 @@ import type {
 } from "../App.js";
 import { ActivationPage } from "./ActivationPage.js";
 import { EstablishmentCreationPanel } from "./EstablishmentCreationPanel.js";
+import { HomologationReadinessPanel } from "./HomologationReadinessPanel.js";
 import { EligibilityPanel } from "./EligibilityPanel.js";
 import { StockSearchPanel } from "./StockSearchPanel.js";
 
@@ -60,6 +62,9 @@ export interface DashboardPageProps {
   preflightAvailable?: boolean;
   preflightError?: boolean;
   preflightPending?: boolean;
+  readiness?: BrowserRenaveReadiness;
+  readinessError?: boolean;
+  readinessLoading?: boolean;
   tenants?: readonly { id: string; label: string }[];
   userDisplayName: string;
 }
@@ -108,11 +113,22 @@ export function DashboardPage({
   preflightAvailable = false,
   preflightError = false,
   preflightPending = false,
+  readiness,
+  readinessError = false,
+  readinessLoading = false,
   tenants = [],
   userDisplayName,
 }: DashboardPageProps) {
   const activeTenant =
     tenants.find((tenant) => tenant.id === selectedTenantId) ?? tenants[0];
+  const readinessAllowsPreflight =
+    !readinessLoading &&
+    !readinessError &&
+    (readiness === undefined ||
+      (readiness.integration === "configured" &&
+        (readiness.certificate === "ready" ||
+          readiness.certificate === "warning")));
+  const queriesReady = readiness?.queries === "ready";
   return (
     <AppShell
       environment={environment}
@@ -248,10 +264,13 @@ export function DashboardPage({
               linkStatusLoading ||
               (linkStatusError
                 ? !onReloadLinkStatus
-                : !preflightAvailable || !onRunPreflight)
+                : !readinessAllowsPreflight ||
+                  !preflightAvailable ||
+                  !onRunPreflight)
             }
             aria-describedby={
-              !linkStatusError && !preflightAvailable
+              !linkStatusError &&
+              (!preflightAvailable || !readinessAllowsPreflight)
                 ? "preflight-unavailable-reason"
                 : undefined
             }
@@ -259,7 +278,8 @@ export function DashboardPage({
           >
             {linkStatusError ? "Tentar carregar vínculo" : "Verificar vínculo"}
           </Button>
-          {!linkStatusError && !preflightAvailable ? (
+          {!linkStatusError &&
+          (!preflightAvailable || !readinessAllowsPreflight) ? (
             <p id="preflight-unavailable-reason" className="sr-only">
               A verificação exige configuração segura da integração RENAVE no
               ambiente configurado.
@@ -274,6 +294,12 @@ export function DashboardPage({
           linkStatusLoading={linkStatusLoading}
         />
 
+        <HomologationReadinessPanel
+          error={readinessError}
+          loading={readinessLoading}
+          {...(readiness ? { readiness } : {})}
+        />
+
         {onCreateEstablishment && selectedTenantId ? (
           <EstablishmentCreationPanel
             capability={establishmentManagement}
@@ -283,6 +309,7 @@ export function DashboardPage({
         ) : null}
 
         {(linkStatus === "confirmed" || linkStatus === "enabled") &&
+        queriesReady &&
         selectedTenantId &&
         selectedEstablishmentId &&
         onCheckEligibility ? (
@@ -294,6 +321,7 @@ export function DashboardPage({
         ) : null}
 
         {(linkStatus === "confirmed" || linkStatus === "enabled") &&
+        queriesReady &&
         selectedTenantId &&
         selectedEstablishmentId &&
         onSearchStocks ? (
