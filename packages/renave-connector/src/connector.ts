@@ -1,5 +1,6 @@
 import { normalizeCnpj } from "./cnpj.js";
 import type {
+  CrvType,
   RenaveMutationOperation,
   RenaveStockState,
   RenaveVehicle,
@@ -52,10 +53,23 @@ export interface StockSummary {
   placa: string;
 }
 
+export interface StockInventorySummary extends StockSummary {
+  chassi?: string;
+  dataHoraRegistroEntrada?: string;
+  renavam?: string;
+  tipoCrv?: CrvType;
+}
+
 export interface StockQueryResult {
   /** Resposta validada para persistência cifrada; nunca deve ser serializada pelo BFF. */
   evidence: readonly RenaveStockRecord[];
   publicResult: readonly StockSummary[];
+}
+
+export interface StockInventoryQueryResult {
+  /** Resposta validada para persistência cifrada; nunca deve ser serializada pelo BFF. */
+  evidence: readonly RenaveStockRecord[];
+  publicResult: readonly StockInventorySummary[];
 }
 
 export interface RenaveReadOptions {
@@ -75,6 +89,10 @@ export interface RenaveReadOnlyTransport {
   findStocksByPlate(
     headers: EstablishmentHeaders,
     plate: string,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord[]>;
+  findRecentStocks(
+    headers: EstablishmentHeaders,
     options?: RenaveReadOptions,
   ): Promise<RenaveStockRecord[]>;
 }
@@ -239,6 +257,23 @@ export class RenaveQueryConnector {
       verifiedIdentity,
     };
   }
+
+  async getRecentStocks(
+    context: RenaveServerContext,
+  ): Promise<MutationResult<StockInventoryQueryResult>> {
+    const { headers, verifiedIdentity } = await this.authorize(context);
+    const records = await this.transport.findRecentStocks(headers);
+    const publicResult = records
+      .filter((record) => record.cancelamentoEstoque === undefined)
+      .map(stockInventorySummaryFrom);
+    return {
+      result: {
+        evidence: Object.freeze(records),
+        publicResult: Object.freeze(publicResult),
+      },
+      verifiedIdentity,
+    };
+  }
 }
 
 export type ReconciliationReadErrorCategory =
@@ -380,6 +415,62 @@ function stockSummaryFrom(
     throw new RenaveStockQueryResultError();
   }
   return Object.freeze({ estado: record.estado, id: record.id!, placa: plate });
+}
+
+const CRV_TYPES = new Set<CrvType>(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
+
+function optionalInventoryText(
+  value: unknown,
+  pattern: RegExp,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.trim() !== value ||
+    !pattern.test(value)
+  ) {
+    throw new RenaveStockQueryResultError();
+  }
+  return value;
+}
+
+function stockInventorySummaryFrom(
+  record: RenaveStockRecord,
+): StockInventorySummary {
+  let placa: string;
+  try {
+    placa = normalizeStockPlate(record.placa);
+  } catch {
+    throw new RenaveStockQueryResultError();
+  }
+  if (
+    !Number.isSafeInteger(record.id) ||
+    (record.id ?? 0) <= 0 ||
+    !record.estado ||
+    !STOCK_STATES.has(record.estado) ||
+    placa !== record.placa ||
+    (record.tipoCrv !== undefined && !CRV_TYPES.has(record.tipoCrv))
+  ) {
+    throw new RenaveStockQueryResultError();
+  }
+  const chassi = optionalInventoryText(record.chassi, /^[A-Z0-9]{3,64}$/u);
+  const renavam = optionalInventoryText(record.renavam, /^\d{9,11}$/u);
+  const dataHoraRegistroEntrada = optionalInventoryText(
+    record.entradaEstoque?.dataHoraRegistro,
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?$/u,
+  );
+  return Object.freeze({
+    ...(chassi === undefined ? {} : { chassi }),
+    ...(dataHoraRegistroEntrada === undefined
+      ? {}
+      : { dataHoraRegistroEntrada }),
+    estado: record.estado,
+    id: record.id!,
+    placa,
+    ...(renavam === undefined ? {} : { renavam }),
+    ...(record.tipoCrv === undefined ? {} : { tipoCrv: record.tipoCrv }),
+  });
 }
 
 function normalizeConfirmedCnpj(
@@ -769,6 +860,23 @@ export class RenaveConnector {
     const publicResult = records.map((record) =>
       stockSummaryFrom(record, normalizedPlate),
     );
+    return {
+      result: {
+        evidence: Object.freeze(records),
+        publicResult: Object.freeze(publicResult),
+      },
+      verifiedIdentity,
+    };
+  }
+
+  async getRecentStocks(
+    context: RenaveServerContext,
+  ): Promise<MutationResult<StockInventoryQueryResult>> {
+    const { headers, verifiedIdentity } = await this.authorize(context);
+    const records = await this.transport.findRecentStocks(headers);
+    const publicResult = records
+      .filter((record) => record.cancelamentoEstoque === undefined)
+      .map(stockInventorySummaryFrom);
     return {
       result: {
         evidence: Object.freeze(records),

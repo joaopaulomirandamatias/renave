@@ -295,6 +295,7 @@ describe("DashboardPage", () => {
   });
 
   it("só mostra consultas RENAVE com seleção, vínculo e prontidão confirmados", () => {
+    const onLoadRecentStocks = vi.fn(async () => []);
     const onSearchStocks = vi.fn(async () => []);
     const onCheckEligibility = vi.fn(async () => ({
       detranUnavailable: false,
@@ -308,6 +309,7 @@ describe("DashboardPage", () => {
         linkStatus="pending"
         onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
+        onLoadRecentStocks={onLoadRecentStocks}
         onSearchStocks={onSearchStocks}
         route="stock"
         selectedEstablishmentId="store-belem"
@@ -329,6 +331,7 @@ describe("DashboardPage", () => {
         linkStatus="confirmed"
         onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
+        onLoadRecentStocks={onLoadRecentStocks}
         onSearchStocks={onSearchStocks}
         route="stock"
         readiness={{
@@ -360,6 +363,7 @@ describe("DashboardPage", () => {
         linkStatus="confirmed"
         onCheckEligibility={onCheckEligibility}
         onLogout={vi.fn()}
+        onLoadRecentStocks={onLoadRecentStocks}
         onSearchStocks={onSearchStocks}
         route="stock"
         readiness={{
@@ -379,6 +383,9 @@ describe("DashboardPage", () => {
     );
     expect(
       screen.getByRole("heading", { name: "Localizar estoque por placa" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Estoque RENAVE recente" }),
     ).toBeVisible();
     expect(
       screen.getByRole("heading", { name: "Consultar aptidão do veículo" }),

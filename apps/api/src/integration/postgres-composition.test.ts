@@ -448,6 +448,9 @@ function eligibilityResponse(scenario: PreflightScenario) {
 function createStockQueryUseCase(
   scenario: PreflightScenario,
   getStocksByPlate: ReturnType<typeof vi.fn>,
+  getRecentStocks: ReturnType<typeof vi.fn> = vi.fn(async () => {
+    throw new Error("capacidade não configurada neste ensaio");
+  }),
 ): PostgresStockQueryUseCase {
   return new PostgresStockQueryUseCase({
     certificateThumbprintSha256: "f".repeat(64),
@@ -455,7 +458,10 @@ function createStockQueryUseCase(
       activeKeyId: "stock-query-integration-key",
       keys: new Map([["stock-query-integration-key", Buffer.alloc(32, 10)]]),
     }),
-    connector: { getStocksByPlate } as unknown as RenaveConnector,
+    connector: {
+      getRecentStocks,
+      getStocksByPlate,
+    } as unknown as RenaveConnector,
     integratorCnpj: INTEGRATOR_CNPJ,
     pool: appPool,
   });
@@ -466,6 +472,16 @@ function stockQueryInput(scenario: PreflightScenario, traceId: string) {
     actorIp: "198.51.100.13",
     establishmentId: scenario.store.id,
     plate: "ABC1D23",
+    subject: ADMIN,
+    tenantId: scenario.tenant.id,
+    traceId,
+  };
+}
+
+function stockInventoryInput(scenario: PreflightScenario, traceId: string) {
+  return {
+    actorIp: "198.51.100.13",
+    establishmentId: scenario.store.id,
     subject: ADMIN,
     tenantId: scenario.tenant.id,
     traceId,
@@ -526,6 +542,47 @@ function successfulStockConnector(scenario: PreflightScenario) {
       ],
       publicResult: [
         { estado: "CONFIRMADO" as const, id: 71, placa: "ABC1D23" },
+      ],
+    },
+    verifiedIdentity: {
+      confirmedEstablishmentCnpj: scenario.store.cnpj,
+      confirmedIntegratorCnpj: INTEGRATOR_CNPJ,
+      environment: "homologation" as const,
+      establishmentId: scenario.store.id,
+      tenantId: scenario.tenant.id,
+    },
+  }));
+}
+
+function successfulStockInventoryConnector(scenario: PreflightScenario) {
+  return vi.fn(async () => ({
+    result: {
+      evidence: [
+        {
+          chassi: "9BWZZZ377VT004251",
+          codigoSegurancaCrv: "12345678901",
+          entradaEstoque: {
+            cpfOperadorResponsavel: "12345678901",
+            dataHoraRegistro: "2026-11-24T14:30",
+          },
+          estado: "CONFIRMADO" as const,
+          id: 71,
+          numeroCrv: "123456789012",
+          placa: "ABC1D23",
+          renavam: "00607701676",
+          tipoCrv: "DIGITAL" as const,
+        },
+      ],
+      publicResult: [
+        {
+          chassi: "9BWZZZ377VT004251",
+          dataHoraRegistroEntrada: "2026-11-24T14:30",
+          estado: "CONFIRMADO" as const,
+          id: 71,
+          placa: "ABC1D23",
+          renavam: "00607701676",
+          tipoCrv: "DIGITAL" as const,
+        },
       ],
     },
     verifiedIdentity: {
@@ -601,6 +658,9 @@ function vehicleLookupHarness(
   });
   const stockConnector = new RenaveQueryConnector({
     environment: "homologation",
+    findRecentStocks: vi.fn(async () => {
+      throw new Error("capacidade não utilizada no ensaio de veículo");
+    }),
     findStocksByPlate,
     getAuthenticatedClient,
     getVehicleEligibility: vi.fn(async () => {
@@ -1726,6 +1786,51 @@ describe("composição PostgreSQL real da API", () => {
       useCase.execute(stockQueryInput(scenario, "stock-success-trace")),
     ).resolves.toEqual([{ estado: "CONFIRMADO", id: 71, placa: "ABC1D23" }]);
     expect(getStocksByPlate).toHaveBeenCalledOnce();
+    expect(await stockEvidenceState(scenario)).toEqual([
+      {
+        failure_code: null,
+        request_clear_absent: true,
+        response_ciphertext_present: true,
+        response_clear_absent: true,
+        status: "completed",
+      },
+    ]);
+    expect(await stockAuditOutcomes(scenario)).toEqual([
+      "attempted",
+      "succeeded",
+    ]);
+  });
+
+  it("lista inventário recente com projeção mínima e evidência rica cifrada", async () => {
+    const scenario = await createPreflightScenario("stock-inventory-success");
+    await prepareCredentialLink(scenario, "confirmed");
+    const getStocksByPlate = vi.fn(async () => {
+      throw new Error("busca pontual não deve ser usada");
+    });
+    const getRecentStocks = successfulStockInventoryConnector(scenario);
+    const useCase = createStockQueryUseCase(
+      scenario,
+      getStocksByPlate,
+      getRecentStocks,
+    );
+
+    await expect(
+      useCase.executeRecent(
+        stockInventoryInput(scenario, "stock-inventory-success-trace"),
+      ),
+    ).resolves.toEqual([
+      {
+        chassi: "9BWZZZ377VT004251",
+        dataHoraRegistroEntrada: "2026-11-24T14:30",
+        estado: "CONFIRMADO",
+        id: 71,
+        placa: "ABC1D23",
+        renavam: "00607701676",
+        tipoCrv: "DIGITAL",
+      },
+    ]);
+    expect(getRecentStocks).toHaveBeenCalledOnce();
+    expect(getStocksByPlate).not.toHaveBeenCalled();
     expect(await stockEvidenceState(scenario)).toEqual([
       {
         failure_code: null,

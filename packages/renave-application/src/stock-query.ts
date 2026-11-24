@@ -7,6 +7,9 @@ import {
 } from "@seu-renave/access-control";
 import {
   normalizeCnpj,
+  type CrvType,
+  type StockInventoryQueryResult,
+  type StockInventorySummary,
   type MutationResult,
   type RenaveServerContext,
   type RenaveStockRecord,
@@ -27,6 +30,7 @@ const STOCK_STATES = new Set<RenaveStockState>([
   "CONFIRMADO",
   "FINALIZADO",
 ]);
+const CRV_TYPES = new Set<CrvType>(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
 
 export interface StockQueryInput {
   actorIp: string;
@@ -36,6 +40,8 @@ export interface StockQueryInput {
   tenantId: string;
   traceId?: string;
 }
+
+export type StockInventoryQueryInput = Omit<StockQueryInput, "plate">;
 
 export interface StockQueryAuthorizationContextPort {
   load(input: {
@@ -52,6 +58,9 @@ export interface StockQueryEstablishmentPort {
 }
 
 export interface StockQueryConnectorPort {
+  getRecentStocks(
+    context: RenaveServerContext,
+  ): Promise<MutationResult<StockInventoryQueryResult>>;
   getStocksByPlate(
     context: RenaveServerContext,
     plate: string,
@@ -62,7 +71,7 @@ export interface StockQueryEvidenceContext {
   action: typeof ACTION;
   actorSubject: string;
   establishmentId: string;
-  request: { placa: string };
+  request: { placa?: string };
   tenantId: string;
   traceId?: string;
 }
@@ -229,7 +238,7 @@ function validatePayloadReference(reference: unknown): string {
 }
 
 function validateVerifiedIdentity(
-  result: MutationResult<StockQueryResult>,
+  result: MutationResult<unknown>,
   expected: RenaveServerContext,
 ): void {
   const identity = result.verifiedIdentity;
@@ -320,6 +329,127 @@ function rebuildPublicResult(
   };
 }
 
+const INVENTORY_PUBLIC_KEYS = new Set([
+  "chassi",
+  "dataHoraRegistroEntrada",
+  "estado",
+  "id",
+  "placa",
+  "renavam",
+  "tipoCrv",
+]);
+
+function optionalInventoryString(
+  candidate: Record<string, unknown>,
+  key: "chassi" | "dataHoraRegistroEntrada" | "renavam" | "tipoCrv",
+): string | undefined {
+  const value = candidate[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new StockQueryResultInvalidError();
+  }
+  return value;
+}
+
+function evidenceRegistrationTime(
+  evidence: Record<string, unknown>,
+): string | undefined {
+  if (evidence.entradaEstoque === undefined) return undefined;
+  const entry = recordObject(evidence.entradaEstoque);
+  if (entry.dataHoraRegistro === undefined) return undefined;
+  if (typeof entry.dataHoraRegistro !== "string") {
+    throw new StockQueryResultInvalidError();
+  }
+  return entry.dataHoraRegistro;
+}
+
+function rebuildInventoryPublicResult(result: StockInventoryQueryResult): {
+  evidence: readonly RenaveStockRecord[];
+  publicResult: readonly StockInventorySummary[];
+} {
+  if (
+    !result ||
+    typeof result !== "object" ||
+    !Array.isArray(result.evidence) ||
+    !Array.isArray(result.publicResult)
+  ) {
+    throw new StockQueryResultInvalidError();
+  }
+
+  const activeEvidence = new Map<number, Record<string, unknown>>();
+  for (const source of result.evidence) {
+    const evidence = recordObject(source);
+    if (evidence.cancelamentoEstoque !== undefined) continue;
+    if (
+      !Number.isSafeInteger(evidence.id) ||
+      (evidence.id as number) <= 0 ||
+      activeEvidence.has(evidence.id as number)
+    ) {
+      throw new StockQueryResultInvalidError();
+    }
+    activeEvidence.set(evidence.id as number, evidence);
+  }
+  if (activeEvidence.size !== result.publicResult.length) {
+    throw new StockQueryResultInvalidError();
+  }
+
+  const ids = new Set<number>();
+  const publicResult = result.publicResult.map((source) => {
+    const candidate = recordObject(source);
+    if (Object.keys(candidate).some((key) => !INVENTORY_PUBLIC_KEYS.has(key))) {
+      throw new StockQueryResultInvalidError();
+    }
+    const id = candidate.id;
+    const evidence = Number.isSafeInteger(id)
+      ? activeEvidence.get(id as number)
+      : undefined;
+    const plate = resultPlate(candidate.placa);
+    const state = candidate.estado;
+    const chassi = optionalInventoryString(candidate, "chassi");
+    const renavam = optionalInventoryString(candidate, "renavam");
+    const tipoCrv = optionalInventoryString(candidate, "tipoCrv");
+    const registrationTime = optionalInventoryString(
+      candidate,
+      "dataHoraRegistroEntrada",
+    );
+    if (
+      !Number.isSafeInteger(id) ||
+      (id as number) <= 0 ||
+      !evidence ||
+      ids.has(id as number) ||
+      typeof state !== "string" ||
+      !STOCK_STATES.has(state as RenaveStockState) ||
+      evidence.id !== id ||
+      resultPlate(evidence.placa) !== plate ||
+      evidence.estado !== state ||
+      (tipoCrv !== undefined && !CRV_TYPES.has(tipoCrv as CrvType)) ||
+      evidence.chassi !== chassi ||
+      evidence.renavam !== renavam ||
+      evidence.tipoCrv !== tipoCrv ||
+      evidenceRegistrationTime(evidence) !== registrationTime
+    ) {
+      throw new StockQueryResultInvalidError();
+    }
+    ids.add(id as number);
+    return Object.freeze({
+      ...(chassi === undefined ? {} : { chassi }),
+      ...(registrationTime === undefined
+        ? {}
+        : { dataHoraRegistroEntrada: registrationTime }),
+      estado: state as RenaveStockState,
+      id: id as number,
+      placa: plate,
+      ...(renavam === undefined ? {} : { renavam }),
+      ...(tipoCrv === undefined ? {} : { tipoCrv: tipoCrv as CrvType }),
+    });
+  });
+
+  return {
+    evidence: result.evidence,
+    publicResult: Object.freeze(publicResult),
+  };
+}
+
 export class StockQueryService {
   private readonly certificateThumbprintSha256: string;
   private readonly integratorCnpj: string;
@@ -338,6 +468,35 @@ export class StockQueryService {
   }
 
   async execute(input: StockQueryInput): Promise<readonly StockSummary[]> {
+    const plate = normalizedPlate(input.plate);
+    return this.executeQuery(
+      input,
+      { placa: plate },
+      (context) => this.ports.connector.getStocksByPlate(context, plate),
+      (result) => rebuildPublicResult(result, plate),
+    );
+  }
+
+  async executeRecent(
+    input: StockInventoryQueryInput,
+  ): Promise<readonly StockInventorySummary[]> {
+    return this.executeQuery(
+      input,
+      {},
+      (context) => this.ports.connector.getRecentStocks(context),
+      rebuildInventoryPublicResult,
+    );
+  }
+
+  private async executeQuery<TResult, TPublic>(
+    input: StockInventoryQueryInput,
+    request: { placa?: string },
+    query: (context: RenaveServerContext) => Promise<MutationResult<TResult>>,
+    rebuild: (result: TResult) => {
+      evidence: readonly RenaveStockRecord[];
+      publicResult: readonly TPublic[];
+    },
+  ): Promise<readonly TPublic[]> {
     const subject = requireText(input.subject, "subject");
     const tenantId = requireText(input.tenantId, "tenantId");
     const establishmentId = requireText(
@@ -345,7 +504,6 @@ export class StockQueryService {
       "establishmentId",
     );
     const actorIp = requireText(input.actorIp, "actorIp");
-    const plate = normalizedPlate(input.plate);
     if (input.traceId !== undefined) requireText(input.traceId, "traceId");
 
     const authorizationContext = await this.ports.authorizationContexts.load({
@@ -380,7 +538,6 @@ export class StockQueryService {
     }
 
     const establishmentCnpj = normalizeCnpj(establishment.cnpj);
-    const request = { placa: plate } as const;
     const evidence = await this.ports.protectedEvidence.begin({
       action: ACTION,
       actorSubject: subject,
@@ -415,12 +572,12 @@ export class StockQueryService {
       tenantId,
     };
 
-    let response: MutationResult<StockQueryResult>;
-    let validated: ReturnType<typeof rebuildPublicResult>;
+    let response: MutationResult<TResult>;
+    let validated: ReturnType<typeof rebuild>;
     try {
-      response = await this.ports.connector.getStocksByPlate(context, plate);
+      response = await query(context);
       validateVerifiedIdentity(response, context);
-      validated = rebuildPublicResult(response.result, plate);
+      validated = rebuild(response.result);
     } catch (error) {
       await this.ports.finalization
         .fail({

@@ -30,6 +30,7 @@ import type {
   EstablishmentManagementCapability,
 } from "../App.js";
 import { type ReadonlyCanaryPort } from "../features/homologation-canary/index.js";
+import type { StockInventoryItem } from "./StockInventoryPanel.js";
 import {
   type WorkspaceRoute,
   workspaceNavigation,
@@ -79,6 +80,9 @@ export interface DashboardPageProps {
     readonly { estado: RenaveStockState; id: number; placa: string }[]
   >;
   onLookupVehicle?: (plate: string) => Promise<BrowserVehicle>;
+  onLoadRecentStocks?: (
+    signal: AbortSignal,
+  ) => Promise<readonly StockInventoryItem[]>;
   onReloadCredentialLinkQueue?: () => void;
   onTenantChange?: (tenantId: string) => void;
   selectedEstablishmentId?: string;
@@ -155,6 +159,7 @@ export function DashboardPage({
   onRunPreflight,
   onSearchStocks,
   onLookupVehicle,
+  onLoadRecentStocks,
   onReloadCredentialLinkQueue,
   onTenantChange,
   selectedEstablishmentId,
@@ -213,6 +218,7 @@ export function DashboardPage({
           {...(linkStatus ? { linkStatus } : {})}
           {...(onCheckEligibility ? { onCheckEligibility } : {})}
           {...(onLookupVehicle ? { onLookupVehicle } : {})}
+          {...(onLoadRecentStocks ? { onLoadRecentStocks } : {})}
           {...(onSearchStocks ? { onSearchStocks } : {})}
           {...(readiness ? { readiness } : {})}
           {...(selectedEstablishmentId ? { selectedEstablishmentId } : {})}

@@ -487,6 +487,95 @@ describe("HttpRenaveTransport", () => {
     );
   });
 
+  it("consulta inventário recente sem query string e preserva os campos validados", async () => {
+    const payload = {
+      chassi: "9BWZZZ377VT004251",
+      codigoSegurancaCrv: "12345678901",
+      entradaEstoque: {
+        cpfOperadorResponsavel: "12345678901",
+        dataHoraRegistro: "2026-11-23T15:02",
+      },
+      estado: "CONFIRMADO",
+      id: 7,
+      numeroCrv: "123456789012",
+      placa: "QTP4H82",
+      renavam: "00607701676",
+      tipoCrv: "DIGITAL",
+    };
+    const request = vi.fn(async () => Response.json([payload]));
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request,
+    });
+
+    await expect(transport.findRecentStocks(headers)).resolves.toEqual([
+      payload,
+    ]);
+    expect(request).toHaveBeenCalledWith(
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques",
+      expect.objectContaining({ method: "GET", redirect: "error" }),
+    );
+  });
+
+  it.each([
+    ["chassi", { chassi: 123, id: 7 }],
+    ["data de registro", { entradaEstoque: { dataHoraRegistro: 123 }, id: 7 }],
+  ])("recusa inventário recente com %s incompatível", async (_label, item) => {
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(async () => Response.json([item])),
+    });
+
+    await expect(transport.findRecentStocks(headers)).rejects.toMatchObject({
+      code: "RENAVE_PROTOCOL_ERROR",
+      operation: "find-recent-stocks",
+    });
+  });
+
+  it("recusa inventário cujo Content-Length excede o teto", async () => {
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(async () =>
+        Response.json([], { headers: { "content-length": "8388609" } }),
+      ),
+    });
+
+    await expect(transport.findRecentStocks(headers)).rejects.toMatchObject({
+      code: "RENAVE_PROTOCOL_ERROR",
+      operation: "find-recent-stocks",
+    });
+  });
+
+  it("interrompe stream de inventário acima do teto sem Content-Length", async () => {
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(
+        async () => new Response(new Uint8Array(8 * 1024 * 1024 + 1)),
+      ),
+    });
+
+    await expect(transport.findRecentStocks(headers)).rejects.toMatchObject({
+      code: "RENAVE_PROTOCOL_ERROR",
+      operation: "find-recent-stocks",
+    });
+  });
+
+  it("recusa inventário acima do teto de registros", async () => {
+    const transport = new HttpRenaveTransport({
+      environment: "homologation",
+      request: vi.fn(async () =>
+        Response.json(
+          Array.from({ length: 10_001 }, (_, index) => ({ id: index + 1 })),
+        ),
+      ),
+    });
+
+    await expect(transport.findRecentStocks(headers)).rejects.toMatchObject({
+      code: "RENAVE_PROTOCOL_ERROR",
+      operation: "find-recent-stocks",
+    });
+  });
+
   it("normaliza a placa e nunca envia consulta de estoque sem filtro válido", async () => {
     const request = vi.fn(async () => Response.json([]));
     const transport = new HttpRenaveTransport({
@@ -845,6 +934,9 @@ describe("HttpRenaveReadOnlyTransport", () => {
     await expect(
       transport.findStocksByPlate(headers, " qtp4h82 "),
     ).resolves.toEqual([{ id: 7, placa: "QTP4H82" }]);
+    await expect(transport.findRecentStocks(headers)).resolves.toEqual([
+      { id: 7, placa: "QTP4H82" },
+    ]);
     await expect(
       transport.getVehicleEligibility(headers, {
         placa: "QTP4H82",
@@ -854,10 +946,11 @@ describe("HttpRenaveReadOnlyTransport", () => {
 
     expect(transport.environment).toBe("homologation");
     expect("mutate" in transport).toBe(false);
-    expect(baseRequest).toHaveBeenCalledTimes(3);
+    expect(baseRequest).toHaveBeenCalledTimes(4);
     expect(baseRequest.mock.calls.map(([url]) => url)).toEqual([
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/cliente-autenticado",
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82",
+      "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques",
       "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/aptidao-veiculo-estoque?tipoCrv=DIGITAL&placa=QTP4H82",
     ]);
     for (const [, init] of baseRequest.mock.calls) {

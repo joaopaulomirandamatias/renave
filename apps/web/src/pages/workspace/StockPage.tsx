@@ -8,6 +8,10 @@ import type {
   BrowserVehicle,
 } from "../../App.js";
 import { EligibilityPanel } from "../EligibilityPanel.js";
+import {
+  StockInventoryPanel,
+  type StockInventoryItem,
+} from "../StockInventoryPanel.js";
 import { StockSearchPanel } from "../StockSearchPanel.js";
 
 export interface StockPageProps {
@@ -17,6 +21,9 @@ export interface StockPageProps {
     crvType: BrowserCrvType,
   ) => Promise<BrowserEligibilitySummary>;
   onLookupVehicle?: (plate: string) => Promise<BrowserVehicle>;
+  onLoadRecentStocks?: (
+    signal: AbortSignal,
+  ) => Promise<readonly StockInventoryItem[]>;
   onSearchStocks?: (
     plate: string,
   ) => Promise<
@@ -31,6 +38,7 @@ export function StockPage({
   linkStatus,
   onCheckEligibility,
   onLookupVehicle,
+  onLoadRecentStocks,
   onSearchStocks,
   readiness,
   selectedEstablishmentId,
@@ -48,6 +56,13 @@ export function StockPage({
   const selectionKey = `${selectedTenantId}:${selectedEstablishmentId}`;
   return (
     <>
+      {onLoadRecentStocks ? (
+        <StockInventoryPanel
+          key={`inventory:${selectionKey}`}
+          onLoad={onLoadRecentStocks}
+          selectionKey={selectionKey}
+        />
+      ) : null}
       {onCheckEligibility ? (
         <EligibilityPanel
           key={`eligibility:${selectionKey}`}

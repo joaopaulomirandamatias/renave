@@ -197,6 +197,9 @@ async function setup(
   const matchingRecord = matchingStockRecord();
   const transport: RenaveReadOnlyTransport = {
     environment: "homologation",
+    findRecentStocks: vi.fn(async () => {
+      throw new Error("capacidade não utilizada na reconciliação por placa");
+    }),
     findStocksByPlate: vi.fn(async () => {
       if (result instanceof Error) throw result;
       if (result.outcome === "confirmed") {

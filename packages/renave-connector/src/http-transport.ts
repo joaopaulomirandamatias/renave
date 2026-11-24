@@ -79,6 +79,7 @@ type RenaveHttpOperation =
   | "get-authenticated-client"
   | "get-vehicle-eligibility"
   | "get-vehicle-by-plate"
+  | "find-recent-stocks"
   | "find-stocks-by-plate"
   | RenaveMutationOperation;
 
@@ -149,16 +150,96 @@ export class RenaveProtocolError extends Error {
   }
 }
 
+const MAX_RECENT_STOCK_RESPONSE_BYTES = 8 * 1024 * 1024;
+const MAX_RECENT_STOCK_ITEMS = 10_000;
+const MAX_RECENT_STOCK_JSON_DEPTH = 16;
+const MAX_RECENT_STOCK_JSON_NODES = 200_000;
+const MAX_RECENT_STOCK_STRING_LENGTH = 65_536;
+
 async function parseJson(
   response: Response,
   operation: RenaveHttpOperation,
+  maxBytes?: number,
 ): Promise<unknown> {
-  const body = await response.text();
+  let body: string;
+  if (maxBytes === undefined) {
+    body = await response.text();
+  } else {
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+      throw new RenaveProtocolError(operation);
+    }
+    if (!response.body) {
+      body = await response.text();
+      if (new TextEncoder().encode(body).byteLength > maxBytes) {
+        throw new RenaveProtocolError(operation);
+      }
+    } else {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let byteLength = 0;
+      let text = "";
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          byteLength += value.byteLength;
+          if (byteLength > maxBytes) {
+            await reader.cancel().catch(() => undefined);
+            throw new RenaveProtocolError(operation);
+          }
+          text += decoder.decode(value, { stream: true });
+        }
+        body = text + decoder.decode();
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  }
   if (body.length === 0) return null;
   try {
     return JSON.parse(body) as unknown;
   } catch {
     throw new RenaveProtocolError(operation);
+  }
+}
+
+function assertRecentStockJsonComplexity(value: unknown): void {
+  const stack: Array<{ depth: number; value: unknown }> = [{ depth: 0, value }];
+  let nodes = 0;
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    nodes += 1;
+    if (
+      nodes > MAX_RECENT_STOCK_JSON_NODES ||
+      current.depth > MAX_RECENT_STOCK_JSON_DEPTH
+    ) {
+      throw new RenaveProtocolError("find-recent-stocks");
+    }
+    if (typeof current.value === "string") {
+      if (current.value.length > MAX_RECENT_STOCK_STRING_LENGTH) {
+        throw new RenaveProtocolError("find-recent-stocks");
+      }
+      continue;
+    }
+    if (Array.isArray(current.value)) {
+      if (current.value.length > MAX_RECENT_STOCK_ITEMS) {
+        throw new RenaveProtocolError("find-recent-stocks");
+      }
+      for (const child of current.value) {
+        stack.push({ depth: current.depth + 1, value: child });
+      }
+      continue;
+    }
+    if (current.value && typeof current.value === "object") {
+      const values = Object.values(current.value);
+      if (values.length > 256) {
+        throw new RenaveProtocolError("find-recent-stocks");
+      }
+      for (const child of values) {
+        stack.push({ depth: current.depth + 1, value: child });
+      }
+    }
   }
 }
 
@@ -601,37 +682,47 @@ async function vehicleResponseFrom(
   }
 }
 
-function stockRecordFrom(value: unknown): RenaveStockRecord {
+function stockRecordFrom(
+  value: unknown,
+  operation: "find-recent-stocks" | "find-stocks-by-plate",
+): RenaveStockRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new RenaveProtocolError("find-stocks-by-plate");
+    throw new RenaveProtocolError(operation);
   }
   const candidate = value as Record<string, unknown>;
   if (
     candidate.id !== undefined &&
     (!Number.isSafeInteger(candidate.id) || (candidate.id as number) <= 0)
   ) {
-    throw new RenaveProtocolError("find-stocks-by-plate");
+    throw new RenaveProtocolError(operation);
   }
   if (candidate.placa !== undefined && typeof candidate.placa !== "string") {
-    throw new RenaveProtocolError("find-stocks-by-plate");
+    throw new RenaveProtocolError(operation);
   }
   validateOptionalStrings(
     candidate,
-    ["codigoSegurancaCrv", "numeroCrv", "placa", "renavam", "tipoCrv"],
-    "find-stocks-by-plate",
+    [
+      "chassi",
+      "codigoSegurancaCrv",
+      "numeroCrv",
+      "placa",
+      "renavam",
+      "tipoCrv",
+    ],
+    operation,
   );
   if (
     candidate.estado !== undefined &&
     (typeof candidate.estado !== "string" ||
       !STOCK_STATES.has(candidate.estado))
   ) {
-    throw new RenaveProtocolError("find-stocks-by-plate");
+    throw new RenaveProtocolError(operation);
   }
   if (
     candidate.tipoCrv !== undefined &&
     (typeof candidate.tipoCrv !== "string" || !CRV_TYPES.has(candidate.tipoCrv))
   ) {
-    throw new RenaveProtocolError("find-stocks-by-plate");
+    throw new RenaveProtocolError(operation);
   }
 
   let entradaEstoque: RenaveStockRecord["entradaEstoque"];
@@ -641,7 +732,7 @@ function stockRecordFrom(value: unknown): RenaveStockRecord {
       typeof candidate.entradaEstoque !== "object" ||
       Array.isArray(candidate.entradaEstoque)
     ) {
-      throw new RenaveProtocolError("find-stocks-by-plate");
+      throw new RenaveProtocolError(operation);
     }
     const entry = candidate.entradaEstoque as Record<string, unknown>;
     for (const field of [
@@ -650,7 +741,7 @@ function stockRecordFrom(value: unknown): RenaveStockRecord {
       "dataHoraRegistro",
     ]) {
       if (entry[field] !== undefined && typeof entry[field] !== "string") {
-        throw new RenaveProtocolError("find-stocks-by-plate");
+        throw new RenaveProtocolError(operation);
       }
     }
     entradaEstoque = {
@@ -668,6 +759,9 @@ function stockRecordFrom(value: unknown): RenaveStockRecord {
 
   return {
     ...candidate,
+    ...(typeof candidate.chassi === "string"
+      ? { chassi: candidate.chassi }
+      : {}),
     ...(entradaEstoque === undefined ? {} : { entradaEstoque }),
     ...(candidate.cancelamentoEstoque === undefined
       ? {}
@@ -906,7 +1000,53 @@ export class HttpRenaveTransport
     if (!Array.isArray(result)) {
       throw new RenaveProtocolError("find-stocks-by-plate");
     }
-    return result.map(stockRecordFrom);
+    return result.map((record) =>
+      stockRecordFrom(record, "find-stocks-by-plate"),
+    );
+  }
+
+  async findRecentStocks(
+    headers: EstablishmentHeaders,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord[]> {
+    const state = httpTransportState(this, "find-recent-stocks");
+    if (state.environment === "production") {
+      throw new RenaveProductionBlockedError();
+    }
+    let response: Response;
+    try {
+      response = await state.request(
+        `${baseUrls[state.environment]}/api/estoques`,
+        {
+          headers: { accept: "application/json", ...headers },
+          method: "GET",
+          redirect: "error",
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
+        },
+      );
+    } catch {
+      throw new RenaveHttpError(0, "find-recent-stocks");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "find-recent-stocks");
+    }
+    const result = await parseJson(
+      response,
+      "find-recent-stocks",
+      MAX_RECENT_STOCK_RESPONSE_BYTES,
+    );
+    assertRecentStockJsonComplexity(result);
+    if (!Array.isArray(result) || result.length > MAX_RECENT_STOCK_ITEMS) {
+      throw new RenaveProtocolError("find-recent-stocks");
+    }
+    return result.map((record) =>
+      stockRecordFrom(record, "find-recent-stocks"),
+    );
   }
 
   async mutate<TResult>(
@@ -1140,7 +1280,47 @@ export class HttpRenaveReadOnlyTransport
     if (!Array.isArray(result)) {
       throw new RenaveProtocolError("find-stocks-by-plate");
     }
-    return result.map(stockRecordFrom);
+    return result.map((record) =>
+      stockRecordFrom(record, "find-stocks-by-plate"),
+    );
+  }
+
+  async findRecentStocks(
+    headers: EstablishmentHeaders,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord[]> {
+    const state = httpReadOnlyTransportState(this, "find-recent-stocks");
+    let response: Response;
+    try {
+      response = await state.request(`${baseUrls.homologation}/api/estoques`, {
+        headers: { accept: "application/json", ...headers },
+        method: "GET",
+        redirect: "error",
+        signal: options?.signal
+          ? AbortSignal.any([
+              options.signal,
+              AbortSignal.timeout(state.readTimeoutMs),
+            ])
+          : AbortSignal.timeout(state.readTimeoutMs),
+      });
+    } catch {
+      throw new RenaveHttpError(0, "find-recent-stocks");
+    }
+    if (!response.ok) {
+      throw new RenaveHttpError(response.status, "find-recent-stocks");
+    }
+    const result = await parseJson(
+      response,
+      "find-recent-stocks",
+      MAX_RECENT_STOCK_RESPONSE_BYTES,
+    );
+    assertRecentStockJsonComplexity(result);
+    if (!Array.isArray(result) || result.length > MAX_RECENT_STOCK_ITEMS) {
+      throw new RenaveProtocolError("find-recent-stocks");
+    }
+    return result.map((record) =>
+      stockRecordFrom(record, "find-recent-stocks"),
+    );
   }
 }
 

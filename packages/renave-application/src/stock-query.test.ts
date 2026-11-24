@@ -32,8 +32,12 @@ const operatorContext: AuthorizationContext = {
 const richEvidence = [
   {
     cancelamentoEstoque: { motivo: "somente na evidência" },
+    chassi: "9BWZZZ377VT004251",
     codigoSegurancaCrv: "12345678901",
-    entradaEstoque: { cpfOperadorResponsavel: "12345678901" },
+    entradaEstoque: {
+      cpfOperadorResponsavel: "12345678901",
+      dataHoraRegistro: "2026-11-24T14:30",
+    },
     estado: "CONFIRMADO" as const,
     id: 7,
     numeroCrv: "123456789012",
@@ -61,6 +65,38 @@ const successfulResult: MutationResult<StockQueryResult> = {
     establishmentId: ESTABLISHMENT_ID,
     tenantId: TENANT_ID,
   },
+};
+
+const inventoryEvidence = [
+  {
+    chassi: richEvidence[0]!.chassi,
+    codigoSegurancaCrv: richEvidence[0]!.codigoSegurancaCrv,
+    entradaEstoque: richEvidence[0]!.entradaEstoque,
+    estado: richEvidence[0]!.estado,
+    id: richEvidence[0]!.id,
+    numeroCrv: richEvidence[0]!.numeroCrv,
+    placa: richEvidence[0]!.placa,
+    renavam: richEvidence[0]!.renavam,
+    tipoCrv: richEvidence[0]!.tipoCrv,
+  },
+];
+
+const inventoryResult = {
+  result: {
+    evidence: inventoryEvidence,
+    publicResult: [
+      {
+        chassi: "9BWZZZ377VT004251",
+        dataHoraRegistroEntrada: "2026-11-24T14:30",
+        estado: "CONFIRMADO" as const,
+        id: 7,
+        placa: "ABC1D23",
+        renavam: "00607701676",
+        tipoCrv: "DIGITAL" as const,
+      },
+    ],
+  },
+  verifiedIdentity: successfulResult.verifiedIdentity,
 };
 
 function createHarness(options?: {
@@ -101,7 +137,10 @@ function createHarness(options?: {
           : operatorContext,
       ),
     },
-    connector: { getStocksByPlate: connector },
+    connector: {
+      getRecentStocks: connector,
+      getStocksByPlate: connector,
+    },
     establishments: {
       load: vi.fn(async () => ({
         cnpj: ESTABLISHMENT_CNPJ,
@@ -130,6 +169,76 @@ const input = {
 };
 
 describe("StockQueryService", () => {
+  it("lista inventário recente sem expor os campos protegidos", async () => {
+    const harness = createHarness({ connectorResult: inventoryResult });
+
+    await expect(
+      harness.service.executeRecent({
+        actorIp: input.actorIp,
+        establishmentId: input.establishmentId,
+        subject: input.subject,
+        tenantId: input.tenantId,
+        traceId: "trace-inventory-1",
+      }),
+    ).resolves.toEqual(inventoryResult.result.publicResult);
+    expect(JSON.stringify(inventoryResult.result.publicResult)).not.toMatch(
+      /cpf|numeroCrv|codigoSegurancaCrv|cancelamento/i,
+    );
+    expect(harness.connector).toHaveBeenCalledWith({
+      environment: "homologation",
+      establishmentCnpj: ESTABLISHMENT_CNPJ,
+      establishmentId: ESTABLISHMENT_ID,
+      integratorCnpj: INTEGRATOR_CNPJ,
+      tenantId: TENANT_ID,
+    });
+    expect(harness.begin).toHaveBeenCalledWith(
+      expect.objectContaining({ request: {} }),
+    );
+  });
+
+  it("rejeita campo protegido injetado na projeção do inventário", async () => {
+    const connectorResult = structuredClone(inventoryResult);
+    Object.assign(connectorResult.result.publicResult[0]!, {
+      codigoSegurancaCrv: "não pode vazar",
+    });
+    const harness = createHarness({ connectorResult });
+
+    await expect(
+      harness.service.executeRecent({
+        actorIp: input.actorIp,
+        establishmentId: input.establishmentId,
+        subject: input.subject,
+        tenantId: input.tenantId,
+      }),
+    ).rejects.toBeInstanceOf(StockQueryResultInvalidError);
+  });
+
+  it("preserva cancelado na evidência sem exigir projeção pública", async () => {
+    const cancelled = {
+      cancelamentoEstoque: { motivo: "cancelado" },
+      estado: "CONFIRMADO" as const,
+      id: 8,
+      placa: "QTP4H82",
+    };
+    const connectorResult = structuredClone(inventoryResult);
+    connectorResult.result.evidence.push(cancelled as never);
+    const harness = createHarness({ connectorResult });
+
+    await expect(
+      harness.service.executeRecent({
+        actorIp: input.actorIp,
+        establishmentId: input.establishmentId,
+        subject: input.subject,
+        tenantId: input.tenantId,
+      }),
+    ).resolves.toEqual(inventoryResult.result.publicResult);
+    expect(harness.succeed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidenceResponse: connectorResult.result.evidence,
+      }),
+    );
+  });
+
   it("cifra a resposta rica e retorna somente a projeção reconstruída", async () => {
     const connectorResult = structuredClone(
       successfulResult,

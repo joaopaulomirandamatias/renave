@@ -63,6 +63,19 @@ function setup(
   const stockQueryExecute = vi.fn<StockQueryUseCase["execute"]>(async () => [
     { estado: "CONFIRMADO", id: 7, placa: "ABC1D23" },
   ]);
+  const stockInventoryExecute = vi.fn<StockQueryUseCase["executeRecent"]>(
+    async () => [
+      {
+        chassi: "9BWZZZ377VT004251",
+        dataHoraRegistroEntrada: "2026-11-24T14:30",
+        estado: "CONFIRMADO",
+        id: 7,
+        placa: "ABC1D23",
+        renavam: "00607701676",
+        tipoCrv: "DIGITAL",
+      },
+    ],
+  );
   const authorizeVehicleLookup = vi.fn<VehicleLookupUseCase["authorize"]>(
     async () => undefined,
   );
@@ -113,6 +126,7 @@ function setup(
     stockQuery: {
       authorize: authorizeStockQuery,
       execute: stockQueryExecute,
+      executeRecent: stockInventoryExecute,
     },
     vehicleLookup: {
       authorize: authorizeVehicleLookup,
@@ -137,6 +151,7 @@ function setup(
     readinessExecute,
     release,
     stockQueryExecute,
+    stockInventoryExecute,
     vehicleLookupExecute,
   };
 }
@@ -169,6 +184,17 @@ async function stockRequest(
       origin,
     },
     payload: body,
+  });
+}
+
+async function stockInventoryRequest(
+  app: ReturnType<typeof buildApp>,
+  suffix = "",
+) {
+  return await app.inject({
+    method: "GET",
+    url: `/api/tenants/${TENANT_ID}/establishments/${ESTABLISHMENT_ID}/stocks${suffix}`,
+    headers: { cookie: "renave_session=opaque-session" },
   });
 }
 
@@ -499,6 +525,127 @@ describe("rota autenticada de aptidão", () => {
     expect(execute).toHaveBeenCalledOnce();
     expect(release).toHaveBeenCalledOnce();
     expect(response.body).not.toContain("secret");
+  });
+});
+
+describe("rota autenticada do inventário recente", () => {
+  it("autoriza, limita e devolve somente a projeção pública com no-store", async () => {
+    const {
+      acquire,
+      app,
+      authorizeStockQuery,
+      release,
+      stockInventoryExecute,
+    } = setup();
+
+    const response = await stockInventoryRequest(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual([
+      {
+        chassi: "9BWZZZ377VT004251",
+        dataHoraRegistroEntrada: "2026-11-24T14:30",
+        estado: "CONFIRMADO",
+        id: 7,
+        placa: "ABC1D23",
+        renavam: "00607701676",
+        tipoCrv: "DIGITAL",
+      },
+    ]);
+    expect(response.body).not.toMatch(
+      /cpf|numeroCrv|codigoSegurancaCrv|cancelamento/iu,
+    );
+    const executionInput = expect.objectContaining({
+      establishmentId: ESTABLISHMENT_ID,
+      subject: "oidc|operator-1",
+      tenantId: TENANT_ID,
+    });
+    expect(authorizeStockQuery).toHaveBeenCalledWith(executionInput);
+    expect(stockInventoryExecute).toHaveBeenCalledWith(executionInput);
+    expect(authorizeStockQuery.mock.invocationCallOrder[0]).toBeLessThan(
+      acquire.mock.invocationCallOrder[0]!,
+    );
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("recusa filtros não contratados antes de autorizar ou adquirir lease", async () => {
+    const { acquire, app, authorizeStockQuery, stockInventoryExecute } =
+      setup();
+
+    const response = await stockInventoryRequest(
+      app,
+      "?estadoEstoque=FINALIZADO",
+    );
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ code: "INVALID_REQUEST" });
+    expect(authorizeStockQuery).not.toHaveBeenCalled();
+    expect(acquire).not.toHaveBeenCalled();
+    expect(stockInventoryExecute).not.toHaveBeenCalled();
+  });
+
+  it("nega BOLA antes do lease e da chamada ao SERPRO", async () => {
+    const { acquire, app, authorizeStockQuery, stockInventoryExecute } =
+      setup();
+    authorizeStockQuery.mockRejectedValueOnce(
+      Object.assign(new Error("contexto confidencial"), {
+        code: "AUTHORIZATION_DENIED",
+      }),
+    );
+
+    const response = await stockInventoryRequest(app);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "AUTHORIZATION_DENIED" });
+    expect(response.body).not.toContain("contexto confidencial");
+    expect(acquire).not.toHaveBeenCalled();
+    expect(stockInventoryExecute).not.toHaveBeenCalled();
+  });
+
+  it("retorna 429 com Retry-After sem consultar o inventário", async () => {
+    const { acquire, app, release, stockInventoryExecute } = setup();
+    acquire.mockResolvedValueOnce({
+      allowed: false,
+      retryAfterSeconds: 19,
+      scope: "establishment_rate",
+    });
+
+    const response = await stockInventoryRequest(app);
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBe("19");
+    expect(response.json()).toEqual({ code: "RENAVE_QUERY_LIMITED" });
+    expect(stockInventoryExecute).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("libera o lease e não expõe a mensagem quando o inventário falha", async () => {
+    const { app, release, stockInventoryExecute } = setup();
+    stockInventoryExecute.mockRejectedValueOnce(
+      Object.assign(new Error("CPF 12345678901"), {
+        code: "RENAVE_PROTOCOL_ERROR",
+      }),
+    );
+
+    const response = await stockInventoryRequest(app);
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toMatchObject({ code: "RENAVE_PROTOCOL_ERROR" });
+    expect(response.body).not.toMatch(/cpf|12345678901/iu);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("preserva o resultado se a liberação do lease falhar", async () => {
+    const { app, release, stockInventoryExecute } = setup();
+    release.mockRejectedValueOnce(new Error("segredo do banco"));
+
+    const response = await stockInventoryRequest(app);
+
+    expect(response.statusCode).toBe(200);
+    expect(stockInventoryExecute).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(response.body).not.toContain("segredo do banco");
   });
 });
 

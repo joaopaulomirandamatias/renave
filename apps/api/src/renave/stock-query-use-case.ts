@@ -17,10 +17,12 @@ import {
 import {
   StockQueryService,
   type StockQueryAuditRecord,
+  type StockInventoryQueryInput,
   type StockQueryInput,
 } from "@seu-renave/renave-application";
 import type {
   RenaveQueryConnector,
+  StockInventorySummary,
   StockSummary,
 } from "@seu-renave/renave-connector";
 import type { Pool } from "pg";
@@ -41,7 +43,7 @@ export class RenaveLinkNotReadyError extends Error {
 export interface PostgresStockQueryUseCaseOptions {
   certificateThumbprintSha256: string;
   cipher: EvidenceCipher;
-  connector: Pick<RenaveQueryConnector, "getStocksByPlate">;
+  connector: Pick<RenaveQueryConnector, "getRecentStocks" | "getStocksByPlate">;
   integratorCnpj: string;
   pool: Pool;
 }
@@ -118,6 +120,19 @@ export class PostgresStockQueryUseCase {
 
   async execute(input: StockQueryInput): Promise<readonly StockSummary[]> {
     await this.authorize(input);
+    return this.service(input).execute(input);
+  }
+
+  async executeRecent(
+    input: StockInventoryQueryInput,
+  ): Promise<readonly StockInventorySummary[]> {
+    await this.authorize(input);
+    return this.service(input).executeRecent(input);
+  }
+
+  private service(
+    input: Pick<StockInventoryQueryInput, "establishmentId" | "tenantId">,
+  ): StockQueryService {
     const { pool } = this.options;
     const evidence = new PostgresProtectedEvidenceStore(
       pool,
@@ -128,7 +143,7 @@ export class PostgresStockQueryUseCase {
         tenantId: input.tenantId,
       },
     );
-    const service = new StockQueryService(
+    return new StockQueryService(
       {
         audit: {
           append: async (record) => {
@@ -188,6 +203,5 @@ export class PostgresStockQueryUseCase {
         integratorCnpj: this.options.integratorCnpj,
       },
     );
-    return service.execute(input);
   }
 }

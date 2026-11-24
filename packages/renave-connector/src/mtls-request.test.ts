@@ -300,8 +300,9 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
     `${eligibilityBaseUrl}?tipoCrv=VERDE&renavam=00607701676`,
     `${eligibilityBaseUrl}?tipoCrv=AZUL&numeroCrv=123456789012`,
   ] as const;
-  const stocksUrl =
-    "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques?placa=QTP4H82";
+  const recentStocksUrl =
+    "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/estoques";
+  const stocksUrl = `${recentStocksUrl}?placa=QTP4H82`;
   const vehiclesUrl =
     "https://hom.renave.estaleiro.serpro.gov.br/renave-ws/api/veiculos?placa=QTP4H82";
 
@@ -321,6 +322,10 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       method: "GET",
       redirect: "error",
     });
+    await capability.request(recentStocksUrl, {
+      method: "GET",
+      redirect: "error",
+    });
     await capability.request(vehiclesUrl, {
       method: "GET",
       redirect: "error",
@@ -329,7 +334,7 @@ describe("createHomologationRenaveReadOnlyRequest", () => {
       await capability.request(url, { method: "GET", redirect: "error" });
     }
 
-    expect(baseRequest).toHaveBeenCalledTimes(6);
+    expect(baseRequest).toHaveBeenCalledTimes(7);
     for (const [, init] of baseRequest.mock.calls) {
       expect(init).toMatchObject({ method: "GET", redirect: "error" });
       expect(init.body).toBeUndefined();

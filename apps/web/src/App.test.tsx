@@ -76,6 +76,7 @@ function clientFor(
       operatorIdentity: "pending" as const,
       queries: "blocked" as const,
     })),
+    loadRecentStocks: vi.fn(async () => []),
     loadTenants: vi.fn(async () => tenants),
     logout: vi.fn(async () => ({})),
     lookupVehicle: vi.fn(async () => ({
@@ -218,6 +219,62 @@ describe("App session boundary", () => {
     await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
     await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
     await expect(check()).rejects.toThrow("Resposta de aptidão inválida");
+  });
+
+  it("carrega inventário recente por GET e rejeita campos protegidos", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            chassi: "9BWZZZ377VT004251",
+            dataHoraRegistroEntrada: "2026-11-24T14:30",
+            estado: "CONFIRMADO",
+            id: 71,
+            placa: "ABC1D23",
+            renavam: "00607701676",
+            tipoCrv: "DIGITAL",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            codigoSegurancaCrv: "não pode vazar",
+            estado: "CONFIRMADO",
+            id: 72,
+            placa: "ABC1D23",
+          },
+        ]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      browserSessionClient.loadRecentStocks("tenant-a", "store-a"),
+    ).resolves.toEqual([
+      {
+        chassi: "9BWZZZ377VT004251",
+        dataHoraRegistroEntrada: "2026-11-24T14:30",
+        estado: "CONFIRMADO",
+        id: 71,
+        placa: "ABC1D23",
+        renavam: "00607701676",
+        tipoCrv: "DIGITAL",
+      },
+    ]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/tenants/tenant-a/establishments/store-a/stocks",
+      expect.objectContaining({
+        cache: "no-store",
+        credentials: "same-origin",
+        method: "GET",
+        redirect: "error",
+      }),
+    );
+    await expect(
+      browserSessionClient.loadRecentStocks("tenant-a", "store-a"),
+    ).rejects.toThrow("Item do inventário inválido");
   });
 
   it("envia a placa somente no corpo POST same-origin e minimiza a resposta", async () => {
@@ -849,6 +906,7 @@ describe("App session boundary", () => {
         operatorIdentity: "pending" as const,
         queries: "blocked" as const,
       })),
+      loadRecentStocks: vi.fn(async () => []),
       loadTenants: vi.fn(async () => []),
       logout: vi.fn(async () => ({})),
       lookupVehicle: vi.fn(async () => ({

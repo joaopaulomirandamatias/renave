@@ -164,6 +164,7 @@ function isAllowedReadUrl(input: string): boolean {
     return false;
   }
   if (input === HOMOLOGATION_IDENTITY_URL) return true;
+  if (input === HOMOLOGATION_STOCKS_URL) return true;
   if (url.pathname === "/renave-ws/api/aptidao-veiculo-estoque") {
     const entries = [...url.searchParams.entries()];
     if (entries.length !== 2 || entries[0]?.[0] !== "tipoCrv") return false;

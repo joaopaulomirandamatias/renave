@@ -36,6 +36,7 @@ export {
   type StockQueryEvidencePort,
   type StockQueryFinalizationPort,
   type StockQueryInput,
+  type StockInventoryQueryInput,
   type StockQueryPorts,
   type StockQueryServiceConfig,
 } from "./stock-query.js";

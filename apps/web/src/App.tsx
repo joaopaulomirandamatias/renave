@@ -14,6 +14,7 @@ import {
 } from "./features/platform-console/index.js";
 import type { ReadonlyCanaryPort } from "./features/homologation-canary/index.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import type { StockInventoryItem } from "./pages/StockInventoryPanel.js";
 import { resolveWorkspaceRoute } from "./workspace-routes.js";
 
 interface AnonymousSession {
@@ -215,6 +216,11 @@ export interface SessionClient {
     establishmentId: string,
     signal?: AbortSignal,
   ): Promise<BrowserRenaveReadiness>;
+  loadRecentStocks(
+    tenantId: string,
+    establishmentId: string,
+    signal?: AbortSignal,
+  ): Promise<readonly StockInventoryItem[]>;
   logout(): Promise<{ endSessionUrl?: string }>;
   runRenaveLinkPreflight(
     tenantId: string,
@@ -561,6 +567,14 @@ const stockStates = new Set<BrowserStockState>([
   "CONFIRMADO",
   "FINALIZADO",
 ]);
+const crvTypes = new Set<BrowserCrvType>([
+  "AZUL",
+  "VERDE",
+  "BRANCO",
+  "DIGITAL",
+]);
+const stockRegistrationTime =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?$/u;
 
 const eligibilityStatuses = new Set<BrowserEligibilityStatus>([
   "eligible",
@@ -657,6 +671,63 @@ function parseStocks(value: unknown): readonly BrowserStockSummary[] {
       estado: stock.estado as BrowserStockState,
       id: stock.id as number,
       placa: stock.placa,
+    };
+  });
+}
+
+function parseStockInventory(value: unknown): readonly StockInventoryItem[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Resposta de inventário inválida");
+  }
+  const allowedKeys = new Set([
+    "chassi",
+    "dataHoraRegistroEntrada",
+    "estado",
+    "id",
+    "placa",
+    "renavam",
+    "tipoCrv",
+  ]);
+  const ids = new Set<number>();
+  return value.map((item) => {
+    if (
+      !isRecord(item) ||
+      Object.keys(item).some((key) => !allowedKeys.has(key)) ||
+      !Number.isSafeInteger(item.id) ||
+      (item.id as number) <= 0 ||
+      ids.has(item.id as number) ||
+      typeof item.placa !== "string" ||
+      !/^[A-Z0-9]{7}$/u.test(item.placa) ||
+      typeof item.estado !== "string" ||
+      !stockStates.has(item.estado as BrowserStockState) ||
+      (item.chassi !== undefined &&
+        (typeof item.chassi !== "string" ||
+          !/^[A-Z0-9]{3,64}$/u.test(item.chassi))) ||
+      (item.renavam !== undefined &&
+        (typeof item.renavam !== "string" ||
+          !/^\d{9,11}$/u.test(item.renavam))) ||
+      (item.dataHoraRegistroEntrada !== undefined &&
+        (typeof item.dataHoraRegistroEntrada !== "string" ||
+          !stockRegistrationTime.test(item.dataHoraRegistroEntrada))) ||
+      (item.tipoCrv !== undefined &&
+        (typeof item.tipoCrv !== "string" ||
+          !crvTypes.has(item.tipoCrv as BrowserCrvType)))
+    ) {
+      throw new Error("Item do inventário inválido");
+    }
+    ids.add(item.id as number);
+    return {
+      ...(item.chassi === undefined ? {} : { chassi: item.chassi }),
+      ...(item.dataHoraRegistroEntrada === undefined
+        ? {}
+        : { dataHoraRegistroEntrada: item.dataHoraRegistroEntrada }),
+      estado: item.estado as BrowserStockState,
+      id: item.id as number,
+      placa: item.placa,
+      ...(item.renavam === undefined ? {} : { renavam: item.renavam }),
+      ...(item.tipoCrv === undefined
+        ? {}
+        : { tipoCrv: item.tipoCrv as BrowserCrvType }),
     };
   });
 }
@@ -983,6 +1054,28 @@ export const browserSessionClient: SessionClient = {
       },
     );
     if (!response.ok) throw new Error("Não foi possível verificar o vínculo");
+  },
+  async loadRecentStocks(tenantId, establishmentId, signal) {
+    const response = await fetch(
+      `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/stocks`,
+      {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { accept: "application/json" },
+        method: "GET",
+        redirect: "error",
+        ...(signal ? { signal } : {}),
+      },
+    );
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      throw new StockSearchClientError(
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+      );
+    }
+    return parseStockInventory(value);
   },
   async searchStocks(tenantId, establishmentId, plate, signal) {
     const response = await fetch(
@@ -1945,6 +2038,13 @@ export function App({
           selectedTenantId,
           activeEstablishmentId ?? "",
           plate,
+        )
+      }
+      onLoadRecentStocks={(signal) =>
+        client.loadRecentStocks(
+          selectedTenantId,
+          activeEstablishmentId ?? "",
+          signal,
         )
       }
       onReloadLinkStatus={() => setLinkReloadVersion((current) => current + 1)}

@@ -2,6 +2,7 @@ import type { IdentityService } from "@seu-renave/identity";
 import type {
   CrvType,
   RenaveVehicle,
+  StockInventorySummary,
   StockSummary,
 } from "@seu-renave/renave-connector";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -54,6 +55,13 @@ export interface StockQueryUseCase {
     tenantId: string;
     traceId?: string;
   }): Promise<readonly StockSummary[]>;
+  executeRecent(input: {
+    actorIp: string;
+    establishmentId: string;
+    subject: string;
+    tenantId: string;
+    traceId?: string;
+  }): Promise<readonly StockInventorySummary[]>;
 }
 
 export interface VehicleLookupUseCase {
@@ -214,6 +222,22 @@ function safeStockQueryInput(
   return { body: { plate }, params };
 }
 
+function safeStockInventoryParams(
+  request: FastifyRequest,
+): RouteParams | undefined {
+  const params = safeParams(request);
+  if (
+    !params ||
+    typeof request.query !== "object" ||
+    request.query === null ||
+    Array.isArray(request.query) ||
+    Object.keys(request.query).length !== 0
+  ) {
+    return undefined;
+  }
+  return params;
+}
+
 function mappedStatus(code: string | undefined): number {
   if (
     code === "INVALID_ELIGIBILITY_APPLICATION_INPUT" ||
@@ -312,6 +336,97 @@ export function registerRenaveRoutes(
         return reply.code(status).send({
           code: status === 500 ? "INTERNAL_ERROR" : (code ?? "INTERNAL_ERROR"),
         });
+      }
+    },
+  );
+
+  app.get(
+    "/api/tenants/:tenantId/establishments/:establishmentId/stocks",
+    async (request, reply) => {
+      const sessionResult = await options.accessGuard.authenticate(
+        request,
+        reply,
+      );
+      if (!sessionResult.ok) return;
+      if (!options.stockQuery) {
+        return reply.code(503).send({ code: "RENAVE_NOT_CONFIGURED" });
+      }
+      const params = safeStockInventoryParams(request);
+      if (!params) return reply.code(400).send({ code: "INVALID_REQUEST" });
+      if (!options.queryLimiter) {
+        return reply
+          .code(503)
+          .send({ code: "RENAVE_QUERY_LIMIT_NOT_CONFIGURED" });
+      }
+      const executionInput = {
+        actorIp: request.ip,
+        establishmentId: params.establishmentId,
+        subject: sessionResult.session.subject,
+        tenantId: params.tenantId,
+        traceId: request.id,
+      };
+      try {
+        await options.stockQuery.authorize(executionInput);
+      } catch (error) {
+        const code = errorCode(error);
+        const status = mappedStatus(code);
+        return reply.code(status).send({
+          code: status === 500 ? "INTERNAL_ERROR" : (code ?? "INTERNAL_ERROR"),
+        });
+      }
+
+      let permitDecision;
+      try {
+        permitDecision = await options.queryLimiter.acquire({
+          establishmentId: params.establishmentId,
+          subject: sessionResult.session.subject,
+          tenantId: params.tenantId,
+        });
+      } catch {
+        request.log.error({
+          event: "renave.query_limit_unavailable",
+          traceId: request.id,
+        });
+        return reply.code(503).send({ code: "RENAVE_QUERY_LIMIT_UNAVAILABLE" });
+      }
+      if (!permitDecision.allowed) {
+        request.log.warn({
+          event: "renave.query_limited",
+          scope: permitDecision.scope,
+          traceId: request.id,
+        });
+        reply.header("retry-after", String(permitDecision.retryAfterSeconds));
+        return reply.code(429).send({ code: "RENAVE_QUERY_LIMITED" });
+      }
+
+      try {
+        try {
+          const result = await options.stockQuery.executeRecent(executionInput);
+          reply.header("cache-control", "no-store");
+          return result;
+        } catch (error) {
+          const code = errorCode(error);
+          const status = mappedStatus(code);
+          request.log.error({
+            event: "renave.stock_inventory.failed",
+            errorCode: code ?? "UNEXPECTED_ERROR",
+            traceId: request.id,
+          });
+          return reply.code(status).send({
+            code:
+              status === 500 ? "INTERNAL_ERROR" : (code ?? "UPSTREAM_ERROR"),
+            traceId: request.id,
+          });
+        }
+      } finally {
+        try {
+          await permitDecision.permit.release();
+        } catch {
+          request.log.error({
+            event: "renave.query_permit_release_failed",
+            traceId: request.id,
+          });
+        }
       }
     },
   );

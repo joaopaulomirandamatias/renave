@@ -72,6 +72,8 @@ export {
   type RenaveTransport,
   type RenaveVehicleLookupTransport,
   type StockQueryResult,
+  type StockInventoryQueryResult,
+  type StockInventorySummary,
   type StockSummary,
   type ReconciliationReadErrorCategory,
   type ReconciliationReadResult,

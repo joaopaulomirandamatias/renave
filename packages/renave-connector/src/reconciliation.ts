@@ -6,6 +6,7 @@ const OFFSET_DATE_TIME = /(?:Z|[+-]\d{2}:\d{2})$/i;
 const CRV_TYPES = new Set<CrvType>(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
 
 export interface RenaveStockRecord {
+  chassi?: string;
   entradaEstoque?: {
     cpfOperadorResponsavel?: string;
     dataHora?: string;
