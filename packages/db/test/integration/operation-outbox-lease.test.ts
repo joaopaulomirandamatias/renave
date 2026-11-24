@@ -83,7 +83,7 @@ function operationInput(target: Fixture, label: string): CreateOperationInput {
 }
 
 async function seed(target: Fixture, label: string): Promise<string> {
-  const result = await withTenant(appPool, target.tenant.id, (client) =>
+  const result = await withTenant(migratorPool, target.tenant.id, (client) =>
     createOrReplayOperation(client, operationInput(target, label)),
   );
   return result.operation.id;

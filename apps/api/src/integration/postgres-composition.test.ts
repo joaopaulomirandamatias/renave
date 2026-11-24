@@ -11,7 +11,6 @@ import {
   type RenaveConnector,
 } from "@seu-renave/renave-connector";
 import {
-  createOrReplayOperation,
   createEstablishment,
   createPool,
   computeCnpjCheckDigits,
@@ -23,8 +22,10 @@ import {
   provisionTenant,
   transitionCredentialLink,
   withTenant,
+  type CreateOperationInput,
   type CredentialLinkStatus,
   type Establishment,
+  type TenantClient,
   type Tenant,
 } from "@seu-renave/db";
 import type { Pool } from "pg";
@@ -67,6 +68,48 @@ let migratorPool: Pool;
 let tenant: Tenant;
 let operatorStore: Establishment;
 let otherStore: Establishment;
+
+async function createLegacyOperationForTest(
+  client: TenantClient,
+  operation: CreateOperationInput,
+): Promise<string> {
+  const { rows } = await client.query<{ operation_id: string }>(
+    `select operation_id
+       from renave.create_operation_with_outbox(
+         $1, $2, $3, $4, $5, $6, $7, $8,
+         $9, $10, $11, $12, $13, $14, $15, $16,
+         $17, $18, $19, $20, $21, $22, $23
+       )`,
+    [
+      operation.operationId,
+      operation.establishmentId,
+      operation.kind,
+      operation.mutationFamily,
+      operation.idempotencyKeyDigest,
+      operation.vehicleKeyDigest,
+      operation.requestSha256,
+      operation.requestCiphertext.byteLength,
+      operation.requestSchemaVersion,
+      operation.requestKeyId,
+      operation.requestNonce,
+      operation.requestAuthTag,
+      operation.requestCiphertext,
+      operation.actorSubjectHash,
+      operation.correlationId,
+      operation.reconciliationProjectionKind,
+      operation.reconciliationProjectionSchemaVersion,
+      operation.reconciliationProjectionGeneration,
+      operation.reconciliationProjectionByteLength,
+      operation.reconciliationProjectionKeyId,
+      operation.reconciliationProjectionNonce,
+      operation.reconciliationProjectionAuthTag,
+      operation.reconciliationProjectionCiphertext,
+    ],
+  );
+  const operationId = rows[0]?.operation_id;
+  if (!operationId) throw new Error("Fixture de operação legada não criada.");
+  return operationId;
+}
 
 interface PreflightScenario {
   store: Establishment;
@@ -659,8 +702,10 @@ describe("composição PostgreSQL real da API", () => {
       operationInput: Awaited<ReturnType<typeof build>>,
       path: "unknown" | "recovery",
     ) {
-      const created = await withTenant(appPool, tenant.id, (client) =>
-        createOrReplayOperation(client, operationInput),
+      const createdOperationId = await withTenant(
+        migratorPool,
+        tenant.id,
+        (client) => createLegacyOperationForTest(client, operationInput),
       );
       const result = await withTenant(
         migratorPool,
@@ -751,7 +796,7 @@ describe("composição PostgreSQL real da API", () => {
           return begun.rows[0]!;
         },
       );
-      expect(result.operation_id).toBe(created.operation.id);
+      expect(result.operation_id).toBe(createdOperationId);
       const restored = projectionCipher.decrypt(
         {
           authTag: result.projection_auth_tag,

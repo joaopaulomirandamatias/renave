@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   InvalidPreparedRenaveMutationError,
@@ -195,5 +195,67 @@ describe("PreparedRenaveMutation", () => {
 
     expect(serialized).toContain(prepared.requestSha256);
     expect(serialized).not.toMatch(/12345678901|pessoa@example\.com|QTP4H82/u);
+  });
+
+  it("destrói o plaintext de forma idempotente e invalida todas as leituras", async () => {
+    const digest = crypto.subtle.digest.bind(crypto.subtle);
+    let internalBody: Uint8Array<ArrayBuffer> | undefined;
+    const digestSpy = vi
+      .spyOn(crypto.subtle, "digest")
+      .mockImplementation(async (algorithm, data) => {
+        if (ArrayBuffer.isView(data) && data.buffer instanceof ArrayBuffer) {
+          internalBody = new Uint8Array(
+            data.buffer,
+            data.byteOffset,
+            data.byteLength,
+          );
+        }
+        return digest(algorithm, data);
+      });
+
+    try {
+      const prepared = await prepareRenaveMutation("request-stock-entry", {
+        cpf: "12345678901",
+        placa: "QTP4H82",
+      });
+      expect(internalBody).toBeDefined();
+      expect(internalBody?.some((byte) => byte !== 0)).toBe(true);
+
+      prepared.destroy();
+      expect(internalBody?.every((byte) => byte === 0)).toBe(true);
+      expect(() => prepared.destroy()).not.toThrow();
+
+      for (const read of [
+        () => prepared.byteLength,
+        () => prepared.operation,
+        () => prepared.requestSha256,
+        () => prepared.copyBodyBytes(),
+        () => prepared.toJSON(),
+        () => readPreparedRenaveMutation(prepared),
+        () => JSON.stringify(prepared),
+      ]) {
+        expect(read).toThrow(
+          expect.objectContaining({
+            code: "INVALID_PREPARED_RENAVE_MUTATION",
+            reason: "DESTROYED",
+          }),
+        );
+      }
+    } finally {
+      digestSpy.mockRestore();
+    }
+  });
+
+  it("recusa destroy em objeto forjado sem torná-lo um envelope destruído", () => {
+    const forged = Object.create(
+      PreparedRenaveMutation.prototype,
+    ) as PreparedRenaveMutation;
+
+    expect(() => forged.destroy()).toThrow(
+      expect.objectContaining({ reason: "NOT_SERIALIZABLE" }),
+    );
+    expect(() => forged.destroy()).toThrow(
+      expect.objectContaining({ reason: "NOT_SERIALIZABLE" }),
+    );
   });
 });

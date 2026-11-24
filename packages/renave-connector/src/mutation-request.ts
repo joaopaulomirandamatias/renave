@@ -20,6 +20,7 @@ export interface PreparedRenaveMutationSnapshot {
 
 const CONSTRUCTION_TOKEN = Symbol("PreparedRenaveMutation");
 const states = new WeakMap<PreparedRenaveMutation, PreparedState>();
+const destroyed = new WeakSet<PreparedRenaveMutation>();
 
 export type InvalidPreparedRenaveMutationReason =
   | "BODY_FORMAT"
@@ -27,7 +28,8 @@ export type InvalidPreparedRenaveMutationReason =
   | "HASH_FORMAT"
   | "HASH_MISMATCH"
   | "NOT_SERIALIZABLE"
-  | "OPERATION";
+  | "OPERATION"
+  | "DESTROYED";
 
 export class InvalidPreparedRenaveMutationError extends Error {
   readonly code = "INVALID_PREPARED_RENAVE_MUTATION";
@@ -75,6 +77,9 @@ function validateJsonObject(bytes: OwnedBytes): void {
 function preparedState(prepared: PreparedRenaveMutation): PreparedState {
   const state = states.get(prepared);
   if (!state) {
+    if (destroyed.has(prepared)) {
+      throw new InvalidPreparedRenaveMutationError("DESTROYED");
+    }
     throw new InvalidPreparedRenaveMutationError("NOT_SERIALIZABLE");
   }
   return state;
@@ -171,6 +176,21 @@ export class PreparedRenaveMutation {
 
   copyBodyBytes(): OwnedBytes {
     return copyPreparedRenaveMutationBody(this);
+  }
+
+  /**
+   * Apaga o plaintext mantido pelo envelope. É idempotente para permitir uso
+   * seguro em `finally`; qualquer leitura posterior falha fechada.
+   */
+  destroy(): void {
+    const state = states.get(this);
+    if (!state) {
+      if (destroyed.has(this)) return;
+      throw new InvalidPreparedRenaveMutationError("NOT_SERIALIZABLE");
+    }
+    state.body.fill(0);
+    states.delete(this);
+    destroyed.add(this);
   }
 
   toJSON(): Readonly<{

@@ -263,6 +263,7 @@ describe("codec fechado da projeção de reconciliação", () => {
       { ...request(), cpfOperadorResponsavel: "123 456 789 01" },
     ],
     ["número inválido", { ...request(), valorCompra: "123" }],
+    ["valor zero", { ...request(), valorCompra: 0 }],
     ["valor negativo", { ...request(), valorCompra: -0.01 }],
     ["valor acima do máximo", { ...request(), valorCompra: 100_000_000 }],
     ["data impossível", { ...request(), dataCompra: "2025-02-29" }],

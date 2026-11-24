@@ -108,9 +108,30 @@ function envelope(
   };
 }
 
+function expectPreparedDestroyed(prepared: PreparedRenaveMutation): void {
+  for (const read of [
+    () => prepared.byteLength,
+    () => prepared.operation,
+    () => prepared.requestSha256,
+    () => prepared.copyBodyBytes(),
+    () => prepared.toJSON(),
+    () => JSON.stringify(prepared),
+  ]) {
+    expect(read).toThrow(
+      expect.objectContaining({
+        code: "INVALID_PREPARED_RENAVE_MUTATION",
+        reason: "DESTROYED",
+      }),
+    );
+  }
+}
+
 describe("buildCreateOperationInput", () => {
   it("produz input coerente a partir dos mesmos bytes preparados", async () => {
     const prepared = await preparedExact();
+    const expectedBody = prepared.copyBodyBytes();
+    const expectedByteLength = prepared.byteLength;
+    const expectedRequestSha256 = prepared.requestSha256;
     const input = { ...metadata, prepared };
     const requestCipher = cipher();
     const reconciliationCipher = projectionCipher();
@@ -120,6 +141,7 @@ describe("buildCreateOperationInput", () => {
       reconciliationCipher,
       input,
     );
+    expectPreparedDestroyed(prepared);
     const restored = await requestCipher.decrypt(
       envelope(operation),
       binding(input),
@@ -159,17 +181,13 @@ describe("buildCreateOperationInput", () => {
       requestKeyId: "operation-key-2026-11",
       requestSchemaVersion: 1,
     });
-    expect(operation.requestCiphertext).toHaveLength(prepared.byteLength);
+    expect(operation.requestCiphertext).toHaveLength(expectedByteLength);
     expect(operation.requestSha256).toEqual(sha256(plaintext));
-    expect(operation.requestSha256.toString("hex")).toBe(
-      prepared.requestSha256,
-    );
+    expect(operation.requestSha256.toString("hex")).toBe(expectedRequestSha256);
     expect(sha256(operation.requestCiphertext)).not.toEqual(
       operation.requestSha256,
     );
-    expect(Buffer.from(plaintext)).toEqual(
-      Buffer.from(prepared.copyBodyBytes()),
-    );
+    expect(Buffer.from(plaintext)).toEqual(Buffer.from(expectedBody));
     expect(JSON.parse(new TextDecoder().decode(projectionPlaintext))).toEqual({
       cpfOperadorResponsavel: "12345678901",
       schemaVersion: 1,
@@ -181,6 +199,8 @@ describe("buildCreateOperationInput", () => {
         tipoCrv: "DIGITAL",
       },
     });
+    expectedBody.fill(0);
+    restored.destroy();
     restoredProjection.destroy();
   });
 
@@ -198,6 +218,7 @@ describe("buildCreateOperationInput", () => {
       projectionCipher(),
       input,
     );
+    expectPreparedDestroyed(prepared);
     input.actorSubjectHash.fill(0);
     input.idempotencyKeyDigest.fill(0);
     input.vehicleKeyDigest.fill(0);
@@ -209,13 +230,26 @@ describe("buildCreateOperationInput", () => {
     expect(operation.vehicleKeyDigest).toEqual(metadata.vehicleKeyDigest);
   });
 
-  it("duas montagens mantêm o hash e variam nonce/ciphertext", async () => {
-    const prepared = await preparedExact();
-    const input = { ...metadata, prepared };
+  it("duas montagens independentes mantêm o hash e variam nonce/ciphertext", async () => {
+    const firstPrepared = await preparedExact();
+    const secondPrepared = await preparedExact();
+    const expectedRequestSha256 = firstPrepared.requestSha256;
+    const firstInput = { ...metadata, prepared: firstPrepared };
+    const secondInput = { ...metadata, prepared: secondPrepared };
     const requestCipher = cipher();
     const projection = projectionCipher();
-    const first = buildCreateOperationInput(requestCipher, projection, input);
-    const second = buildCreateOperationInput(requestCipher, projection, input);
+    const first = buildCreateOperationInput(
+      requestCipher,
+      projection,
+      firstInput,
+    );
+    const second = buildCreateOperationInput(
+      requestCipher,
+      projection,
+      secondInput,
+    );
+    expectPreparedDestroyed(firstPrepared);
+    expectPreparedDestroyed(secondPrepared);
 
     expect(first.requestSha256).toEqual(second.requestSha256);
     expect(first.requestNonce.equals(second.requestNonce)).toBe(false);
@@ -227,34 +261,28 @@ describe("buildCreateOperationInput", () => {
     first.requestAuthTag.fill(0);
     first.requestCiphertext.fill(0);
     await expect(
-      requestCipher.decrypt(envelope(second), binding(input)),
-    ).resolves.toMatchObject({ requestSha256: prepared.requestSha256 });
+      requestCipher.decrypt(envelope(second), binding(secondInput)),
+    ).resolves.toMatchObject({ requestSha256: expectedRequestSha256 });
   });
 
   it("recusa cifrador falso, sem brand ou com dispatch forjado", async () => {
-    const prepared = await preparedExact();
-    const input = { ...metadata, prepared };
     const fake = {
-      encrypt: () => ({
-        authTag: Buffer.alloc(16),
-        ciphertext: prepared.copyBodyBytes(),
-        keyId: "fake",
-        nonce: Buffer.alloc(12),
-        operation: prepared.operation,
-        requestByteLength: prepared.byteLength,
-        requestSha256: prepared.requestSha256,
-      }),
+      encrypt: () => ({}),
     } as unknown as OperationRequestCipher;
     const prototypeOnly = Object.create(
       OperationRequestCipher.prototype,
     ) as OperationRequestCipher;
 
-    expect(() =>
-      buildCreateOperationInput(fake, projectionCipher(), input),
-    ).toThrow();
-    expect(() =>
-      buildCreateOperationInput(prototypeOnly, projectionCipher(), input),
-    ).toThrow();
+    for (const forged of [fake, prototypeOnly]) {
+      const prepared = await preparedExact();
+      expect(() =>
+        buildCreateOperationInput(forged, projectionCipher(), {
+          ...metadata,
+          prepared,
+        }),
+      ).toThrow(OperationRequestBuilderError);
+      expectPreparedDestroyed(prepared);
+    }
 
     let projectionDispatchCalled = false;
     const fakeProjection = {
@@ -277,9 +305,14 @@ describe("buildCreateOperationInput", () => {
       projectionProxy,
       projectionSubclassOnly,
     ]) {
-      expect(() => buildCreateOperationInput(cipher(), forged, input)).toThrow(
-        OperationRequestBuilderError,
-      );
+      const prepared = await preparedExact();
+      expect(() =>
+        buildCreateOperationInput(cipher(), forged, {
+          ...metadata,
+          prepared,
+        }),
+      ).toThrow(OperationRequestBuilderError);
+      expectPreparedDestroyed(prepared);
     }
     expect(projectionDispatchCalled).toBe(false);
   });
@@ -315,6 +348,8 @@ describe("buildCreateOperationInput", () => {
       projection,
       secondInput,
     );
+    expectPreparedDestroyed(firstPrepared);
+    expectPreparedDestroyed(secondPrepared);
     const mixed = envelope(first);
     mixed.requestSha256 = second.requestSha256.toString("hex");
 
@@ -345,5 +380,6 @@ describe("buildCreateOperationInput", () => {
         prepared,
       } as BuildCreateOperationInput),
     ).toThrow(OperationRequestBuilderError);
+    expectPreparedDestroyed(prepared);
   });
 });

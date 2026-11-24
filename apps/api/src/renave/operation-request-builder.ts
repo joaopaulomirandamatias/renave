@@ -47,6 +47,10 @@ export interface BuildCreateOperationInput {
   environment: RenaveEnvironment;
   establishmentId: string;
   idempotencyKeyDigest: Uint8Array;
+  /**
+   * Recurso de uso único cujo ownership é transferido ao builder. A chamada
+   * sempre o destrói antes de retornar ou lançar; o chamador não pode reutilizá-lo.
+   */
   prepared: PreparedRenaveMutation;
   tenantId: string;
   vehicleKeyDigest: Uint8Array;
@@ -132,6 +136,7 @@ function assertEncryptedProjection(
 /**
  * Monta de forma atômica o envelope coerente esperado pelo repositório.
  * Não persiste, não consulta identidade e não conhece transporte HTTP.
+ * Consome e destrói `input.prepared` no sucesso e em qualquer falha.
  */
 export function buildCreateOperationInput(
   requestCipher: OperationRequestCipher,
@@ -146,14 +151,16 @@ export function buildCreateOperationInput(
     EncryptedOperationReconciliationProjection | undefined;
   let preparedProjection:
     ReturnType<typeof prepareOperationReconciliationProjection> | undefined;
+  let prepared: PreparedRenaveMutation | undefined;
   try {
+    prepared = input.prepared;
     const captured = {
       actorSubjectHash: input.actorSubjectHash,
       correlationId: input.correlationId,
       environment: input.environment,
       establishmentId: input.establishmentId,
       idempotencyKeyDigest: input.idempotencyKeyDigest,
-      prepared: input.prepared,
+      prepared,
       tenantId: input.tenantId,
       vehicleKeyDigest: input.vehicleKeyDigest,
     };
@@ -254,5 +261,6 @@ export function buildCreateOperationInput(
     encryptedProjection?.authTag.fill(0);
     encryptedProjection?.ciphertext.fill(0);
     encryptedProjection?.nonce.fill(0);
+    prepared?.destroy();
   }
 }

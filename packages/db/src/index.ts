@@ -90,12 +90,13 @@ export {
   type MigrationResult,
 } from "./migrate.js";
 export {
-  createOrReplayOperation,
+  createOrReplayHeldLocalOperation,
   getOperation,
   operationKinds,
   operationMutationFamilies,
   operationStatuses,
   OperationActiveConflictError,
+  OperationCredentialLinkNotEnabledError,
   OperationIdempotencyConflictError,
   OperationIdentifierConflictError,
   OperationInputError,

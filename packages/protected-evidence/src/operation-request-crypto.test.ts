@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
+  InvalidPreparedRenaveMutationError,
   prepareRenaveMutation,
   restorePreparedRenaveMutation,
 } from "@seu-renave/renave-connector";
@@ -84,6 +85,25 @@ describe("OperationRequestCipher", () => {
     expect(first.nonce.equals(second.nonce)).toBe(false);
     expect(first.ciphertext.equals(second.ciphertext)).toBe(false);
     expect(first.requestSha256).toBe(second.requestSha256);
+  });
+
+  it("recusa criptografar uma mutação preparada já destruída", async () => {
+    const prepared = await prepareRenaveMutation("request-stock-entry", {
+      placa: "QTP4H82",
+    });
+    const cipher = createCipher();
+
+    prepared.destroy();
+
+    expect(() => cipher.encrypt(prepared, binding)).toThrow(
+      expect.objectContaining({
+        code: "INVALID_PREPARED_RENAVE_MUTATION",
+        reason: "DESTROYED",
+      }),
+    );
+    expect(() => cipher.encrypt(prepared, binding)).toThrow(
+      InvalidPreparedRenaveMutationError,
+    );
   });
 
   it("copia chave, binding e envelope em vez de compartilhar buffers", async () => {

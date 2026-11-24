@@ -207,7 +207,7 @@ describe("fundação operation/outbox", () => {
     ).toHaveProperty("size", 60);
     const results = await Promise.all(
       inputs.map((input) =>
-        withTenant(appPool, tenantA.id, (client) =>
+        withTenant(migratorPool, tenantA.id, (client) =>
           createOperation(client, input),
         ),
       ),
@@ -310,7 +310,7 @@ describe("fundação operation/outbox", () => {
     original.requestHash = createHash("sha256")
       .update(original.requestCiphertext)
       .digest();
-    await withTenant(appPool, tenantA.id, (client) =>
+    await withTenant(migratorPool, tenantA.id, (client) =>
       createOperation(client, original),
     );
     const changedCiphertext = Buffer.from(original.requestCiphertext);
@@ -330,7 +330,7 @@ describe("fundação operation/outbox", () => {
     ).toBe(1);
 
     await expect(
-      withTenant(appPool, tenantA.id, (client) =>
+      withTenant(migratorPool, tenantA.id, (client) =>
         createOperation(client, changed),
       ),
     ).rejects.toMatchObject({ code: "23000" });
@@ -365,7 +365,7 @@ describe("fundação operation/outbox", () => {
     `);
     try {
       await expect(
-        withTenant(appPool, tenantA.id, (client) =>
+        withTenant(migratorPool, tenantA.id, (client) =>
           createOperation(client, input),
         ),
       ).rejects.toThrow();
@@ -404,7 +404,7 @@ describe("fundação operation/outbox", () => {
       `);
     }
 
-    const retry = await withTenant(appPool, tenantA.id, (client) =>
+    const retry = await withTenant(migratorPool, tenantA.id, (client) =>
       createOperation(client, input),
     );
     expect(retry).toMatchObject({
@@ -422,10 +422,10 @@ describe("fundação operation/outbox", () => {
       projectionNonce: randomBytes(12),
     };
     const [createdA, createdB] = await Promise.all([
-      withTenant(appPool, tenantA.id, (client) =>
+      withTenant(migratorPool, tenantA.id, (client) =>
         createOperation(client, inputA),
       ),
-      withTenant(appPool, tenantB.id, (client) =>
+      withTenant(migratorPool, tenantB.id, (client) =>
         createOperation(client, inputB),
       ),
     ]);
@@ -440,7 +440,7 @@ describe("fundação operation/outbox", () => {
   });
 
   it("aplica FORCE RLS inclusive à projeção e limpa tenant no mesmo backend", async () => {
-    const created = await withTenant(appPool, tenantA.id, (client) =>
+    const created = await withTenant(migratorPool, tenantA.id, (client) =>
       createOperation(
         client,
         operationInput("rls-behavior", establishmentA.id),
@@ -595,7 +595,7 @@ describe("fundação operation/outbox", () => {
     ).rejects.toMatchObject({ code: "42501" });
 
     await expect(
-      withTenant(appPool, tenantA.id, (client) =>
+      withTenant(migratorPool, tenantA.id, (client) =>
         createOperation(
           client,
           operationInput("foreign-establishment", establishmentB.id),
@@ -613,7 +613,7 @@ describe("fundação operation/outbox", () => {
     );
     try {
       await expect(
-        withTenant(appPool, tenantA.id, (client) =>
+        withTenant(migratorPool, tenantA.id, (client) =>
           createOperation(
             client,
             operationInput("suspended-tenant", establishmentA.id),
@@ -630,7 +630,7 @@ describe("fundação operation/outbox", () => {
     }
 
     await expect(
-      withTenant(appPool, tenantA.id, (client) =>
+      withTenant(migratorPool, tenantA.id, (client) =>
         createOperation(client, {
           ...operationInput("invalid-key-id", establishmentA.id),
           keyId: "../secret",
@@ -648,7 +648,7 @@ describe("fundação operation/outbox", () => {
     "bloqueia segunda chave enquanto a operação está %s",
     async (status, path) => {
       const first = operationInput(`active-${status}`, establishmentA.id);
-      const created = await withTenant(appPool, tenantA.id, (client) =>
+      const created = await withTenant(migratorPool, tenantA.id, (client) =>
         createOperation(client, first),
       );
       await withTenant(migratorPool, tenantA.id, async (client) => {
@@ -662,7 +662,7 @@ describe("fundação operation/outbox", () => {
       };
 
       await expect(
-        withTenant(appPool, tenantA.id, (client) =>
+        withTenant(migratorPool, tenantA.id, (client) =>
           createOperation(client, second),
         ),
       ).rejects.toMatchObject({ code: "23000" });
@@ -673,14 +673,14 @@ describe("fundação operation/outbox", () => {
     "libera nova operação após estado terminal %s",
     async (status) => {
       const first = operationInput(`terminal-${status}`, establishmentA.id);
-      const created = await withTenant(appPool, tenantA.id, (client) =>
+      const created = await withTenant(migratorPool, tenantA.id, (client) =>
         createOperation(client, first),
       );
       await withTenant(migratorPool, tenantA.id, async (client) => {
         await transitionOperation(client, created.operation_id, "SENT");
         await transitionOperation(client, created.operation_id, status);
       });
-      const second = await withTenant(appPool, tenantA.id, (client) =>
+      const second = await withTenant(migratorPool, tenantA.id, (client) =>
         createOperation(client, {
           ...operationInput(`terminal-${status}-second`, establishmentA.id),
           vehicleDigest: first.vehicleDigest,
@@ -761,17 +761,14 @@ describe("fundação operation/outbox", () => {
     for (const row of functionMatrix.rows) {
       expect(row.granted).toBe(
         row.role_name === "renave_app" &&
-          (row.function_name.startsWith(
-            "renave.create_operation_with_outbox",
-          ) ||
-            row.function_name === "renave.get_operation_summary(uuid)"),
+          row.function_name === "renave.get_operation_summary(uuid)",
       );
     }
   });
 
   it("triggers protegem payload e histórico inclusive contra o migrator", async () => {
     const input = operationInput("immutable", establishmentA.id);
-    const operation = await withTenant(appPool, tenantA.id, (client) =>
+    const operation = await withTenant(migratorPool, tenantA.id, (client) =>
       createOperation(client, input),
     );
 

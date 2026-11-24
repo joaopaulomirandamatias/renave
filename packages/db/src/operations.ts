@@ -9,6 +9,7 @@ const MAX_SCHEMA_VERSION = 2_147_483_647;
 export const operationKinds = ["USED_STOCK_ENTRY"] as const;
 export const operationMutationFamilies = ["STOCK_ENTRY"] as const;
 export const operationStatuses = [
+  "HELD_LOCAL",
   "PENDING_SEND",
   "SENT",
   "REJECTED",
@@ -93,6 +94,14 @@ export class OperationIdentifierConflictError extends Error {
 
   constructor() {
     super("O identificador da operação já está em uso.");
+  }
+}
+
+export class OperationCredentialLinkNotEnabledError extends Error {
+  override name = "OperationCredentialLinkNotEnabledError";
+
+  constructor() {
+    super("O vínculo de credencial do estabelecimento não está habilitado.");
   }
 }
 
@@ -268,6 +277,12 @@ function mapCreateError(error: unknown): never {
   if (code === "23000" && message === "operation: identificador já utilizado") {
     throw new OperationIdentifierConflictError();
   }
+  if (
+    code === "55000" &&
+    message === "operation: vínculo credencial não habilitado"
+  ) {
+    throw new OperationCredentialLinkNotEnabledError();
+  }
   throw new OperationStorageError();
 }
 
@@ -329,16 +344,17 @@ export async function getOperation(
   }
 }
 
-export async function createOrReplayOperation(
+async function createOrReplayUsing(
   client: TenantClient,
   input: CreateOperationInput,
+  functionName: "create_held_local_operation" | "create_operation_with_outbox",
 ): Promise<CreateOperationResult> {
   const operation = normalizeInput(input);
   let created: CreateOperationRow | undefined;
   try {
     const { rows } = await client.query<CreateOperationRow>(
       `select operation_id, replayed
-         from renave.create_operation_with_outbox(
+         from renave.${functionName}(
            $1, $2, $3, $4, $5, $6, $7, $8,
            $9, $10, $11, $12, $13, $14, $15, $16,
            $17, $18, $19, $20, $21, $22, $23
@@ -384,4 +400,22 @@ export async function createOrReplayOperation(
   const record = await getOperation(client, created.operation_id);
   if (!record) throw new OperationStorageError();
   return { operation: record, replayed: created.replayed };
+}
+
+export function createOrReplayOperation(
+  client: TenantClient,
+  input: CreateOperationInput,
+): Promise<CreateOperationResult> {
+  return createOrReplayUsing(client, input, "create_operation_with_outbox");
+}
+
+/**
+ * Persiste uma operação local retida. Não cria outbox e não habilita envio;
+ * uma futura liberação exigirá um contrato de banco separado.
+ */
+export function createOrReplayHeldLocalOperation(
+  client: TenantClient,
+  input: CreateOperationInput,
+): Promise<CreateOperationResult> {
+  return createOrReplayUsing(client, input, "create_held_local_operation");
 }

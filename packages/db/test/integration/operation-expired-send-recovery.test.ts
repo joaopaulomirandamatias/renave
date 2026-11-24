@@ -100,7 +100,7 @@ async function fixture(label: string): Promise<Fixture> {
     requestSha256: digest(`plaintext:${label}:${fixtureCounter}`),
     vehicleKeyDigest: digest(`vehicle:${label}:${fixtureCounter}`),
   };
-  const created = await withTenant(appPool, tenant.id, (client) =>
+  const created = await withTenant(migratorPool, tenant.id, (client) =>
     createOrReplayOperation(client, input),
   );
   return { establishment, operationId: created.operation.id, tenant };
@@ -111,7 +111,7 @@ async function fixtureInTenant(
   label: string,
 ): Promise<Fixture> {
   fixtureCounter += 1;
-  const created = await withTenant(appPool, target.tenant.id, (client) =>
+  const created = await withTenant(migratorPool, target.tenant.id, (client) =>
     createOrReplayOperation(client, {
       ...operationProjectionFields(`recovery:${label}:${fixtureCounter}`),
       actorSubjectHash: digest(`actor:${label}:${fixtureCounter}`),

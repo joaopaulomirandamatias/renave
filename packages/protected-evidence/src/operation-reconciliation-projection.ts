@@ -383,7 +383,7 @@ function projectionFromRequest(
     !isCalendarDate(purchaseDate) ||
     !EMAIL_PATTERN.test(establishmentEmail) ||
     !EMAIL_PATTERN.test(sellerEmail) ||
-    purchaseValue < 0 ||
+    purchaseValue <= 0 ||
     purchaseValue > MAX_PURCHASE_VALUE
   ) {
     throw new OperationReconciliationProjectionInputError();

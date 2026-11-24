@@ -113,7 +113,7 @@ async function createTarget(label: string, base?: Target): Promise<Target> {
     requestSha256: digest(`plaintext:${label}:${sequence}`),
     vehicleKeyDigest: digest(`vehicle:${label}:${sequence}`),
   };
-  const created = await withTenant(appPool, tenant.id, (client) =>
+  const created = await withTenant(migratorPool, tenant.id, (client) =>
     createOrReplayOperation(client, input),
   );
   const sendOwner = randomUUID();

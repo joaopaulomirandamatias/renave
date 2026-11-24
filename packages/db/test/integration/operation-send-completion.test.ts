@@ -109,7 +109,7 @@ async function fixture(label: string): Promise<Fixture> {
     requestSha256: digest(`plaintext:${label}:${sequence}`),
     vehicleKeyDigest: digest(`vehicle:${label}:${sequence}`),
   };
-  const created = await withTenant(appPool, tenant.id, (client) =>
+  const created = await withTenant(migratorPool, tenant.id, (client) =>
     createOrReplayOperation(client, input),
   );
   return { establishment, operationId: created.operation.id, tenant };

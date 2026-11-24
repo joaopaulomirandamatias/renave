@@ -85,10 +85,10 @@ afterAll(async () => {
 describe("operation repository integration", () => {
   it("cria, faz replay e lê somente o resumo sanitizado", async () => {
     const input = operationInput("replay");
-    const first = await withTenant(appPool, tenantA.id, (client) =>
+    const first = await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, input),
     );
-    const replay = await withTenant(appPool, tenantA.id, (client) =>
+    const replay = await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, input),
     );
 
@@ -114,7 +114,7 @@ describe("operation repository integration", () => {
 
   it("converte conflito de idempotência em erro fechado", async () => {
     const original = operationInput("idempotency-conflict");
-    await withTenant(appPool, tenantA.id, (client) =>
+    await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, original),
     );
     const changedCiphertext = Buffer.from(original.requestCiphertext);
@@ -126,7 +126,7 @@ describe("operation repository integration", () => {
     };
 
     await expect(
-      withTenant(appPool, tenantA.id, (client) =>
+      withTenant(migratorPool, tenantA.id, (client) =>
         createOrReplayOperation(client, changed),
       ),
     ).rejects.toBeInstanceOf(OperationIdempotencyConflictError);
@@ -134,7 +134,7 @@ describe("operation repository integration", () => {
 
   it("replay após rotação preserva o primeiro envelope cifrado", async () => {
     const original = operationInput("replay-key-rotation");
-    const first = await withTenant(appPool, tenantA.id, (client) =>
+    const first = await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, original),
     );
     const rotatedCiphertext = Buffer.from(original.requestCiphertext);
@@ -155,7 +155,7 @@ describe("operation repository integration", () => {
       requestNonce: Buffer.alloc(12, 8),
     };
 
-    const replay = await withTenant(appPool, tenantA.id, (client) =>
+    const replay = await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, rotated),
     );
     expect(replay.replayed).toBe(true);
@@ -227,7 +227,7 @@ describe("operation repository integration", () => {
 
   it("converte operação ativa do mesmo veículo em erro fechado", async () => {
     const original = operationInput("active-conflict");
-    await withTenant(appPool, tenantA.id, (client) =>
+    await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, original),
     );
     const second = {
@@ -236,7 +236,7 @@ describe("operation repository integration", () => {
     };
 
     await expect(
-      withTenant(appPool, tenantA.id, (client) =>
+      withTenant(migratorPool, tenantA.id, (client) =>
         createOrReplayOperation(client, second),
       ),
     ).rejects.toBeInstanceOf(OperationActiveConflictError);
@@ -244,7 +244,7 @@ describe("operation repository integration", () => {
 
   it("distingue colisão de operationId do conflito de veículo ativo", async () => {
     const original = operationInput("operation-id-collision");
-    await withTenant(appPool, tenantA.id, (client) =>
+    await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, original),
     );
     const collision = {
@@ -253,7 +253,7 @@ describe("operation repository integration", () => {
     };
 
     await expect(
-      withTenant(appPool, tenantA.id, (client) =>
+      withTenant(migratorPool, tenantA.id, (client) =>
         createOrReplayOperation(client, collision),
       ),
     ).rejects.toBeInstanceOf(OperationIdentifierConflictError);
@@ -261,7 +261,7 @@ describe("operation repository integration", () => {
 
   it("impõe nonce global por chave e reverte toda a segunda criação", async () => {
     const original = operationInput("projection-global-nonce-a");
-    await withTenant(appPool, tenantA.id, (client) =>
+    await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, original),
     );
     const collision = {
@@ -274,7 +274,7 @@ describe("operation repository integration", () => {
     };
 
     await expect(
-      withTenant(appPool, tenantB.id, (client) =>
+      withTenant(migratorPool, tenantB.id, (client) =>
         createOrReplayOperation(client, collision),
       ),
     ).rejects.toBeInstanceOf(OperationStorageError);
@@ -287,7 +287,7 @@ describe("operation repository integration", () => {
 
   it("falha fechado no replay de estado legado sem projeção", async () => {
     const original = operationInput("legacy-without-projection");
-    await withTenant(appPool, tenantA.id, (client) =>
+    await withTenant(migratorPool, tenantA.id, (client) =>
       createOrReplayOperation(client, original),
     );
 
