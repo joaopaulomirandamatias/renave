@@ -16,6 +16,8 @@ SQL versionado em `db/migrations/`; runner, helpers e testes em `packages/db`
 | `pnpm db:purge-identity`                          | Remove tentativas e sessões OIDC expiradas em um lote. Requer `IDENTITY_DATABASE_URL`; indicado para agendamento periódico. |
 | `pnpm db:scan-evidence`                           | Detecta evidências pendentes acima do SLA em lote, sem alterar a prova. Requer `MAINTENANCE_DATABASE_URL`.                   |
 | `pnpm db:status-evidence`                         | Consulta heartbeat e backlog agregados, sem iniciar varredura. Requer `MAINTENANCE_DATABASE_URL`.                           |
+| `pnpm db:platform:grant`                          | Concede acesso global a partir de uma decisão JSON no `stdin`; requer a URL do provisionador e a HMAC compartilhada.         |
+| `pnpm db:platform:revoke`                         | Revoga acesso global pelo mesmo canal offline; não aceita identidade, ticket nem chave na linha de comando.                  |
 | `pnpm db:test`                                    | Sobe o Postgres e roda os testes de **integração** (banco descartável por execução).                                       |
 | `pnpm --filter @seu-renave/db test`               | Testes unitários (sem banco). Entram no `pnpm test` / `pnpm check`.                                                        |
 | `pnpm stock-entry:bundle:generate -- --generation-id <id> --output-dir <dir>` | Gera um bundle HELD_LOCAL novo, fora do repositório, sem sobrescrever arquivo existente. |
@@ -46,10 +48,30 @@ o subject OIDC, o ticket ou a justificativa em claro. `grant_operator` aceita
 início no máximo 5 minutos à frente e expiração posterior ao início, limitada
 a 366 dias; toda concessão, revogação e reconcessão válida entra em histórico
 append-only. A leitura global exige um `reason_ticket_digest` de 32 bytes em
-cada chamada, limita a página a 500 itens e registra resultado e truncamento na
+cada chamada, limita a página a 100 itens e registra resultado e truncamento na
 auditoria encadeada. Entrada malformada falha antes de qualquer ação e, por não
 constituir uma decisão autorizativa, não gera evento; decisões válidas,
 autorizadas ou negadas, são auditadas.
+
+A sessão OIDC persiste o issuer validado e o `auth_time` real separadamente do
+horário de criação e do toque da sessão. Sessões legadas sem issuer ou sem a
+prova temporal não atravessam a rota global. A API compõe um pool exclusivo
+com `renave_platform_reader` e comprova o contrato por uma probe dedicada que
+não lê a fila nem cria evento de auditoria. A credencial do provisionador nunca
+entra no runtime HTTP.
+
+O provisionamento usa a mesma codificação HMAC versionada da API. A decisão JSON
+contém `target` e `changedBy` com `issuer`/`subject`, `decisionTicket`, `actorIp`,
+`traceId` e, para concessão, `validFrom`/`expiresAt` em ISO 8601 UTC canônico. O
+corpo entra somente por `stdin`; o comando imprime apenas o resultado estável.
+A leitura passa primeiro por um gate local de duas consultas concorrentes (uma
+por ator) e depois por buckets PostgreSQL de 60 segundos: 30 tentativas por ator
+e 120 globais. A negação retorna `Retry-After` e não chega à função auditada.
+
+A rotação de `PLATFORM_OPERATOR_HMAC_KEY_BASE64` invalida imediatamente grants e
+cursores assinados existentes. Ela exige cerimônia coordenada: bloquear a rota,
+publicar a nova chave no provisionador e na API, recriar os grants necessários e
+somente então reabrir o console.
 
 O pin do bundle de entrada de estoque é deliberadamente **write-once**. O
 provisionador não aplica migrations, não ativa flags e não aceita `--force`.

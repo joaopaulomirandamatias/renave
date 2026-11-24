@@ -20,6 +20,7 @@ export type LoginFailureReason =
   | "binding_mismatch"
   | "provider_error"
   | "exchange_failed"
+  | "authentication_too_old"
   | "nonce_mismatch";
 
 export interface StartLoginResult {
@@ -50,6 +51,8 @@ export type CompleteLoginResult =
   | { ok: false; reason: LoginFailureReason };
 
 export interface AuthenticatedSession {
+  /** Issuer que assinou a identidade; deve acompanhar o subject no HMAC. */
+  issuer: string;
   /** Identificador estável interno. A rota pública não deve serializá-lo. */
   subject: string;
   name?: string;
@@ -57,6 +60,8 @@ export interface AuthenticatedSession {
   roles: readonly string[];
   /** Garantia derivada da política local atual; nunca serializar `acr`. */
   mfaVerified: boolean;
+  /** Claim `auth_time` que provou MFA; nunca deriva da criação da sessão. */
+  mfaVerifiedAt?: number;
   expiresAt: number;
 }
 
@@ -108,6 +113,9 @@ export function createIdentityService(
       nonce,
       codeChallenge: codeChallengeS256(codeVerifier),
       redirectUri: config.redirectUri,
+      ...(config.maxAuthenticationAgeSeconds !== undefined
+        ? { maxAgeSeconds: config.maxAuthenticationAgeSeconds }
+        : {}),
     });
 
     await store.saveLoginAttempt(sha256Base64Url(state), {
@@ -180,23 +188,39 @@ export function createIdentityService(
       return { ok: false, reason: "nonce_mismatch" };
     }
 
+    const now = clock.now();
+    if (
+      identity.issuer !== config.issuer ||
+      (config.maxAuthenticationAgeSeconds !== undefined &&
+        (identity.authenticationTime === undefined ||
+          identity.authenticationTime > now ||
+          now - identity.authenticationTime >
+            config.maxAuthenticationAgeSeconds * 1_000))
+    ) {
+      return { ok: false, reason: "authentication_too_old" };
+    }
+
     // Rotação: o identificador é sempre novo e o anterior (se houver) morre.
     if (input.previousSessionId && SESSION_ID.test(input.previousSessionId)) {
       await store.deleteSession(sha256Base64Url(input.previousSessionId));
     }
 
-    const now = clock.now();
     const sessionId = randomToken();
+    const mfaVerifiedAtLogin =
+      identity.authenticationContext !== undefined &&
+      config.mfaAcceptedAcrValues.includes(identity.authenticationContext);
     const record: SessionRecord = {
+      issuer: identity.issuer,
       subject: identity.subject,
       roles: identity.roles,
-      mfaVerifiedAtLogin:
-        identity.authenticationContext !== undefined &&
-        config.mfaAcceptedAcrValues.includes(identity.authenticationContext),
+      mfaVerifiedAtLogin,
       createdAt: now,
       lastSeenAt: now,
       idleExpiresAt: now + config.sessionIdleTtlSeconds * 1000,
       absoluteExpiresAt: now + config.sessionAbsoluteTtlSeconds * 1000,
+      ...(mfaVerifiedAtLogin && identity.authenticationTime !== undefined
+        ? { mfaAuthenticatedAt: identity.authenticationTime }
+        : {}),
       ...(identity.authenticationContext !== undefined
         ? { authenticationContext: identity.authenticationContext }
         : {}),
@@ -221,6 +245,7 @@ export function createIdentityService(
     const now = clock.now();
     const record = await store.getSession(key, now);
     if (!record) return undefined;
+    if (record.issuer !== config.issuer) return undefined;
 
     // Expiração por inatividade deslizante, limitada ao teto absoluto.
     const idleExpiresAt = Math.min(
@@ -229,13 +254,19 @@ export function createIdentityService(
     );
     await store.touchSession(key, now, idleExpiresAt);
 
+    const mfaVerified =
+      record.mfaVerifiedAtLogin &&
+      record.authenticationContext !== undefined &&
+      config.mfaAcceptedAcrValues.includes(record.authenticationContext);
+
     return {
+      issuer: record.issuer,
       subject: record.subject,
       roles: record.roles,
-      mfaVerified:
-        record.mfaVerifiedAtLogin &&
-        record.authenticationContext !== undefined &&
-        config.mfaAcceptedAcrValues.includes(record.authenticationContext),
+      mfaVerified,
+      ...(mfaVerified && record.mfaAuthenticatedAt !== undefined
+        ? { mfaVerifiedAt: record.mfaAuthenticatedAt }
+        : {}),
       expiresAt: idleExpiresAt,
       ...(record.name !== undefined ? { name: record.name } : {}),
       ...(record.email !== undefined ? { email: record.email } : {}),

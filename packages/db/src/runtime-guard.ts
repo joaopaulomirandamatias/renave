@@ -5,13 +5,15 @@ import {
   IDENTITY_APP_ROLE,
   MAINTENANCE_APP_ROLE,
   OPERATION_WORKER_ROLE,
+  PLATFORM_READER_ROLE,
 } from "./config.js";
 
 export type RuntimeDatabaseRole =
   | typeof APP_ROLE
   | typeof IDENTITY_APP_ROLE
   | typeof MAINTENANCE_APP_ROLE
-  | typeof OPERATION_WORKER_ROLE;
+  | typeof OPERATION_WORKER_ROLE
+  | typeof PLATFORM_READER_ROLE;
 
 export interface RuntimeDatabaseGuardOptions {
   expectedRole: RuntimeDatabaseRole;
@@ -81,7 +83,8 @@ export async function assertRuntimeDatabase(
     options.expectedRole !== APP_ROLE &&
     options.expectedRole !== IDENTITY_APP_ROLE &&
     options.expectedRole !== MAINTENANCE_APP_ROLE &&
-    options.expectedRole !== OPERATION_WORKER_ROLE
+    options.expectedRole !== OPERATION_WORKER_ROLE &&
+    options.expectedRole !== PLATFORM_READER_ROLE
   ) {
     throw new RuntimeDatabaseContractError();
   }
@@ -125,7 +128,8 @@ export async function assertRuntimeDatabase(
             where namespace.nspname = any (
               array[
                 'renave', 'renave_identity', 'renave_directory',
-                'renave_operations', 'renave_runtime'
+                'renave_operations', 'renave_platform',
+                'renave_platform_rate', 'renave_runtime'
               ]::text[]
             )
               and namespace.nspowner = roles.oid
@@ -137,7 +141,8 @@ export async function assertRuntimeDatabase(
             where namespace.nspname = any (
               array[
                 'renave', 'renave_identity', 'renave_directory',
-                'renave_operations', 'renave_runtime'
+                'renave_operations', 'renave_platform',
+                'renave_platform_rate', 'renave_runtime'
               ]::text[]
             )
               and object.relowner = roles.oid
@@ -152,9 +157,11 @@ export async function assertRuntimeDatabase(
     const contractFunction =
       options.expectedRole === MAINTENANCE_APP_ROLE
         ? "maintenance_contract_ready"
-        : options.expectedRole === OPERATION_WORKER_ROLE
-          ? "operation_worker_contract_ready"
-          : "api_contract_ready";
+        : options.expectedRole === PLATFORM_READER_ROLE
+          ? "platform_reader_contract_ready"
+          : options.expectedRole === OPERATION_WORKER_ROLE
+            ? "operation_worker_contract_ready"
+            : "api_contract_ready";
     const contract = await pool.query<{ ready: boolean }>(
       `select renave_runtime.${contractFunction}() as ready`,
     );

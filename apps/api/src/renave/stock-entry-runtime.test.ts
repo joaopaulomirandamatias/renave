@@ -78,6 +78,7 @@ describe("composição HELD_LOCAL", () => {
         idempotencyKey: "22222222-2222-4222-8222-222222222222",
         session: {
           expiresAt: Date.now() + 60_000,
+          issuer: "https://idp.test",
           mfaVerified: true,
           roles: [],
           subject: "subject",

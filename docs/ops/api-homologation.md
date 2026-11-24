@@ -45,6 +45,8 @@ versões.
 | `identity-database-url` / `identity-database-ca.pem` | DSN e CA do banco de identidade |
 | `login-rate-limit-hmac-key` | HMAC do limite de login |
 | `tenant-admin-hmac-key` | HMAC administrativo |
+| `platform-reader-database-url` / `platform-reader-database-ca.pem` | DSN e CA exclusivos do leitor global `renave_platform_reader` |
+| `platform-operator-hmac-key` | HMAC exclusivo de ator, ticket, trace e cursor do console global |
 | `serpro-query-limit-hmac-key` | HMAC do limite de consultas SERPRO |
 | `oidc-client-secret` | segredo do cliente confidencial, se houver |
 | `mtls-ca.pem`, `mtls-cert.pem`, `mtls-key.pem`, `mtls-passphrase` | material mTLS; passphrase opcional |
@@ -77,6 +79,19 @@ Antes de iniciar a API, verifique por controles da plataforma:
 Não imprima o conteúdo, o caminho completo ou a impressão digital do material
 em evidências de mudança. Registre somente a versão lógica do Secret e o
 resultado do gate.
+
+O console global permanece desligado com `PLATFORM_CONSOLE_ENABLED=false`. Para
+ativá-lo, configure `OIDC_MFA_ACCEPTED_ACR_VALUES`, force autenticação recente
+com `OIDC_MAX_AUTHENTICATION_AGE_SECONDS` e limite a janela com
+`PLATFORM_OPERATOR_MFA_MAX_AGE_SECONDS` (60–900 s). A API valida `auth_time` e
+o issuer do ID token; criação ou toque da sessão não renovam essa prova. O
+endpoint `GET /api/platform/renave-link-queue` exige o header canônico
+`x-renave-reason-ticket`, envia ao banco somente HMACs e ignora roles do IdP.
+Somente um grant interno ativo libera a projeção sanitizada.
+Antes da leitura auditada, a instância aceita no máximo duas consultas
+concorrentes e uma por ator; o banco aplica ainda uma janela distribuída de 60
+segundos (30 tentativas por ator e 120 globais). Saturação retorna `429` com
+`Retry-After`, e falha do limitador retorna `503` sem liberar a consulta.
 
 ## Sequência de liberação
 
@@ -197,6 +212,12 @@ de sessões.
 Rotação de certificado, CA, chave de evidência ou HMAC exige nova versão
 imutável de Secret e reinício controlado. Atualizar apenas o volume não troca o
 Agent mTLS já carregado.
+
+No console global, a HMAC também deriva o identificador dos grants e assina os
+cursores. Portanto sua rotação revoga, por construção, todos os grants e
+cursores anteriores. Bloqueie a rota, rotacione simultaneamente API e
+provisionador offline, refaça as concessões autorizadas e só então reative a
+flag.
 
 Para rollback:
 

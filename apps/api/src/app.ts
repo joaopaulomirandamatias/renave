@@ -12,6 +12,8 @@ import {
   type SessionLookupGate,
 } from "./auth/routes.js";
 import type { AppConfig } from "./config.js";
+import type { PlatformConsole } from "./platform/console.js";
+import { registerPlatformRoutes } from "./platform/routes.js";
 import {
   registerRenaveRoutes,
   type SerproQueryLimiter,
@@ -80,6 +82,8 @@ export interface BuildAppOptions {
   tenantMutationRateLimiter?: TenantMutationRateLimiter;
   /** Autoriza e executa a mutação no mesmo contexto transacional RLS. */
   tenantActionRunner?: TenantActionRunner;
+  /** Leitor global isolado; só é aceito quando a capability está configurada. */
+  platformConsole?: PlatformConsole;
   /** Probe das dependências já compostas pelo runtime. */
   ready?: () => Promise<boolean>;
   logger?: boolean;
@@ -129,6 +133,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   }
   if (options.stockEntryOperation && !options.stockEntryMutationRateLimiter) {
     throw new Error("Entrada de estoque exige rate limit distribuído");
+  }
+  if (options.config.platformConsole && !options.platformConsole) {
+    throw new Error("Console global exige leitor de plataforma configurado");
   }
 
   const app = Fastify({
@@ -247,6 +254,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         ? { operation: options.stockEntryOperation }
         : {}),
     });
+    if (options.config.platformConsole && options.platformConsole) {
+      registerPlatformRoutes(app, {
+        accessGuard,
+        console: options.platformConsole,
+        mfaMaxAgeSeconds: options.config.platformConsole.mfaMaxAgeSeconds,
+      });
+    }
   }
 
   return app;

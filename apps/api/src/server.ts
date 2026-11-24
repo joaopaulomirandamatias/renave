@@ -52,6 +52,9 @@ const app = buildApp({
   ...(runtime.tenantMutationRateLimiter
     ? { tenantMutationRateLimiter: runtime.tenantMutationRateLimiter }
     : {}),
+  ...(runtime.platformConsole
+    ? { platformConsole: runtime.platformConsole }
+    : {}),
   ready: runtime.ready,
 });
 

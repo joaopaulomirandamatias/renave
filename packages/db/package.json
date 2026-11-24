@@ -31,6 +31,8 @@
     "cli": "tsx src/cli.ts",
     "bootstrap": "tsx src/cli.ts bootstrap",
     "migrate": "tsx src/cli.ts migrate",
+    "platform:grant": "tsx src/cli.ts platform-grant",
+    "platform:revoke": "tsx src/cli.ts platform-revoke",
     "purge:identity": "tsx src/cli.ts purge-identity",
     "scan:evidence": "tsx src/cli.ts scan-evidence",
     "status:evidence": "tsx src/cli.ts status-evidence",

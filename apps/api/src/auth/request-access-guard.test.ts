@@ -33,6 +33,7 @@ function identity(getSession: IdentityService["getSession"]): IdentityService {
 function session(overrides: Record<string, unknown> = {}) {
   return {
     expiresAt: Date.now() + 60_000,
+    issuer: "https://idp.test",
     mfaVerified: false,
     roles: ["idp-role-must-not-authorize"],
     subject: "oidc|admin-a",
@@ -68,6 +69,14 @@ function guardApp(options: {
   app.get("/mfa", async (request, reply) => {
     const result = await guard.authenticate(request, reply, {
       mfa: "required",
+    });
+    if (!result.ok) return;
+    return { allowed: true };
+  });
+  app.get("/mfa-recent", async (request, reply) => {
+    const result = await guard.authenticate(request, reply, {
+      mfa: "required",
+      mfaMaxAgeSeconds: 300,
     });
     if (!result.ok) return;
     return { allowed: true };
@@ -213,6 +222,25 @@ describe("RequestAccessGuard", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ allowed: true });
     expect(release).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["ausente", undefined],
+    ["antiga", Date.now() - 301_000],
+    ["futura", Date.now() + 1_000],
+  ])("recusa prova MFA recente %s", async (_label, mfaVerifiedAt) => {
+    const { app } = guardApp({
+      getSession: vi.fn(
+        async () => session({ mfaVerified: true, mfaVerifiedAt }) as never,
+      ),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/mfa-recent",
+      headers: { cookie: SESSION_COOKIE },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ code: "MFA_RECENT_REQUIRED" });
   });
 });
 

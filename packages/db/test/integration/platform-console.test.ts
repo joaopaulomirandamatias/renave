@@ -4,6 +4,12 @@ import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, inject } from "vitest";
 
 import { createEstablishment } from "../../src/establishments.js";
+import {
+  acquirePlatformConsolePermit,
+  derivePlatformActorDigest,
+  derivePlatformDecisionTicketDigest,
+  grantPlatformOperator,
+} from "../../src/index.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
 import { transitionCredentialLink } from "../../src/credential-links.js";
@@ -43,17 +49,77 @@ afterAll(async () => {
 
 describe.sequential("console global da integradora", () => {
   it("mantém fingerprint esperado", async () => {
-    const result = await migrator.query<{ fingerprint: string }>(
-      "select renave_runtime.platform_console_catalog_fingerprint_v0064() as fingerprint",
+    const result = await migrator.query<{
+      fingerprint: string;
+      recent_mfa_fingerprint: string;
+      rate_fingerprint: string;
+    }>(
+      `select
+         renave_runtime.platform_console_catalog_fingerprint_v0064()
+           as fingerprint,
+         renave_runtime.identity_recent_mfa_catalog_fingerprint_v0067()
+           as recent_mfa_fingerprint,
+         renave_runtime.platform_rate_catalog_fingerprint_v0068()
+           as rate_fingerprint`,
     );
-    expect(result.rows[0]?.fingerprint).toBe(
-      "a5c46b031ea30cd7671348eff6243f74491c33d19bdc053a79c1b987cba39012",
-    );
+    expect(result.rows[0]).toEqual({
+      fingerprint:
+        "3d842166e4e52ee35599d836a1dcd161c15f04a0fb582bba2c56cc03fd66e644",
+      recent_mfa_fingerprint:
+        "5fb9ec168abf86dfb5ae23478309808242244b5070ce46c981a76ba84c9b3f09",
+      rate_fingerprint:
+        "c76c7287f34425a70b8e83e7d1fa1db1fc5a2d0f3c9aead1e5f323c489c450c7",
+    });
     await expect(
       app.query<{ ready: boolean }>(
         "select renave_runtime.api_contract_ready() as ready",
       ),
     ).resolves.toMatchObject({ rows: [{ ready: true }] });
+  });
+
+  it("limita de forma distribuída por ator e global antes da auditoria", async () => {
+    await migrator.query("truncate renave_platform_rate.queue_bucket");
+    const actor = digest("rate-limited-actor");
+    await expect(acquirePlatformConsolePermit(reader, actor)).resolves.toEqual({
+      allowed: true,
+      retryAfterSeconds: 0,
+    });
+    await migrator.query(
+      `update renave_platform_rate.queue_bucket set request_count=30
+        where scope='actor' and actor_digest=$1`,
+      [actor],
+    );
+    await expect(acquirePlatformConsolePermit(reader, actor)).resolves.toEqual({
+      allowed: false,
+      retryAfterSeconds: expect.any(Number),
+    });
+    await expect(
+      acquirePlatformConsolePermit(reader, digest("different-actor")),
+    ).resolves.toEqual({ allowed: true, retryAfterSeconds: 0 });
+
+    await migrator.query("truncate renave_platform_rate.queue_bucket");
+    await expect(
+      acquirePlatformConsolePermit(reader, digest("global-rate-first")),
+    ).resolves.toEqual({ allowed: true, retryAfterSeconds: 0 });
+    await migrator.query(
+      `update renave_platform_rate.queue_bucket set request_count=120
+        where scope='global'`,
+    );
+    await expect(
+      acquirePlatformConsolePermit(reader, digest("global-rate-denied")),
+    ).resolves.toEqual({
+      allowed: false,
+      retryAfterSeconds: expect.any(Number),
+    });
+    await expect(
+      reader.query("select * from renave_platform_rate.queue_bucket"),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      app.query(
+        "select * from renave_runtime.acquire_platform_console_permit($1)",
+        [digest("forbidden-app")],
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
   });
 
   it("mantém papéis separados e nenhuma leitura direta", async () => {
@@ -131,18 +197,36 @@ describe.sequential("console global da integradora", () => {
         status: "pending",
       }),
     );
-    const actor = digest("operator-hmac-output");
+    const platformKey = Buffer.alloc(32, 41);
+    const operatorIdentity = {
+      issuer: "https://idp.integration.test",
+      subject: "operator-hmac-output",
+    };
+    const actor = derivePlatformActorDigest(
+      platformKey,
+      operatorIdentity.issuer,
+      operatorIdentity.subject,
+    );
     const changedBy = digest("security-admin-hmac-output");
-    const grantTicket = digest("ticket-grant");
-    const trace = digest("trace-grant");
+    const grantTicket = derivePlatformDecisionTicketDigest(
+      platformKey,
+      "SEC-GRANT-001",
+    );
     const readReason = digest("reason-read");
     const deniedReason = digest("reason-denied");
 
-    await provisioner.query(
-      `select renave_platform.grant_operator(
-        $1,clock_timestamp(),clock_timestamp()+interval '1 hour',$2,$3,$4,$5)`,
-      [actor, grantTicket, changedBy, "127.0.0.1", trace],
-    );
+    await grantPlatformOperator(provisioner, platformKey, {
+      actorIp: "127.0.0.1",
+      changedBy: {
+        issuer: "https://idp.integration.test",
+        subject: "security-admin",
+      },
+      decisionTicket: "SEC-GRANT-001",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1_000),
+      target: operatorIdentity,
+      traceId: "trace-grant",
+      validFrom: new Date(),
+    });
     const listed = await reader.query<{
       authorized: boolean;
       establishment_id: string | null;
@@ -215,6 +299,7 @@ describe.sequential("console global da integradora", () => {
       digest("ticket-revoke"),
     );
     expect(revisions.rows[2]?.decision_ticket_digest).toEqual(regrantTicket);
+    platformKey.fill(0);
     for (const revision of revisions.rows) {
       expect(revision.expires_at.getTime()).toBeGreaterThan(
         revision.valid_from.getTime(),

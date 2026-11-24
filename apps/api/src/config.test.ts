@@ -27,6 +27,22 @@ const stockEntryLocal = {
   TENANT_ADMIN_HMAC_KEY_BASE64: Buffer.alloc(32, 2).toString("base64"),
 };
 
+const platformConsole = {
+  ...oidc,
+  APP_ENVIRONMENT: "homologation",
+  DATABASE_PLATFORM_READER_URL:
+    "postgres://renave_platform_reader@127.0.0.1:54317/renave",
+  IDENTITY_DATABASE_URL:
+    "postgres://renave_identity_app@127.0.0.1:54317/renave",
+  LOGIN_RATE_LIMIT_HMAC_KEY_BASE64: Buffer.alloc(32, 6).toString("base64"),
+  OIDC_MAX_AUTHENTICATION_AGE_SECONDS: "300",
+  OIDC_MFA_ACCEPTED_ACR_VALUES: "urn:example:assurance:mfa",
+  PLATFORM_CONSOLE_ENABLED: "true",
+  PLATFORM_OPERATOR_HMAC_KEY_BASE64: Buffer.alloc(32, 7).toString("base64"),
+  PLATFORM_OPERATOR_MFA_MAX_AGE_SECONDS: "300",
+  SESSION_STORE: "postgres",
+};
+
 describe("configuração da API", () => {
   it("mantém a entrada de estoque local desligada por padrão", () => {
     expect(loadConfig().stockEntryLocalEnabled).toBe(false);
@@ -72,6 +88,32 @@ describe("configuração da API", () => {
         TENANT_ADMIN_HMAC_KEY_BASE64: undefined,
       }),
     ).toThrow("DATABASE_URL");
+  });
+
+  it("habilita o console global somente com reader, HMAC e MFA recente real", () => {
+    expect(loadConfig(platformConsole).platformConsole).toMatchObject({
+      databaseUrl: platformConsole.DATABASE_PLATFORM_READER_URL,
+      hmacKeyBase64: platformConsole.PLATFORM_OPERATOR_HMAC_KEY_BASE64,
+      mfaMaxAgeSeconds: 300,
+    });
+    expect(() =>
+      loadConfig({
+        ...platformConsole,
+        OIDC_MAX_AUTHENTICATION_AGE_SECONDS: undefined,
+      }),
+    ).toThrow("OIDC_MAX_AUTHENTICATION_AGE_SECONDS");
+    expect(() =>
+      loadConfig({
+        ...platformConsole,
+        OIDC_MAX_AUTHENTICATION_AGE_SECONDS: "600",
+      }),
+    ).toThrow("compatível");
+    expect(() =>
+      loadConfig({
+        ...platformConsole,
+        DATABASE_PLATFORM_READER_URL: undefined,
+      }),
+    ).toThrow("DATABASE_PLATFORM_READER_URL");
   });
 
   it("valida a concorrência dedicada das consultas de sessão", () => {
@@ -320,6 +362,8 @@ function secureSecrets(
   return {
     databaseCa: undefined,
     databaseUrl: "postgres://app@127.0.0.1:54317/renave",
+    platformReaderDatabaseCa: undefined,
+    platformReaderDatabaseUrl: undefined,
     evidenceKeyringJson: JSON.stringify(evidenceKeyring),
     identityDatabaseCa: undefined,
     identityDatabaseUrl: "postgres://identity@127.0.0.1:54317/renave_identity",
@@ -329,6 +373,7 @@ function secureSecrets(
     mtlsKey: "KEY",
     mtlsKeyPassphrase: "passphrase",
     oidcClientSecret: "oidc-secret",
+    platformOperatorHmacKeyBase64: undefined,
     serproQueryLimitHmacKeyBase64: Buffer.alloc(32, 4).toString("base64"),
     tenantAdminHmacKeyBase64: Buffer.alloc(32, 5).toString("base64"),
   };

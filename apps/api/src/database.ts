@@ -4,7 +4,10 @@ import { createPool } from "@seu-renave/db/api-runtime";
 import type { Pool } from "pg";
 
 export interface RuntimePoolOptions {
-  applicationName: "seu-renave-api-business" | "seu-renave-api-identity";
+  applicationName:
+    | "seu-renave-api-business"
+    | "seu-renave-api-identity"
+    | "seu-renave-api-platform-reader";
   ca?: string;
   caFile: string | undefined;
   connectionString: string;

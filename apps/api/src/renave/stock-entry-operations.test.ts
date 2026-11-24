@@ -565,6 +565,7 @@ describe("PostgresHeldStockEntryOperation", () => {
     });
     const session = {
       expiresAt: Date.now() + 60_000,
+      issuer: "https://idp.test",
       mfaVerified: true,
       roles: [],
       subject: SUBJECT,
@@ -712,6 +713,7 @@ describe("PostgresHeldStockEntryOperation", () => {
     };
     const session = {
       expiresAt: Date.now() + 60_000,
+      issuer: "https://idp.test",
       mfaVerified: true,
       roles: [],
       subject: SUBJECT,
@@ -830,6 +832,7 @@ describe("PostgresHeldStockEntryOperation", () => {
         idempotencyKey: IDEMPOTENCY_KEY,
         session: {
           expiresAt: Date.now() + 60_000,
+          issuer: "https://idp.test",
           mfaVerified: true,
           roles: [],
           subject: SUBJECT,

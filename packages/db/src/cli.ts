@@ -23,6 +23,12 @@ import {
 import { purgeExpiredIdentityBacklog } from "./identity-maintenance.js";
 import { purgeStaleLoginRateBuckets } from "./login-rate-limiter.js";
 import { runMigrations } from "./migrate.js";
+import {
+  grantPlatformOperator,
+  revokePlatformOperator,
+  type PlatformOperatorIdentity,
+} from "./platform-operator-provisioning.js";
+import { decodePlatformOperatorHmacKeyBase64 } from "./platform-digests.js";
 import { assertRuntimeDatabase } from "./runtime-guard.js";
 import { PostgresIdentitySessionStore } from "./session-store.js";
 import { createPool } from "./tenant-context.js";
@@ -51,11 +57,154 @@ const USAGE = `Uso: pnpm --filter @seu-renave/db cli <comando>
                Verifica heartbeat/backlog sem executar uma varredura.
                Exit 0=saudável, 2=atenção operacional, 1=falha técnica.
                Requer: MAINTENANCE_DATABASE_URL
+  platform-grant
+               Concede acesso global a um operador. Lê uma decisão JSON do
+               stdin; não aceita identidades nem tickets na linha de comando.
+               Requer: DATABASE_PLATFORM_PROVISIONER_URL,
+               PLATFORM_OPERATOR_HMAC_KEY_BASE64
+  platform-revoke
+               Revoga acesso global. Usa o mesmo formato seguro via stdin.
+               Requer: DATABASE_PLATFORM_PROVISIONER_URL,
+               PLATFORM_OPERATOR_HMAC_KEY_BASE64
   setup-local  bootstrap + migrate no Postgres local do compose, com valores
                de desenvolvimento NÃO secretos (recusa host fora de loopback).
 `;
 
 const EVIDENCE_JOB = "protected-evidence-monitor";
+const MAX_PLATFORM_DECISION_BYTES = 16_384;
+
+interface PlatformDecisionDocument {
+  actorIp: string;
+  changedBy: PlatformOperatorIdentity;
+  decisionTicket: string;
+  expiresAt?: string;
+  target: PlatformOperatorIdentity;
+  traceId: string;
+  validFrom?: string;
+}
+
+async function readStandardInput(): Promise<string> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of process.stdin) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += bytes.byteLength;
+    if (size > MAX_PLATFORM_DECISION_BYTES) {
+      for (const item of chunks) item.fill(0);
+      bytes.fill(0);
+      throw new ConfigError("A decisão do console global excede o limite.");
+    }
+    chunks.push(bytes);
+  }
+  const document = Buffer.concat(chunks).toString("utf8");
+  for (const item of chunks) item.fill(0);
+  return document;
+}
+
+function platformDecisionDocument(value: unknown): PlatformDecisionDocument {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new ConfigError("A decisão do console global é inválida.");
+  }
+  const item = value as Record<string, unknown>;
+  const identity = (candidate: unknown): PlatformOperatorIdentity => {
+    if (
+      typeof candidate !== "object" ||
+      candidate === null ||
+      Array.isArray(candidate)
+    ) {
+      throw new ConfigError("A decisão do console global é inválida.");
+    }
+    const fields = candidate as Record<string, unknown>;
+    if (
+      Object.keys(fields).some(
+        (key) => key !== "issuer" && key !== "subject",
+      ) ||
+      typeof fields.issuer !== "string" ||
+      typeof fields.subject !== "string"
+    ) {
+      throw new ConfigError("A decisão do console global é inválida.");
+    }
+    return { issuer: fields.issuer, subject: fields.subject };
+  };
+  if (
+    Object.keys(item).some(
+      (key) =>
+        ![
+          "actorIp",
+          "changedBy",
+          "decisionTicket",
+          "expiresAt",
+          "target",
+          "traceId",
+          "validFrom",
+        ].includes(key),
+    ) ||
+    typeof item.actorIp !== "string" ||
+    typeof item.decisionTicket !== "string" ||
+    typeof item.traceId !== "string" ||
+    (item.expiresAt !== undefined && typeof item.expiresAt !== "string") ||
+    (item.validFrom !== undefined && typeof item.validFrom !== "string")
+  ) {
+    throw new ConfigError("A decisão do console global é inválida.");
+  }
+  return {
+    actorIp: item.actorIp,
+    changedBy: identity(item.changedBy),
+    decisionTicket: item.decisionTicket,
+    target: identity(item.target),
+    traceId: item.traceId,
+    ...(item.expiresAt === undefined ? {} : { expiresAt: item.expiresAt }),
+    ...(item.validFrom === undefined ? {} : { validFrom: item.validFrom }),
+  };
+}
+
+function exactIsoDate(value: string | undefined, name: string): Date {
+  if (value === undefined) {
+    throw new ConfigError(`${name} é obrigatório para concessão.`);
+  }
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString() !== value) {
+    throw new ConfigError(`${name} deve estar em ISO 8601 UTC canônico.`);
+  }
+  return parsed;
+}
+
+async function runPlatformDecision(command: "grant" | "revoke"): Promise<void> {
+  const raw = await readStandardInput();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new ConfigError("A decisão do console global é inválida.");
+  }
+  const input = platformDecisionDocument(parsed);
+  const key = decodePlatformOperatorHmacKeyBase64(
+    requireEnv("PLATFORM_OPERATOR_HMAC_KEY_BASE64"),
+  );
+  const pool = createPool(requireEnv("DATABASE_PLATFORM_PROVISIONER_URL"), {
+    max: 1,
+  });
+  try {
+    if (command === "grant") {
+      await grantPlatformOperator(pool, key, {
+        ...input,
+        expiresAt: exactIsoDate(input.expiresAt, "expiresAt"),
+        validFrom: exactIsoDate(input.validFrom, "validFrom"),
+      });
+      console.log("Decisão de concessão registrada.");
+    } else {
+      const changed = await revokePlatformOperator(pool, key, input);
+      console.log(
+        changed
+          ? "Decisão de revogação registrada."
+          : "Revogação registrada; não havia concessão ativa.",
+      );
+    }
+  } finally {
+    key.fill(0);
+    await pool.end();
+  }
+}
 
 function positiveIntegerFromEnv(
   name: string,
@@ -208,6 +357,14 @@ async function main(command: string | undefined): Promise<void> {
       } finally {
         await pool.end();
       }
+      return;
+    }
+    case "platform-grant": {
+      await runPlatformDecision("grant");
+      return;
+    }
+    case "platform-revoke": {
+      await runPlatformDecision("revoke");
       return;
     }
     case "setup-local": {

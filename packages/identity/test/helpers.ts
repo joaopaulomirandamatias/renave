@@ -16,6 +16,7 @@ export function testConfig(overrides: Partial<OidcConfig> = {}): OidcConfig {
     postLogoutRedirectUri: undefined,
     scopes: ["openid", "profile", "email"],
     mfaAcceptedAcrValues: [],
+    maxAuthenticationAgeSeconds: undefined,
     publicOrigin: "https://app.test",
     loginAttemptTtlSeconds: 300,
     sessionIdleTtlSeconds: 1_800,
@@ -63,7 +64,7 @@ export function fakeOidc(): FakeOidc {
     async buildAuthorizationUrl(request) {
       const url = new URL("https://idp.test/authorize");
       for (const [name, value] of Object.entries(request)) {
-        url.searchParams.set(name, value);
+        if (value !== undefined) url.searchParams.set(name, String(value));
       }
       return url.href;
     },
@@ -74,11 +75,17 @@ export function fakeOidc(): FakeOidc {
         nonce: parsed.searchParams.get("nonce") ?? "",
         codeChallenge: parsed.searchParams.get("codeChallenge") ?? "",
         redirectUri: parsed.searchParams.get("redirectUri") ?? "",
+        ...(parsed.searchParams.has("maxAgeSeconds")
+          ? {
+              maxAgeSeconds: Number(parsed.searchParams.get("maxAgeSeconds")),
+            }
+          : {}),
       };
       const code = `code-${++sequence}`;
       pending.set(code, {
         request,
         identity: {
+          issuer: "https://idp.test/realms/renave",
           subject: "subject-1",
           nonce: request.nonce,
           name: "Maria Operadora",

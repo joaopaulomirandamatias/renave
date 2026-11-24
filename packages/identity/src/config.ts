@@ -10,6 +10,8 @@ export interface OidcConfig {
   scopes: readonly string[];
   /** Valores `acr` exatos que o contrato deste IdP reconhece como MFA. */
   mfaAcceptedAcrValues: readonly string[];
+  /** Idade máxima da autenticação no IdP solicitada por `max_age`. */
+  maxAuthenticationAgeSeconds: number | undefined;
   /** Origem pública da aplicação (derivada de `redirectUri`), usada no CSRF do logout. */
   publicOrigin: string;
   loginAttemptTtlSeconds: number;
@@ -72,6 +74,23 @@ function seconds(
 ): number {
   const raw = text(env[name]);
   if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new OidcConfigError(
+      `${name} deve ser um inteiro entre ${min} e ${max}`,
+    );
+  }
+  return value;
+}
+
+function optionalSeconds(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  min: number,
+  max: number,
+): number | undefined {
+  const raw = text(env[name]);
+  if (raw === undefined) return undefined;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < min || value > max) {
     throw new OidcConfigError(
@@ -170,6 +189,12 @@ export function loadOidcConfig(
     postLogoutRedirectUri: logout?.href,
     scopes,
     mfaAcceptedAcrValues: exactAcrValues(env.OIDC_MFA_ACCEPTED_ACR_VALUES),
+    maxAuthenticationAgeSeconds: optionalSeconds(
+      env,
+      "OIDC_MAX_AUTHENTICATION_AGE_SECONDS",
+      60,
+      900,
+    ),
     publicOrigin: redirect.origin,
     loginAttemptTtlSeconds: seconds(
       env,

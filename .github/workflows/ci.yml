@@ -79,9 +79,11 @@ jobs:
           );
           for (const forbidden of [
             "DATABASE_URL",
+            "DATABASE_PLATFORM_READER_URL",
             "IDENTITY_DATABASE_URL",
             "LOGIN_RATE_LIMIT_HMAC_KEY_BASE64",
             "OIDC_CLIENT_SECRET",
+            "PLATFORM_OPERATOR_HMAC_KEY_BASE64",
             "RENAVE_EVIDENCE_KEY_BASE64",
             "RENAVE_MTLS_KEY_PASSPHRASE",
             "SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64",

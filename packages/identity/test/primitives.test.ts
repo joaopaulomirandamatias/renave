@@ -97,6 +97,35 @@ describe("primitivas OIDC", () => {
     ).toThrow(/OIDC_MFA_ACCEPTED_ACR_VALUES/u);
   });
 
+  it("limita a política server-side de max_age", () => {
+    const base = {
+      OIDC_ISSUER: "https://idp.test",
+      OIDC_CLIENT_ID: "client",
+      OIDC_REDIRECT_URI: "https://app.test/callback",
+    };
+    expect(
+      loadOidcConfig(
+        { ...base, OIDC_MAX_AUTHENTICATION_AGE_SECONDS: "300" },
+        "homologation",
+      ).maxAuthenticationAgeSeconds,
+    ).toBe(300);
+    expect(
+      loadOidcConfig(base, "homologation").maxAuthenticationAgeSeconds,
+    ).toBeUndefined();
+    expect(() =>
+      loadOidcConfig(
+        { ...base, OIDC_MAX_AUTHENTICATION_AGE_SECONDS: "59" },
+        "homologation",
+      ),
+    ).toThrow(/OIDC_MAX_AUTHENTICATION_AGE_SECONDS/u);
+    expect(() =>
+      loadOidcConfig(
+        { ...base, OIDC_MAX_AUTHENTICATION_AGE_SECONDS: "901" },
+        "homologation",
+      ),
+    ).toThrow(/OIDC_MAX_AUTHENTICATION_AGE_SECONDS/u);
+  });
+
   it("consome tentativa em memória uma única vez e descarta expirada", async () => {
     const store = new InMemorySessionStore({ environment: "test" });
     const attempt = {

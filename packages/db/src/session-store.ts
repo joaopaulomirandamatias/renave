@@ -25,8 +25,10 @@ interface SessionRow {
   display_name: string | null;
   email: string | null;
   idle_expires_at_ms: string;
+  issuer: string | null;
   last_seen_at_ms: string;
   mfa_verified_at_login: boolean;
+  mfa_authenticated_at_ms: string | null;
   roles: string[];
   subject: string;
 }
@@ -79,12 +81,40 @@ function assertLoginAttempt(attempt: LoginAttempt): void {
 }
 
 function assertSession(session: SessionRecord): void {
+  let issuer: URL;
+  try {
+    issuer = new URL(session.issuer);
+  } catch {
+    throw new IdentitySessionStoreInputError("issuer inválido.");
+  }
+  if (
+    session.issuer.length > 2_048 ||
+    (issuer.protocol !== "https:" && issuer.protocol !== "http:") ||
+    issuer.username !== "" ||
+    issuer.password !== "" ||
+    issuer.search !== "" ||
+    issuer.hash !== ""
+  ) {
+    throw new IdentitySessionStoreInputError("issuer inválido.");
+  }
   if (
     session.subject.trim() !== session.subject ||
     session.subject.length === 0 ||
     session.subject.length > 255
   ) {
     throw new IdentitySessionStoreInputError("subject inválido.");
+  }
+  if (session.mfaAuthenticatedAt !== undefined) {
+    assertEpoch(session.mfaAuthenticatedAt, "mfaAuthenticatedAt");
+    if (
+      !session.mfaVerifiedAtLogin ||
+      session.authenticationContext === undefined ||
+      session.mfaAuthenticatedAt > session.createdAt
+    ) {
+      throw new IdentitySessionStoreInputError(
+        "mfaAuthenticatedAt exige garantia MFA válida.",
+      );
+    }
   }
   for (const [field, value] of [
     ["name", session.name],
@@ -166,9 +196,13 @@ function toSession(row: SessionRow): SessionRecord {
     createdAt: toNumber(row.created_at_ms),
     idleExpiresAt: toNumber(row.idle_expires_at_ms),
     lastSeenAt: toNumber(row.last_seen_at_ms),
+    issuer: row.issuer ?? "",
     mfaVerifiedAtLogin: row.mfa_verified_at_login,
     roles: row.roles,
     subject: row.subject,
+    ...(row.mfa_authenticated_at_ms === null
+      ? {}
+      : { mfaAuthenticatedAt: toNumber(row.mfa_authenticated_at_ms) }),
     ...(row.authentication_context === null
       ? {}
       : { authenticationContext: row.authentication_context }),
@@ -227,16 +261,18 @@ export class PostgresIdentitySessionStore implements SessionStore {
     assertSession(session);
     await this.pool.query(
       `select renave_identity.save_auth_session(
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
        )`,
       [
         key,
+        session.issuer,
         session.subject,
         session.name ?? null,
         session.email ?? null,
         [...session.roles],
         session.authenticationContext ?? null,
         session.mfaVerifiedAtLogin,
+        session.mfaAuthenticatedAt ?? null,
         session.createdAt,
         session.lastSeenAt,
         session.idleExpiresAt,
@@ -252,8 +288,9 @@ export class PostgresIdentitySessionStore implements SessionStore {
     assertHash(key);
     assertEpoch(now, "now");
     const { rows } = await this.pool.query<SessionRow>(
-      `select subject, display_name, email, roles, authentication_context,
-              mfa_verified_at_login, created_at_ms::text,
+      `select issuer, subject, display_name, email, roles, authentication_context,
+              mfa_verified_at_login, mfa_authenticated_at_ms::text,
+              created_at_ms::text,
               last_seen_at_ms::text, idle_expires_at_ms::text,
               absolute_expires_at_ms::text
          from renave_identity.get_auth_session($1, $2)`,

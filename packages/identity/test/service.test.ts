@@ -3,12 +3,23 @@ import { describe, expect, it } from "vitest";
 import { InMemorySessionStore } from "../src/memory-store.js";
 import { createIdentityService } from "../src/service.js";
 import { fakeOidc, manualClock, testConfig } from "./helpers.js";
-import type { VerifiedIdentity } from "../src/ports.js";
+import type { SessionRecord, VerifiedIdentity } from "../src/ports.js";
 
-function setup(config = testConfig()) {
+class CapturingSessionStore extends InMemorySessionStore {
+  readonly saved: SessionRecord[] = [];
+
+  override async saveSession(key: string, session: SessionRecord) {
+    this.saved.push(session);
+    await super.saveSession(key, session);
+  }
+}
+
+function setup(
+  config = testConfig(),
+  store = new InMemorySessionStore({ environment: "test" }),
+) {
   const oidc = fakeOidc();
   const clock = manualClock();
-  const store = new InMemorySessionStore({ environment: "test" });
   const service = createIdentityService({
     oidc,
     store,
@@ -74,6 +85,118 @@ describe("IdentityService", () => {
     const session = await downgraded.getSession(login.sessionId);
     expect(session).toEqual(expect.objectContaining({ mfaVerified: false }));
     expect(session).not.toHaveProperty("authenticationContext");
+  });
+
+  it("exige auth_time recente quando max_age foi configurado", async () => {
+    const authenticationTime = 1_699_999_940_000;
+    const config = testConfig({
+      maxAuthenticationAgeSeconds: 300,
+      mfaAcceptedAcrValues: ["urn:example:loa:2"],
+    });
+    const context = await startAndAuthorize("/plataforma", config, {
+      authenticationContext: "urn:example:loa:2",
+      authenticationTime,
+    });
+    expect(
+      new URL(context.started.authorizationUrl).searchParams.get(
+        "maxAgeSeconds",
+      ),
+    ).toBe("300");
+    const login = await context.service.completeLogin({
+      ...context.callback,
+      bindingSecret: context.started.bindingSecret,
+    });
+    if (!login.ok) throw new Error("login deveria ter sucesso");
+
+    await expect(context.service.getSession(login.sessionId)).resolves.toEqual(
+      expect.objectContaining({
+        issuer: "https://idp.test/realms/renave",
+        mfaVerified: true,
+        mfaVerifiedAt: authenticationTime,
+      }),
+    );
+  });
+
+  it("não persiste auth_time como prova MFA quando o ACR não é aceito", async () => {
+    const store = new CapturingSessionStore({ environment: "test" });
+    const context = setup(testConfig(), store);
+    const started = await context.service.startLogin({ returnTo: "/" });
+    const callback = context.oidc.authorize(started.authorizationUrl, {
+      authenticationContext: "urn:example:loa:other",
+      authenticationTime: 1_699_999_940_000,
+    });
+    const login = await context.service.completeLogin({
+      ...callback,
+      bindingSecret: started.bindingSecret,
+    });
+    if (!login.ok) throw new Error("login deveria ter sucesso");
+    const session = await context.service.getSession(login.sessionId);
+    expect(session).toEqual(expect.objectContaining({ mfaVerified: false }));
+    expect(session).not.toHaveProperty("mfaVerifiedAt");
+    expect(store.saved.at(-1)).not.toHaveProperty("mfaAuthenticatedAt");
+  });
+
+  it.each([
+    ["ausente", undefined],
+    ["antigo", 1_699_999_699_999],
+    ["futuro", 1_700_000_000_001],
+  ])(
+    "recusa auth_time %s e preserva a sessão anterior",
+    async (_label, value) => {
+      const context = setup(
+        testConfig({
+          maxAuthenticationAgeSeconds: 300,
+          mfaAcceptedAcrValues: ["urn:example:loa:2"],
+        }),
+      );
+      const previousStart = await context.service.startLogin({ returnTo: "/" });
+      const previousCallback = context.oidc.authorize(
+        previousStart.authorizationUrl,
+        {
+          authenticationContext: "urn:example:loa:2",
+          authenticationTime: 1_699_999_940_000,
+        },
+      );
+      const previous = await context.service.completeLogin({
+        ...previousCallback,
+        bindingSecret: previousStart.bindingSecret,
+      });
+      if (!previous.ok) throw new Error("login inicial deveria ter sucesso");
+
+      const started = await context.service.startLogin({ returnTo: "/" });
+      const callback = context.oidc.authorize(started.authorizationUrl, {
+        authenticationContext: "urn:example:loa:2",
+        ...(value === undefined ? {} : { authenticationTime: value }),
+      });
+      await expect(
+        context.service.completeLogin({
+          ...callback,
+          bindingSecret: started.bindingSecret,
+          previousSessionId: previous.sessionId,
+        }),
+      ).resolves.toEqual({ ok: false, reason: "authentication_too_old" });
+      await expect(
+        context.service.getSession(previous.sessionId),
+      ).resolves.toBeDefined();
+    },
+  );
+
+  it("não reinterpreta uma sessão quando o issuer configurado muda", async () => {
+    const context = await startAndAuthorize();
+    const login = await context.service.completeLogin({
+      ...context.callback,
+      bindingSecret: context.started.bindingSecret,
+    });
+    if (!login.ok) throw new Error("login deveria ter sucesso");
+    const changedIssuer = createIdentityService({
+      oidc: context.oidc,
+      store: context.store,
+      config: testConfig({ issuer: "https://idp.test/realms/other" }),
+      clock: context.clock,
+    });
+    await expect(
+      changedIssuer.getSession(login.sessionId),
+    ).resolves.toBeUndefined();
   });
 
   it("não eleva retroativamente sessão criada antes da allowlist", async () => {

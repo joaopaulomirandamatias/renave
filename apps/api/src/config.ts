@@ -42,6 +42,14 @@ export interface RenaveIntegrationConfig {
   mtls: RenaveMtlsMaterialConfig;
 }
 
+export interface PlatformConsoleConfig {
+  databaseUrl: string;
+  databaseTlsCa?: string | undefined;
+  databaseTlsCaFile: string | undefined;
+  hmacKeyBase64: string;
+  mfaMaxAgeSeconds: number;
+}
+
 export interface AppConfig {
   appEnvironment: AppEnvironment;
   authMode: AuthMode;
@@ -65,6 +73,8 @@ export interface AppConfig {
   databaseUrl: string | undefined;
   databaseTlsCa?: string | undefined;
   databaseTlsCaFile: string | undefined;
+  /** Leitor global isolado; ausente mantém todas as rotas de plataforma fechadas. */
+  platformConsole: PlatformConsoleConfig | undefined;
   renave: RenaveIntegrationConfig | undefined;
   host: string;
   port: number;
@@ -149,7 +159,8 @@ function parseProxyTrust(
 }
 
 function validateDatabaseUrl(
-  name: "DATABASE_URL" | "IDENTITY_DATABASE_URL",
+  name:
+    "DATABASE_URL" | "DATABASE_PLATFORM_READER_URL" | "IDENTITY_DATABASE_URL",
   connectionString: string | undefined,
   tlsCaFile: string | undefined,
   appEnvironment: AppEnvironment,
@@ -195,6 +206,13 @@ function stockEntryLocalEnabled(value: string | undefined): boolean {
   if (!normalized || normalized === "false") return false;
   if (normalized === "true") return true;
   throw new Error("RENAVE_STOCK_ENTRY_LOCAL_ENABLED deve ser true ou false");
+}
+
+function platformConsoleEnabled(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === "false") return false;
+  if (normalized === "true") return true;
+  throw new Error("PLATFORM_CONSOLE_ENABLED deve ser true ou false");
 }
 
 const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
@@ -400,6 +418,16 @@ function parseSessionLookupMaxConcurrency(value: string | undefined): number {
   return concurrency;
 }
 
+function parsePlatformMfaMaxAgeSeconds(value: string | undefined): number {
+  const seconds = Number(value ?? "300");
+  if (!Number.isInteger(seconds) || seconds < 60 || seconds > 900) {
+    throw new Error(
+      "PLATFORM_OPERATOR_MFA_MAX_AGE_SECONDS deve ser um inteiro entre 60 e 900",
+    );
+  }
+  return seconds;
+}
+
 function withSecretValues(
   environment: NodeJS.ProcessEnv,
   secretFiles: ApiSecretFiles | undefined,
@@ -408,9 +436,12 @@ function withSecretValues(
   const result: NodeJS.ProcessEnv = { ...environment };
   const values = {
     DATABASE_URL: secretFiles.databaseUrl,
+    DATABASE_PLATFORM_READER_URL: secretFiles.platformReaderDatabaseUrl,
     IDENTITY_DATABASE_URL: secretFiles.identityDatabaseUrl,
     LOGIN_RATE_LIMIT_HMAC_KEY_BASE64: secretFiles.loginRateLimitHmacKeyBase64,
     OIDC_CLIENT_SECRET: secretFiles.oidcClientSecret,
+    PLATFORM_OPERATOR_HMAC_KEY_BASE64:
+      secretFiles.platformOperatorHmacKeyBase64,
     SERPRO_QUERY_LIMIT_HMAC_KEY_BASE64:
       secretFiles.serproQueryLimitHmacKeyBase64,
     TENANT_ADMIN_HMAC_KEY_BASE64: secretFiles.tenantAdminHmacKeyBase64,
@@ -446,6 +477,19 @@ function parseConfig(
   const databaseUrl = optionalText(environment.DATABASE_URL);
   const databaseTlsCaFile = optionalText(environment.DATABASE_TLS_CA_FILE);
   const databaseTlsCa = secretFiles?.databaseCa;
+  const enablePlatformConsole = platformConsoleEnabled(
+    environment.PLATFORM_CONSOLE_ENABLED,
+  );
+  const platformReaderDatabaseUrl = optionalText(
+    environment.DATABASE_PLATFORM_READER_URL,
+  );
+  const platformReaderDatabaseTlsCaFile = optionalText(
+    environment.DATABASE_PLATFORM_READER_TLS_CA_FILE,
+  );
+  const platformReaderDatabaseTlsCa = secretFiles?.platformReaderDatabaseCa;
+  const platformOperatorHmacKeyBase64 = optionalText(
+    environment.PLATFORM_OPERATOR_HMAC_KEY_BASE64,
+  );
   const loginRateLimitHmacKeyBase64 = optionalText(
     environment.LOGIN_RATE_LIMIT_HMAC_KEY_BASE64,
   );
@@ -464,11 +508,24 @@ function parseConfig(
     authMode,
     secretFiles,
   );
+  const oidc =
+    authMode === "oidc"
+      ? loadOidcConfig(environment, appEnvironment)
+      : undefined;
+  const platformMfaMaxAgeSeconds = parsePlatformMfaMaxAgeSeconds(
+    environment.PLATFORM_OPERATOR_MFA_MAX_AGE_SECONDS,
+  );
 
   validateDatabaseUrl(
     "IDENTITY_DATABASE_URL",
     identityDatabaseUrl,
     identityDatabaseTlsCaFile ?? identityDatabaseTlsCa,
+    appEnvironment,
+  );
+  validateDatabaseUrl(
+    "DATABASE_PLATFORM_READER_URL",
+    platformReaderDatabaseUrl,
+    platformReaderDatabaseTlsCaFile ?? platformReaderDatabaseTlsCa,
     appEnvironment,
   );
   validateDatabaseUrl(
@@ -535,15 +592,37 @@ function parseConfig(
       throw new Error("A entrada de estoque local exige DATABASE_URL");
     }
   }
+  if (enablePlatformConsole) {
+    if (authMode !== "oidc") {
+      throw new Error("O console global exige AUTH_MODE=oidc");
+    }
+    if (sessionStore !== "postgres" || !identityDatabaseUrl) {
+      throw new Error(
+        "O console global exige SESSION_STORE=postgres e IDENTITY_DATABASE_URL",
+      );
+    }
+    if (!platformReaderDatabaseUrl || !platformOperatorHmacKeyBase64) {
+      throw new Error(
+        "O console global exige DATABASE_PLATFORM_READER_URL e PLATFORM_OPERATOR_HMAC_KEY_BASE64",
+      );
+    }
+    if (
+      !oidc ||
+      oidc.mfaAcceptedAcrValues.length === 0 ||
+      oidc.maxAuthenticationAgeSeconds === undefined ||
+      oidc.maxAuthenticationAgeSeconds > platformMfaMaxAgeSeconds
+    ) {
+      throw new Error(
+        "O console global exige ACR de MFA e OIDC_MAX_AUTHENTICATION_AGE_SECONDS compatível",
+      );
+    }
+  }
 
   return {
     appEnvironment,
     authMode,
     // Falha fechada: AUTH_MODE=oidc com variáveis ausentes ou inseguras aborta.
-    oidc:
-      authMode === "oidc"
-        ? loadOidcConfig(environment, appEnvironment)
-        : undefined,
+    oidc,
     sessionStore,
     identityDatabaseUrl,
     identityDatabaseTlsCa,
@@ -558,6 +637,15 @@ function parseConfig(
     databaseUrl,
     databaseTlsCa,
     databaseTlsCaFile,
+    platformConsole: enablePlatformConsole
+      ? {
+          databaseUrl: platformReaderDatabaseUrl!,
+          databaseTlsCa: platformReaderDatabaseTlsCa,
+          databaseTlsCaFile: platformReaderDatabaseTlsCaFile,
+          hmacKeyBase64: platformOperatorHmacKeyBase64!,
+          mfaMaxAgeSeconds: platformMfaMaxAgeSeconds,
+        }
+      : undefined,
     renave,
     host: environment.HOST?.trim() || "0.0.0.0",
     port: parsePort(environment.PORT),
@@ -575,10 +663,13 @@ export function loadConfig(
 const RAW_SECRET_ENV_NAMES = Object.freeze([
   "DATABASE_TLS_CA_FILE",
   "DATABASE_URL",
+  "DATABASE_PLATFORM_READER_TLS_CA_FILE",
+  "DATABASE_PLATFORM_READER_URL",
   "IDENTITY_DATABASE_TLS_CA_FILE",
   "IDENTITY_DATABASE_URL",
   "LOGIN_RATE_LIMIT_HMAC_KEY_BASE64",
   "OIDC_CLIENT_SECRET",
+  "PLATFORM_OPERATOR_HMAC_KEY_BASE64",
   "RENAVE_EVIDENCE_KEY_BASE64",
   "RENAVE_EVIDENCE_KEY_ID",
   "RENAVE_MTLS_CA_FILE",
@@ -592,6 +683,7 @@ const RAW_SECRET_ENV_NAMES = Object.freeze([
 function hasOperationalCapability(environment: NodeJS.ProcessEnv): boolean {
   return (
     parseAuthMode(environment.AUTH_MODE) === "oidc" ||
+    platformConsoleEnabled(environment.PLATFORM_CONSOLE_ENABLED) ||
     integrationEnabled(environment.RENAVE_INTEGRATION_ENABLED) ||
     stockEntryLocalEnabled(environment.RENAVE_STOCK_ENTRY_LOCAL_ENABLED)
   );

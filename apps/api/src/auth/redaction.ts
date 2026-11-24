@@ -11,6 +11,7 @@ export const redactedLogPaths = [
   "req.headers.authorization",
   "req.headers.cookie",
   'req.headers["idempotency-key"]',
+  'req.headers["x-renave-reason-ticket"]',
   "req.body.cnpj",
   "req.body.password",
   "req.body.token",

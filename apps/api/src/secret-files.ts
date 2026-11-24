@@ -7,6 +7,8 @@ export const API_SECRET_DIRECTORY = "/run/secrets/seu-renave/api";
 const SECRET_FILES = Object.freeze({
   databaseCa: "database-ca.pem",
   databaseUrl: "database-url",
+  platformReaderDatabaseCa: "platform-reader-database-ca.pem",
+  platformReaderDatabaseUrl: "platform-reader-database-url",
   evidenceKeyringJson: "evidence-keyring.json",
   identityDatabaseCa: "identity-database-ca.pem",
   identityDatabaseUrl: "identity-database-url",
@@ -16,6 +18,7 @@ const SECRET_FILES = Object.freeze({
   mtlsKey: "mtls-key.pem",
   mtlsKeyPassphrase: "mtls-passphrase",
   oidcClientSecret: "oidc-client-secret",
+  platformOperatorHmacKeyBase64: "platform-operator-hmac-key",
   serproQueryLimitHmacKeyBase64: "serpro-query-limit-hmac-key",
   tenantAdminHmacKeyBase64: "tenant-admin-hmac-key",
 });
@@ -23,6 +26,8 @@ const SECRET_FILES = Object.freeze({
 const LIMITS = Object.freeze({
   databaseCa: 256 * 1_024,
   databaseUrl: 4_096,
+  platformReaderDatabaseCa: 256 * 1_024,
+  platformReaderDatabaseUrl: 4_096,
   evidenceKeyringJson: 16 * 1_024,
   identityDatabaseCa: 256 * 1_024,
   identityDatabaseUrl: 4_096,
@@ -32,6 +37,7 @@ const LIMITS = Object.freeze({
   mtlsKey: 64 * 1_024,
   mtlsKeyPassphrase: 4_096,
   oidcClientSecret: 4_096,
+  platformOperatorHmacKeyBase64: 256,
   serproQueryLimitHmacKeyBase64: 256,
   tenantAdminHmacKeyBase64: 256,
 });
@@ -39,6 +45,8 @@ const LIMITS = Object.freeze({
 export interface ApiSecretFiles {
   databaseCa: string | undefined;
   databaseUrl: string | undefined;
+  platformReaderDatabaseCa: string | undefined;
+  platformReaderDatabaseUrl: string | undefined;
   evidenceKeyringJson: string | undefined;
   identityDatabaseCa: string | undefined;
   identityDatabaseUrl: string | undefined;
@@ -48,6 +56,7 @@ export interface ApiSecretFiles {
   mtlsKey: string | undefined;
   mtlsKeyPassphrase: string | undefined;
   oidcClientSecret: string | undefined;
+  platformOperatorHmacKeyBase64: string | undefined;
   serproQueryLimitHmacKeyBase64: string | undefined;
   tenantAdminHmacKeyBase64: string | undefined;
 }

@@ -23,6 +23,8 @@ export interface SessionLookupGate {
 
 export interface SessionRequirement {
   mfa?: "required";
+  /** Idade máxima da prova MFA; ausente aceita toda a sessão autenticada. */
+  mfaMaxAgeSeconds?: number;
   required?: boolean;
   responseBase?: Readonly<Record<string, unknown>>;
 }
@@ -44,11 +46,13 @@ export interface RequestAccessGuard {
 }
 
 export function createRequestAccessGuard(options: {
+  clock?: Readonly<{ now(): number }>;
   identity: IdentityService;
   secure: boolean;
   sessionLookupGate?: SessionLookupGate;
 }): RequestAccessGuard {
   const sessionCookie = cookieNames(options.secure).session;
+  const clock = options.clock ?? { now: () => Date.now() };
 
   const authenticate = async (
     request: FastifyRequest,
@@ -102,6 +106,18 @@ export function createRequestAccessGuard(options: {
       }
       if (requirement.mfa === "required" && session.mfaVerified !== true) {
         await reply.code(403).send({ code: "MFA_REQUIRED" });
+        return { ok: false };
+      }
+      const now = clock.now();
+      if (
+        requirement.mfa === "required" &&
+        requirement.mfaMaxAgeSeconds !== undefined &&
+        (typeof session.mfaVerifiedAt !== "number" ||
+          !Number.isFinite(session.mfaVerifiedAt) ||
+          session.mfaVerifiedAt > now ||
+          now - session.mfaVerifiedAt > requirement.mfaMaxAgeSeconds * 1_000)
+      ) {
+        await reply.code(403).send({ code: "MFA_RECENT_REQUIRED" });
         return { ok: false };
       }
       return { ok: true, session };

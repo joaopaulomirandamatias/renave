@@ -18,7 +18,29 @@ export {
   type CredentialLinkQueueEntry,
   type CredentialLinkQueuePage,
 } from "./credential-links.js";
-export { APP_ROLE, IDENTITY_APP_ROLE } from "./config.js";
+export { APP_ROLE, IDENTITY_APP_ROLE, PLATFORM_READER_ROLE } from "./config.js";
+export {
+  decodePlatformOperatorHmacKeyBase64,
+  derivePlatformActorDigest,
+  derivePlatformCursorDigest,
+  derivePlatformReasonDigest,
+  derivePlatformTraceDigest,
+  PlatformDigestInputError,
+} from "./platform-digests.js";
+export {
+  acquirePlatformConsolePermit,
+  PlatformConsoleRateLimitContractError,
+  type PlatformConsoleRateLimitDecision,
+} from "./platform-console-rate-limiter.js";
+export {
+  listPlatformCredentialLinkQueue,
+  PlatformQueueContractError,
+  type ListPlatformQueueInput,
+  type PlatformCredentialLinkStatus,
+  type PlatformQueueCursor,
+  type PlatformQueueEntry,
+  type PlatformQueueResult,
+} from "./platform-console-reader.js";
 export {
   getEstablishment,
   listEstablishments,

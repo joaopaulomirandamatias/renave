@@ -8,6 +8,7 @@ import {
   decodeSerproQueryHmacKeyBase64,
   decodeTenantAdminHmacKeyBase64,
   IDENTITY_APP_ROLE,
+  PLATFORM_READER_ROLE,
   PostgresIdentitySessionStore,
   PostgresLoginRateLimiter,
   PostgresSerproQueryLimiter,
@@ -36,6 +37,11 @@ import type { SessionLookupGate } from "./auth/routes.js";
 import { LocalSessionLookupGate } from "./auth/session-lookup-gate.js";
 import type { AppConfig } from "./config.js";
 import { createRuntimePool } from "./database.js";
+import {
+  decodePlatformOperatorHmacKeyBase64,
+  PostgresPlatformConsole,
+  type PlatformConsole,
+} from "./platform/console.js";
 import { PostgresVehicleEligibilityUseCase } from "./renave/use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
 import { readRenaveMtlsMaterial } from "./renave/mtls-material.js";
@@ -84,6 +90,7 @@ export interface AppRuntime {
   tenantEstablishmentAdministration?: TenantEstablishmentAdministration;
   tenantMutationRateLimiter?: TenantMutationRateLimiter;
   tenantActionRunner?: TenantActionRunner;
+  platformConsole?: PlatformConsole;
 }
 
 export function areRuntimeDependenciesReady(input: {
@@ -168,7 +175,8 @@ export async function rollbackRuntimeResources(
 export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
   const cleanup = createRuntimeCleanupCoordinator();
   const runtimeDatabases: Array<{
-    expectedRole: typeof APP_ROLE | typeof IDENTITY_APP_ROLE;
+    expectedRole:
+      typeof APP_ROLE | typeof IDENTITY_APP_ROLE | typeof PLATFORM_READER_ROLE;
     pool: Pool;
   }> = [];
   let degraded = false;
@@ -249,6 +257,36 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     if (businessPool) {
       await assertRuntimeDatabase(businessPool, { expectedRole: APP_ROLE });
       runtimeDatabases.push({ expectedRole: APP_ROLE, pool: businessPool });
+    }
+    let platformConsole: PostgresPlatformConsole | undefined;
+    if (config.platformConsole) {
+      const platformPool = registerPool(
+        await createRuntimePool({
+          applicationName: "seu-renave-api-platform-reader",
+          ...(config.platformConsole.databaseTlsCa
+            ? { ca: config.platformConsole.databaseTlsCa }
+            : {}),
+          caFile: config.platformConsole.databaseTlsCaFile,
+          connectionString: config.platformConsole.databaseUrl,
+          max: 4,
+        }),
+      );
+      await assertRuntimeDatabase(platformPool, {
+        expectedRole: PLATFORM_READER_ROLE,
+      });
+      runtimeDatabases.push({
+        expectedRole: PLATFORM_READER_ROLE,
+        pool: platformPool,
+      });
+      const key = decodePlatformOperatorHmacKeyBase64(
+        config.platformConsole.hmacKeyBase64,
+      );
+      try {
+        platformConsole = new PostgresPlatformConsole(platformPool, key);
+        cleanup.registerResource(() => platformConsole!.destroy());
+      } finally {
+        key.fill(0);
+      }
     }
     let serproQueryLimiter: PostgresSerproQueryLimiter | undefined;
     if (businessPool && config.serproQueryLimitHmacKeyBase64) {
@@ -449,6 +487,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         ? { tenantEstablishmentAdministration: tenantAdministration }
         : {}),
       ...(tenantMutationRateLimiter ? { tenantMutationRateLimiter } : {}),
+      ...(platformConsole ? { platformConsole } : {}),
       async ready() {
         let databasesReady = true;
         try {

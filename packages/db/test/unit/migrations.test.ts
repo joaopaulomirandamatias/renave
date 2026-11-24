@@ -6,11 +6,20 @@ import { loadMigrations, MigrationError } from "../../src/migrate.js";
 
 describe("loadMigrations", () => {
   it("lê as migrations versionadas em ordem, com checksum estável", async () => {
-    const allWithPlatformConsole = await loadMigrations();
+    const loaded = await loadMigrations();
+    const platformReaderProbeIndex = loaded.findIndex(
+      ({ version }) => version === "0065_platform_reader_runtime_probe",
+    );
+    expect(platformReaderProbeIndex).toBeGreaterThan(-1);
+    const allWithPlatformReaderProbe = loaded.slice(
+      0,
+      platformReaderProbeIndex + 1,
+    );
+    const allWithPlatformConsole = allWithPlatformReaderProbe.slice(0, -1);
     const allWithVehicleLookup = allWithPlatformConsole.slice(0, -2);
     const all = allWithVehicleLookup.slice(0, -2);
     const first = all.slice(0, -16);
-    const second = (await loadMigrations()).slice(0, -20);
+    const second = (await loadMigrations()).slice(0, first.length);
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
     expect(first.at(-21)?.version).toBe("0024_runtime_contract_stock_query");
@@ -314,6 +323,41 @@ describe("loadMigrations", () => {
     expect(allWithPlatformConsole.at(-1)?.sql).toContain(
       "grant execute on function renave_platform.grant_operator",
     );
+    expect(allWithPlatformReaderProbe.at(-1)?.version).toBe(
+      "0065_platform_reader_runtime_probe",
+    );
+    expect(allWithPlatformReaderProbe.at(-1)?.sql).toContain(
+      "platform_reader_contract_ready",
+    );
+    expect(allWithPlatformReaderProbe.at(-1)?.sql).toContain(
+      "session_user = 'renave_platform_reader'",
+    );
+    expect(allWithPlatformReaderProbe.at(-1)?.sql).toContain(
+      "grant usage on schema renave_runtime to renave_platform_reader",
+    );
+    expect(loaded.at(-4)?.version).toBe("0066_identity_issuer_recent_mfa");
+    expect(loaded.at(-4)?.sql).toContain("mfa_authenticated_at_ms");
+    expect(loaded.at(-4)?.sql).toContain("add column issuer text");
+    expect(loaded.at(-3)?.version).toBe(
+      "0067_runtime_contract_identity_recent_mfa",
+    );
+    expect(loaded.at(-3)?.sql).toContain(loaded.at(-4)?.checksum);
+    expect(loaded.at(-3)?.sql).toContain(
+      allWithPlatformReaderProbe.at(-1)?.checksum,
+    );
+    expect(loaded.at(-3)?.sql).toContain(
+      "identity_recent_mfa_catalog_fingerprint_v0067",
+    );
+    expect(loaded.at(-2)?.version).toBe("0068_platform_console_rate_limit");
+    expect(loaded.at(-2)?.sql).toContain("acquire_platform_console_permit");
+    expect(loaded.at(-2)?.sql).toContain(
+      "platform_rate_catalog_fingerprint_v0068",
+    );
+    expect(loaded.at(-1)?.version).toBe(
+      "0069_runtime_contract_platform_console_rate_limit",
+    );
+    expect(loaded.at(-1)?.sql).toContain(loaded.at(-2)?.checksum);
+    expect(loaded.at(-1)?.sql).toContain("platform_rate_contract_ready_v0068");
   });
 
   it("recusa lacuna na sequência e nome fora do padrão", async () => {

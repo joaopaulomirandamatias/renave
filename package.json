@@ -15,6 +15,8 @@
     "db:bootstrap": "pnpm --filter @seu-renave/db bootstrap",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @seu-renave/db migrate",
+    "db:platform:grant": "pnpm --filter @seu-renave/db platform:grant",
+    "db:platform:revoke": "pnpm --filter @seu-renave/db platform:revoke",
     "db:purge-identity": "pnpm --filter @seu-renave/db purge:identity",
     "db:scan-evidence": "pnpm --filter @seu-renave/db scan:evidence",
     "db:status-evidence": "pnpm --filter @seu-renave/db status:evidence",

@@ -20,6 +20,7 @@ const config: AppConfig = {
     postLogoutRedirectUri: undefined,
     scopes: ["openid"],
     mfaAcceptedAcrValues: [],
+    maxAuthenticationAgeSeconds: undefined,
     publicOrigin: "https://app.test",
     loginAttemptTtlSeconds: 300,
     sessionIdleTtlSeconds: 1_800,
@@ -36,6 +37,7 @@ const config: AppConfig = {
   stockEntryLocalEnabled: false,
   databaseUrl: undefined,
   databaseTlsCaFile: undefined,
+  platformConsole: undefined,
   renave: undefined,
   host: "127.0.0.1",
   port: 3000,
@@ -281,6 +283,7 @@ describe("rotas OIDC", () => {
   it("não expõe subject na sessão pública", async () => {
     const service = identity({
       getSession: vi.fn(async () => ({
+        issuer: "https://idp.test",
         subject: "internal-stable-subject",
         name: "Maria",
         email: "maria@example.invalid",

@@ -391,11 +391,24 @@ export function createOidcClient(options: OidcClientOptions): OidcClient {
     const name = claimText(claims.name);
     const email = claimText(claims.email);
     const acr = authenticationContext(claims.acr);
+    let authenticationTime: number | undefined;
+    if (claims.auth_time !== undefined) {
+      if (
+        !Number.isSafeInteger(claims.auth_time) ||
+        (claims.auth_time as number) <= 0 ||
+        (claims.auth_time as number) * 1_000 > nowMs
+      ) {
+        throw new OidcClientError("ID token: auth_time inválido");
+      }
+      authenticationTime = (claims.auth_time as number) * 1_000;
+    }
     return {
+      issuer: config.issuer,
       subject,
       nonce: claimText(claims.nonce),
       roles: extractRoles(claims),
       ...(acr !== undefined ? { authenticationContext: acr } : {}),
+      ...(authenticationTime !== undefined ? { authenticationTime } : {}),
       ...(name !== undefined ? { name } : {}),
       ...(email !== undefined ? { email } : {}),
     };
@@ -413,6 +426,9 @@ export function createOidcClient(options: OidcClientOptions): OidcClient {
       url.searchParams.set("nonce", request.nonce);
       url.searchParams.set("code_challenge", request.codeChallenge);
       url.searchParams.set("code_challenge_method", "S256");
+      if (request.maxAgeSeconds !== undefined) {
+        url.searchParams.set("max_age", String(request.maxAgeSeconds));
+      }
       if (config.mfaAcceptedAcrValues.length > 0) {
         url.searchParams.set(
           "acr_values",

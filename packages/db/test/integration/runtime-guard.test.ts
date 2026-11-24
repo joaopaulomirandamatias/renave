@@ -16,6 +16,7 @@ let identityPool: Pool;
 let maintenancePool: Pool;
 let migratorPool: Pool;
 let operationWorkerPool: Pool;
+let platformReaderPool: Pool;
 
 async function expectAppContractRejected(): Promise<void> {
   await expect(
@@ -52,6 +53,7 @@ beforeAll(() => {
   maintenancePool = createPool(urls.maintenance, { max: 1 });
   migratorPool = createPool(urls.migrator, { max: 1 });
   operationWorkerPool = createPool(urls.operationWorker, { max: 1 });
+  platformReaderPool = createPool(urls.platformReader, { max: 1 });
 });
 
 afterAll(async () => {
@@ -62,6 +64,7 @@ afterAll(async () => {
     maintenancePool?.end(),
     migratorPool?.end(),
     operationWorkerPool?.end(),
+    platformReaderPool?.end(),
   ]);
 });
 
@@ -85,6 +88,11 @@ describe("guard do banco de runtime", () => {
         expectedRole: "renave_operation_worker",
       }),
     ).resolves.toBeUndefined();
+    await expect(
+      assertRuntimeDatabase(platformReaderPool, {
+        expectedRole: "renave_platform_reader",
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it("recusa URLs trocadas sem revelar detalhes da conexão", async () => {
@@ -98,6 +106,12 @@ describe("guard do banco de runtime", () => {
       }),
       assertRuntimeDatabase(appPool, {
         expectedRole: "renave_operation_worker",
+      }),
+      assertRuntimeDatabase(appPool, {
+        expectedRole: "renave_platform_reader",
+      }),
+      assertRuntimeDatabase(platformReaderPool, {
+        expectedRole: "renave_app",
       }),
     ];
     const errors = await Promise.all(
@@ -195,6 +209,150 @@ describe("guard do banco de runtime", () => {
         "select renave_runtime.operation_worker_contract_ready() as ready",
       ),
     ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      appPool.query(
+        "select renave_runtime.platform_reader_contract_ready() as ready",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      platformReaderPool.query(
+        "select renave_runtime.api_contract_ready() as ready",
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  it("fecha a probe do leitor global diante de ACL, membership ou ownership extra", async () => {
+    const expectReaderRejected = async () => {
+      await expect(
+        assertRuntimeDatabase(platformReaderPool, {
+          expectedRole: "renave_platform_reader",
+        }),
+      ).rejects.toBeInstanceOf(RuntimeDatabaseContractError);
+    };
+    const expectReaderReady = async () => {
+      await expect(
+        assertRuntimeDatabase(platformReaderPool, {
+          expectedRole: "renave_platform_reader",
+        }),
+      ).resolves.toBeUndefined();
+    };
+
+    await migratorPool.query(
+      "grant execute on function renave_runtime.platform_reader_contract_ready() to renave_app",
+    );
+    try {
+      await expectReaderRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke execute on function renave_runtime.platform_reader_contract_ready() from renave_app",
+      );
+    }
+    await expectReaderReady();
+
+    await migratorPool.query(
+      "grant usage on schema renave to renave_platform_reader",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke usage on schema renave from renave_platform_reader",
+      );
+    }
+    await expectAppContractReady();
+
+    await migratorPool.query(
+      "grant select on renave.tenant to renave_platform_reader",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke select on renave.tenant from renave_platform_reader",
+      );
+    }
+    await expectAppContractReady();
+
+    await migratorPool.query(
+      "grant create on schema renave_runtime to renave_platform_reader",
+    );
+    try {
+      await expectAppContractRejected();
+      await expectReaderRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke create on schema renave_runtime from renave_platform_reader",
+      );
+    }
+    await expectAppContractReady();
+    await expectReaderReady();
+
+    await migratorPool.query(
+      "grant usage on schema renave_runtime to renave_platform_provisioner",
+    );
+    try {
+      await expectAppContractRejected();
+      await expectReaderRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke usage on schema renave_runtime from renave_platform_provisioner",
+      );
+    }
+    await expectAppContractReady();
+    await expectReaderReady();
+
+    await migratorPool.query(
+      "grant select on renave_platform_rate.queue_bucket to renave_platform_reader",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke select on renave_platform_rate.queue_bucket from renave_platform_reader",
+      );
+    }
+    await expectAppContractReady();
+
+    await migratorPool.query(
+      "grant execute on function renave_runtime.acquire_platform_console_permit(bytea) to renave_platform_provisioner",
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await migratorPool.query(
+        "revoke execute on function renave_runtime.acquire_platform_console_permit(bytea) from renave_platform_provisioner",
+      );
+    }
+    await expectAppContractReady();
+
+    await adminPool.query("create role platform_reader_parent nologin");
+    await adminPool.query(
+      "grant platform_reader_parent to renave_platform_reader",
+    );
+    try {
+      await expectReaderRejected();
+    } finally {
+      await adminPool.query(
+        "revoke platform_reader_parent from renave_platform_reader",
+      );
+      await adminPool.query("drop role platform_reader_parent");
+    }
+    await expectReaderReady();
+
+    await adminPool.query(
+      "create table renave_platform.runtime_guard_owned_probe (id integer)",
+    );
+    await adminPool.query(
+      "alter table renave_platform.runtime_guard_owned_probe owner to renave_platform_reader",
+    );
+    try {
+      await expectReaderRejected();
+    } finally {
+      await adminPool.query(
+        "drop table renave_platform.runtime_guard_owned_probe",
+      );
+    }
+    await expectReaderReady();
   });
 
   it("contrato do worker recusa ACL extra de função, tabela ou membership", async () => {
@@ -1553,6 +1711,26 @@ describe("guard do banco de runtime", () => {
     await expectAppContractReady();
   });
 
+  it("recusa adulteração transacional do checksum do limitador global", async () => {
+    const client = await adminPool.connect();
+    try {
+      await client.query("begin");
+      await client.query(
+        `update renave.schema_migrations set checksum = $1
+          where version = '0068_platform_console_rate_limit'`,
+        ["0".repeat(64)],
+      );
+      const result = await client.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      );
+      expect(result.rows[0]?.ready).toBe(false);
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+    await expectAppContractReady();
+  });
+
   it("recusa adulteração transacional da constraint de contexto OIDC", async () => {
     const client = await adminPool.connect();
     try {
@@ -1606,8 +1784,8 @@ describe("guard do banco de runtime", () => {
       await client.query("create role identity_assurance_acl_probe nologin");
       await client.query(`
         grant execute on function renave_identity.save_auth_session(
-          text, text, text, text, text[], text, boolean,
-          bigint, bigint, bigint, bigint
+          text, text, text, text, text, text[], text, boolean,
+          bigint, bigint, bigint, bigint, bigint
         ) to identity_assurance_acl_probe
       `);
       const result = await client.query<{ ready: boolean }>(

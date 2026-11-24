@@ -50,6 +50,28 @@ export {
   withCredentials,
 } from "./config.js";
 export {
+  acquirePlatformConsolePermit,
+  PlatformConsoleRateLimitContractError,
+  type PlatformConsoleRateLimitDecision,
+} from "./platform-console-rate-limiter.js";
+export {
+  decodePlatformOperatorHmacKeyBase64,
+  derivePlatformActorDigest,
+  derivePlatformCursorDigest,
+  derivePlatformDecisionTicketDigest,
+  derivePlatformReasonDigest,
+  derivePlatformTraceDigest,
+  PlatformDigestInputError,
+} from "./platform-digests.js";
+export {
+  grantPlatformOperator,
+  revokePlatformOperator,
+  PlatformOperatorProvisioningInputError,
+  type GrantPlatformOperatorInput,
+  type PlatformOperatorIdentity,
+  type RevokePlatformOperatorInput,
+} from "./platform-operator-provisioning.js";
+export {
   createEstablishment,
   getEstablishment,
   listEstablishments,

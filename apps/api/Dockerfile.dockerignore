@@ -30,6 +30,8 @@
 **/*.spec.*
 **/database-url
 **/identity-database-url
+**/platform-reader-database-url
+**/platform-operator-hmac-key
 **/limiter-hmac-key
 **/tenant-admin-hmac-key
 **/stock-entry-secret-bundle.json

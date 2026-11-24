@@ -7,12 +7,16 @@
 
 /** Identidade já verificada (assinatura, issuer, audience, expiração). */
 export interface VerifiedIdentity {
+  /** Issuer validado literalmente contra discovery/configuração. */
+  issuer: string;
   /** Claim `sub`: identificador estável do usuário no IdP. */
   subject: string;
   /** Claim `nonce` exatamente como veio no ID token. */
   nonce: string | undefined;
   /** Claim `acr` validado e normalizado; nunca implica MFA sem política local. */
   authenticationContext?: string;
+  /** Claim `auth_time` validado, em milissegundos Unix. */
+  authenticationTime?: number;
   name?: string;
   email?: string;
   roles: readonly string[];
@@ -23,6 +27,8 @@ export interface AuthorizationRequest {
   nonce: string;
   codeChallenge: string;
   redirectUri: string;
+  /** Valor server-side de OIDC `max_age`; o navegador não o escolhe. */
+  maxAgeSeconds?: number;
 }
 
 export interface CodeExchange {
@@ -56,11 +62,15 @@ export interface LoginAttempt {
 }
 
 export interface SessionRecord {
+  /** Issuer persistido junto com o subject; sessões legadas falham fechadas. */
+  issuer: string;
   subject: string;
   /** Evidência `acr` mínima; o serviço reavalia a política a cada leitura. */
   authenticationContext?: string;
   /** A política vigente no callback aceitou o contexto; nunca elevar depois. */
   mfaVerifiedAtLogin: boolean;
+  /** Instante `auth_time` do IdP; nunca derivado do horário da sessão. */
+  mfaAuthenticatedAt?: number;
   name?: string;
   email?: string;
   roles: readonly string[];

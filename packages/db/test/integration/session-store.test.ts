@@ -45,6 +45,7 @@ function session(overrides: Partial<SessionFixture> = {}): SessionFixture {
     createdAt: NOW,
     email: "operador@example.invalid",
     idleExpiresAt: NOW + 1_800_000,
+    issuer: "https://idp.example.invalid/realms/renave",
     lastSeenAt: NOW,
     mfaVerifiedAtLogin: false,
     name: "Operador de Teste",
@@ -136,6 +137,7 @@ describe("PostgresIdentitySessionStore", () => {
     const assuredKey = hash("session-mfa-assurance");
     const assured = session({
       authenticationContext: "urn:example:assurance:mfa",
+      mfaAuthenticatedAt: NOW - 60_000,
       mfaVerifiedAtLogin: true,
     });
     await store.saveSession(assuredKey, assured);
@@ -162,9 +164,10 @@ describe("PostgresIdentitySessionStore", () => {
         baseline.absoluteExpiresAt,
       ],
     );
-    await expect(store.getSession(baselineKey, NOW + 1)).resolves.toEqual(
-      baseline,
-    );
+    await expect(store.getSession(baselineKey, NOW + 1)).resolves.toEqual({
+      ...baseline,
+      issuer: "",
+    });
 
     const { rows } = await adminPool.query<{
       authentication_context: string | null;
@@ -460,8 +463,8 @@ describe("PostgresIdentitySessionStore", () => {
     const call = (roles: string[] | string[][]) =>
       identityPool.query(
         `select renave_identity.save_auth_session(
-           $1, 'subject', null, null, $2::text[], null, false,
-           $3, $3, $4, $5
+           $1, 'https://idp.test', 'subject', null, null, $2::text[],
+           null, false, null, $3, $3, $4, $5
          )`,
         [
           hash(`invalid-roles-${JSON.stringify(roles)}`),
@@ -487,8 +490,8 @@ describe("PostgresIdentitySessionStore", () => {
     const call = (authenticationContext: string) =>
       identityPool.query(
         `select renave_identity.save_auth_session(
-           $1, 'subject', null, null, '{}'::text[], $2, false,
-           $3, $3, $4, $5
+           $1, 'https://idp.test', 'subject', null, null, '{}'::text[],
+           $2, false, null, $3, $3, $4, $5
          )`,
         [
           hash(`invalid-auth-context-${authenticationContext}`),
@@ -512,8 +515,8 @@ describe("PostgresIdentitySessionStore", () => {
     await expect(
       identityPool.query(
         `select renave_identity.save_auth_session(
-           $1, 'subject', null, null, '{}'::text[], null, true,
-           $2, $2, $3, $4
+           $1, 'https://idp.test', 'subject', null, null, '{}'::text[],
+           null, true, null, $2, $2, $3, $4
          )`,
         [hash("mfa-snapshot-without-context"), NOW, NOW + 1, NOW + 2],
       ),

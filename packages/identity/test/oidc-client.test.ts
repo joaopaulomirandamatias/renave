@@ -122,7 +122,10 @@ describe("cliente OIDC", () => {
     const token = jwt(
       signing.privateKey,
       "key-1",
-      claims({ acr: "urn:example:loa:2" }),
+      claims({
+        acr: "urn:example:loa:2",
+        auth_time: NOW / 1_000 - 60,
+      }),
     );
     const fake = provider({ token, jwks: [signing.publicJwk] });
     const client = createOidcClient({
@@ -138,6 +141,7 @@ describe("cliente OIDC", () => {
         nonce: "nonce-1",
         codeChallenge: "challenge",
         redirectUri: "https://app.test/api/auth/callback",
+        maxAgeSeconds: 300,
       }),
     );
     expect(authorization.searchParams.get("response_type")).toBe("code");
@@ -147,6 +151,7 @@ describe("cliente OIDC", () => {
     expect(authorization.searchParams.get("acr_values")).toBe(
       "urn:example:loa:2 urn:example:loa:3",
     );
+    expect(authorization.searchParams.get("max_age")).toBe("300");
 
     await expect(
       client.exchangeCode({
@@ -156,6 +161,8 @@ describe("cliente OIDC", () => {
       }),
     ).resolves.toMatchObject({
       authenticationContext: "urn:example:loa:2",
+      authenticationTime: NOW - 60_000,
+      issuer: "https://idp.test/realms/renave",
       subject: "subject-1",
       nonce: "nonce-1",
     });
@@ -183,6 +190,22 @@ describe("cliente OIDC", () => {
     await expect(
       exchange(jwt(signing.privateKey, "key-1", claims()), [signing.publicJwk]),
     ).resolves.not.toHaveProperty("authenticationContext");
+  });
+
+  it.each([
+    ["futuro", NOW / 1_000 + 1],
+    ["zero", 0],
+    ["negativo", -1],
+    ["fracionário", NOW / 1_000 - 0.5],
+    ["texto", "1700000000"],
+  ])("recusa auth_time inválido: %s", async (_label, authTime) => {
+    const signing = key("key-1");
+    await expect(
+      exchange(
+        jwt(signing.privateKey, "key-1", claims({ auth_time: authTime })),
+        [signing.publicJwk],
+      ),
+    ).rejects.toBeInstanceOf(OidcClientError);
   });
 
   it.each([
