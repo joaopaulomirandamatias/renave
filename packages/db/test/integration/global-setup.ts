@@ -8,6 +8,8 @@ import {
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
+  PLATFORM_PROVISIONER_ROLE,
+  PLATFORM_READER_ROLE,
   PROFILE_PROVISIONER_ROLE,
   PROFILE_READER_ROLE,
   isLoopbackUrl,
@@ -25,6 +27,8 @@ export interface DbUrls {
   operationWorker: string;
   profileProvisioner: string;
   profileReader: string;
+  platformProvisioner: string;
+  platformReader: string;
 }
 
 declare module "vitest" {
@@ -49,6 +53,8 @@ const TEST_MAINTENANCE_APP_PASSWORD = "renave_maintenance_app_it";
 const TEST_OPERATION_WORKER_PASSWORD = "renave_operation_worker_it";
 const TEST_PROFILE_PROVISIONER_PASSWORD = "renave_profile_provisioner_it";
 const TEST_PROFILE_READER_PASSWORD = "renave_profile_reader_it";
+const TEST_PLATFORM_PROVISIONER_PASSWORD = "renave_platform_provisioner_it";
+const TEST_PLATFORM_READER_PASSWORD = "renave_platform_reader_it";
 
 export default async function setup(
   project: TestProject,
@@ -83,6 +89,8 @@ export default async function setup(
     operationWorkerPassword: TEST_OPERATION_WORKER_PASSWORD,
     profileProvisionerPassword: TEST_PROFILE_PROVISIONER_PASSWORD,
     profileReaderPassword: TEST_PROFILE_READER_PASSWORD,
+    platformProvisionerPassword: TEST_PLATFORM_PROVISIONER_PASSWORD,
+    platformReaderPassword: TEST_PLATFORM_READER_PASSWORD,
   });
   const migrator = withCredentials(
     admin,
@@ -115,6 +123,16 @@ export default async function setup(
     PROFILE_READER_ROLE,
     TEST_PROFILE_READER_PASSWORD,
   );
+  const platformProvisioner = withCredentials(
+    admin,
+    PLATFORM_PROVISIONER_ROLE,
+    TEST_PLATFORM_PROVISIONER_PASSWORD,
+  );
+  const platformReader = withCredentials(
+    admin,
+    PLATFORM_READER_ROLE,
+    TEST_PLATFORM_READER_PASSWORD,
+  );
   await runMigrations(migrator);
 
   project.provide("dbUrls", {
@@ -126,6 +144,8 @@ export default async function setup(
     operationWorker,
     profileProvisioner,
     profileReader,
+    platformProvisioner,
+    platformReader,
   });
 
   return async () => {

@@ -450,10 +450,20 @@ describe("guard do banco de runtime", () => {
       `grant temporary on database ${database} to
          renave_app,renave_identity_app,renave_maintenance_app,
          renave_operation_worker,renave_profile_provisioner,
-         renave_profile_reader`,
+         renave_profile_reader,renave_platform_provisioner,
+         renave_platform_reader`,
     );
     await adminPool.query(
       `grant create on database ${database} to renave_operation_worker`,
+    );
+    await adminPool.query(
+      "drop role if exists platform_bootstrap_parent_probe, platform_bootstrap_member_probe",
+    );
+    await adminPool.query(
+      "create role platform_bootstrap_parent_probe nologin; create role platform_bootstrap_member_probe nologin",
+    );
+    await adminPool.query(
+      "grant platform_bootstrap_parent_probe to renave_platform_reader; grant renave_platform_provisioner to platform_bootstrap_member_probe",
     );
 
     const options = {
@@ -465,6 +475,8 @@ describe("guard do banco de runtime", () => {
       operationWorkerPassword: "renave_operation_worker_it",
       profileProvisionerPassword: "renave_profile_provisioner_it",
       profileReaderPassword: "renave_profile_reader_it",
+      platformProvisionerPassword: "renave_platform_provisioner_it",
+      platformReaderPassword: "renave_platform_reader_it",
     };
     await bootstrapRoles(options);
     await bootstrapRoles(options);
@@ -496,10 +508,12 @@ describe("guard do banco de runtime", () => {
           "renave_operation_worker",
           "renave_profile_provisioner",
           "renave_profile_reader",
+          "renave_platform_provisioner",
+          "renave_platform_reader",
         ],
       ],
     );
-    expect(privileges.rows).toHaveLength(6);
+    expect(privileges.rows).toHaveLength(8);
     for (const privilege of privileges.rows) {
       expect(privilege).toMatchObject({
         can_connect: true,
@@ -507,6 +521,48 @@ describe("guard do banco de runtime", () => {
         can_temporary: false,
       });
     }
+    const platformRoles = await adminPool.query<{
+      rolbypassrls: boolean;
+      rolcanlogin: boolean;
+      rolcreatedb: boolean;
+      rolcreaterole: boolean;
+      rolinherit: boolean;
+      rolname: string;
+      rolreplication: boolean;
+      rolsuper: boolean;
+    }>(
+      `select rolname,rolsuper,rolinherit,rolcreaterole,rolcreatedb,rolcanlogin,
+              rolreplication,rolbypassrls
+         from pg_catalog.pg_roles
+        where rolname=any($1::text[])
+        order by rolname`,
+      [["renave_platform_provisioner", "renave_platform_reader"]],
+    );
+    expect(platformRoles.rows).toHaveLength(2);
+    for (const role of platformRoles.rows) {
+      expect(role).toMatchObject({
+        rolbypassrls: false,
+        rolcanlogin: true,
+        rolcreatedb: false,
+        rolcreaterole: false,
+        rolinherit: false,
+        rolreplication: false,
+        rolsuper: false,
+      });
+    }
+    const platformMembership = await adminPool.query<{ count: string }>(
+      `select count(*)::text as count
+         from pg_catalog.pg_auth_members membership
+         join pg_catalog.pg_roles member on member.oid=membership.member
+         join pg_catalog.pg_roles parent on parent.oid=membership.roleid
+        where member.rolname=any($1::text[])
+           or parent.rolname=any($1::text[])`,
+      [["renave_platform_provisioner", "renave_platform_reader"]],
+    );
+    expect(platformMembership.rows[0]?.count).toBe("0");
+    await adminPool.query(
+      "drop role platform_bootstrap_parent_probe, platform_bootstrap_member_probe",
+    );
     await expectWorkerContractReady();
   });
 

@@ -6,6 +6,8 @@ import {
   APP_ROLE,
   DEFAULT_MIGRATIONS_DIR,
   IDENTITY_APP_ROLE,
+  PLATFORM_PROVISIONER_ROLE,
+  PLATFORM_READER_ROLE,
   PROFILE_PROVISIONER_ROLE,
   PROFILE_READER_ROLE,
   SCHEMA,
@@ -88,6 +90,8 @@ export async function runMigrations(
           IDENTITY_APP_ROLE,
           PROFILE_PROVISIONER_ROLE,
           PROFILE_READER_ROLE,
+          PLATFORM_PROVISIONER_ROLE,
+          PLATFORM_READER_ROLE,
         ],
       ],
     );
@@ -97,6 +101,8 @@ export async function runMigrations(
       IDENTITY_APP_ROLE,
       PROFILE_PROVISIONER_ROLE,
       PROFILE_READER_ROLE,
+      PLATFORM_PROVISIONER_ROLE,
+      PLATFORM_READER_ROLE,
     ].filter((role) => !existingRoles.has(role));
     if (missingRoles.length > 0) {
       throw new MigrationError(

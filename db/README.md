@@ -11,7 +11,7 @@ SQL versionado em `db/migrations/`; runner, helpers e testes em `packages/db`
 | `pnpm db:up` / `pnpm db:down`                     | Sobe/derruba o Postgres 17 do `compose.yaml` (`127.0.0.1:54317`, banco `renave`).                                          |
 | `pnpm db:setup:local`                             | `bootstrap` + `migrate` no Postgres local, com valores de dev **não secretos**. Recusa host fora de loopback.              |
 | `pnpm db:reset`                                   | Apaga o volume, sobe de novo e roda `db:setup:local`.                                                                      |
-| `pnpm db:bootstrap`                               | Cria/atualiza os papéis (idempotente; rotaciona senhas). Requer `DATABASE_ADMIN_URL` e `RENAVE_DB_*_PASSWORD`, inclusive `RENAVE_DB_PROFILE_PROVISIONER_PASSWORD` e `RENAVE_DB_PROFILE_READER_PASSWORD`.       |
+| `pnpm db:bootstrap`                               | Cria/atualiza os papéis (idempotente; rotaciona senhas). Requer `DATABASE_ADMIN_URL` e `RENAVE_DB_*_PASSWORD`, inclusive os segredos separados de perfis e do console global (`RENAVE_DB_PLATFORM_PROVISIONER_PASSWORD` e `RENAVE_DB_PLATFORM_READER_PASSWORD`).       |
 | `pnpm db:migrate`                                 | Aplica migrations pendentes como migrator. Requer `DATABASE_MIGRATOR_URL`.                                                 |
 | `pnpm db:purge-identity`                          | Remove tentativas e sessões OIDC expiradas em um lote. Requer `IDENTITY_DATABASE_URL`; indicado para agendamento periódico. |
 | `pnpm db:scan-evidence`                           | Detecta evidências pendentes acima do SLA em lote, sem alterar a prova. Requer `MAINTENANCE_DATABASE_URL`.                   |
@@ -34,6 +34,23 @@ reais, forneça URLs distintas pelo cofre: a primeira serve somente aos comandos
 mutantes de perfis e a segunda somente ao `profile-status`. Não existe fallback
 entre elas.
 
+Para o console global, o setup também imprime
+`DATABASE_PLATFORM_PROVISIONER_URL` e `DATABASE_PLATFORM_READER_URL`. Em
+produção, use secrets e workloads separados: o provisionador concede ou revoga
+operadores por cerimônia offline e não lê a fila; o leitor consulta somente a
+projeção sanitizada e não concede acesso. Nenhum deles substitui
+`DATABASE_URL` ou pode assumir o papel do outro.
+
+As rotinas do console recebem somente digests HMAC-SHA-256 de 32 bytes, nunca
+o subject OIDC, o ticket ou a justificativa em claro. `grant_operator` aceita
+início no máximo 5 minutos à frente e expiração posterior ao início, limitada
+a 366 dias; toda concessão, revogação e reconcessão válida entra em histórico
+append-only. A leitura global exige um `reason_ticket_digest` de 32 bytes em
+cada chamada, limita a página a 500 itens e registra resultado e truncamento na
+auditoria encadeada. Entrada malformada falha antes de qualquer ação e, por não
+constituir uma decisão autorizativa, não gera evento; decisões válidas,
+autorizadas ou negadas, são auditadas.
+
 O pin do bundle de entrada de estoque é deliberadamente **write-once**. O
 provisionador não aplica migrations, não ativa flags e não aceita `--force`.
 Perder o bundle depois do pin torna a retenção local indisponível; siga a
@@ -51,6 +68,8 @@ cerimônia de backup e restauração em
 | `renave_operation_worker` | Worker fenced de operações RENAVE.                                         | `NOSUPERUSER`, `NOBYPASSRLS`, `NOINHERIT`; zero ACL de tabela, somente `EXECUTE` nas rotinas fechadas de claim, lease, begin e completion. |
 | `renave_profile_provisioner` | Job administrativo de staging e suspensão de perfis RENAVE.             | Sem acesso direto a tabelas; somente `EXECUTE` nas quatro mutações fechadas. Não consulta status. |
 | `renave_profile_reader` | Job operacional global de consulta sanitizada de perfis RENAVE.               | Sem acesso direto a tabelas; somente `EXECUTE` nas duas funções de status. Não cria nem suspende perfis. |
+| `renave_platform_provisioner` | Job administrativo offline do console global.                         | Sem acesso direto a tabelas nem à fila; somente `EXECUTE` nas funções fechadas de grant/revoke. |
+| `renave_platform_reader` | Runtime isolado do console global.                                         | Sem acesso direto a tabelas; somente `EXECUTE` na consulta sanitizada e auditada. Não concede nem revoga operadores. |
 
 ## Evidência protegida e monitor operacional
 

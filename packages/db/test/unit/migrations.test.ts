@@ -6,10 +6,11 @@ import { loadMigrations, MigrationError } from "../../src/migrate.js";
 
 describe("loadMigrations", () => {
   it("lê as migrations versionadas em ordem, com checksum estável", async () => {
-    const allWithVehicleLookup = await loadMigrations();
+    const allWithPlatformConsole = await loadMigrations();
+    const allWithVehicleLookup = allWithPlatformConsole.slice(0, -2);
     const all = allWithVehicleLookup.slice(0, -2);
     const first = all.slice(0, -16);
-    const second = (await loadMigrations()).slice(0, -18);
+    const second = (await loadMigrations()).slice(0, -20);
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
     expect(first.at(-21)?.version).toBe("0024_runtime_contract_stock_query");
@@ -285,6 +286,33 @@ describe("loadMigrations", () => {
     );
     expect(allWithVehicleLookup.at(-1)?.sql).toContain(
       "vehicle_lookup_catalog_fingerprint_v0062",
+    );
+    expect(allWithPlatformConsole.at(-2)?.version).toBe(
+      "0063_platform_operator_console",
+    );
+    expect(allWithPlatformConsole.at(-2)?.sql).toContain(
+      "renave_platform.list_credential_link_queue",
+    );
+    expect(allWithPlatformConsole.at(-2)?.sql).not.toMatch(
+      /grant\s+usage\s+on\s+schema\s+renave_platform/iu,
+    );
+    expect(allWithPlatformConsole.at(-2)?.sql).not.toMatch(
+      /grant\s+execute\s+on\s+function\s+renave_platform/iu,
+    );
+    expect(allWithPlatformConsole.at(-1)?.version).toBe(
+      "0064_runtime_contract_platform_operator_console",
+    );
+    expect(allWithPlatformConsole.at(-1)?.sql).toContain(
+      allWithPlatformConsole.at(-2)?.checksum,
+    );
+    expect(allWithPlatformConsole.at(-1)?.sql).toContain(
+      "platform_console_catalog_fingerprint_v0064",
+    );
+    expect(allWithPlatformConsole.at(-1)?.sql).toContain(
+      "grant usage on schema renave_platform",
+    );
+    expect(allWithPlatformConsole.at(-1)?.sql).toContain(
+      "grant execute on function renave_platform.grant_operator",
     );
   });
 

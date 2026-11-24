@@ -14,6 +14,10 @@ export const OPERATION_WORKER_ROLE = "renave_operation_worker";
 export const PROFILE_PROVISIONER_ROLE = "renave_profile_provisioner";
 /** Papel global somente leitura para consultar status sanitizado de perfis. */
 export const PROFILE_READER_ROLE = "renave_profile_reader";
+/** Leitor isolado do console global; somente EXECUTE em consultas fechadas. */
+export const PLATFORM_READER_ROLE = "renave_platform_reader";
+/** Provisionador offline de operadores globais; não lê a fila operacional. */
+export const PLATFORM_PROVISIONER_ROLE = "renave_platform_provisioner";
 /** Esquema de negócio e do ledger de migrations. */
 export const SCHEMA = "renave";
 /** GUC transacional com o tenant ativo, lido por `renave.current_tenant_id()`. */

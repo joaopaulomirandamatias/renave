@@ -11,4 +11,6 @@ export const LOCAL_DEFAULTS = {
   operationWorkerPassword: "renave_operation_worker_local",
   profileProvisionerPassword: "renave_profile_provisioner_local",
   profileReaderPassword: "renave_profile_reader_local",
+  platformProvisionerPassword: "renave_platform_provisioner_local",
+  platformReaderPassword: "renave_platform_reader_local",
 } as const;

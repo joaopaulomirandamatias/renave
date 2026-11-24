@@ -6,6 +6,8 @@ import {
   MAINTENANCE_APP_ROLE,
   MIGRATOR_ROLE,
   OPERATION_WORKER_ROLE,
+  PLATFORM_PROVISIONER_ROLE,
+  PLATFORM_READER_ROLE,
   PROFILE_PROVISIONER_ROLE,
   PROFILE_READER_ROLE,
   isLoopbackUrl,
@@ -27,13 +29,15 @@ import { createPool } from "./tenant-context.js";
 
 const USAGE = `Uso: pnpm --filter @seu-renave/db cli <comando>
 
-  bootstrap    Cria/atualiza ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE} e ${PROFILE_READER_ROLE} (idempotente; rotaciona senhas).
+  bootstrap    Cria/atualiza ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE}, ${PROFILE_READER_ROLE}, ${PLATFORM_PROVISIONER_ROLE} e ${PLATFORM_READER_ROLE} (idempotente; rotaciona senhas).
                Requer: DATABASE_ADMIN_URL, RENAVE_DB_MIGRATOR_PASSWORD,
                RENAVE_DB_APP_PASSWORD, RENAVE_DB_IDENTITY_APP_PASSWORD,
                RENAVE_DB_MAINTENANCE_APP_PASSWORD,
                RENAVE_DB_OPERATION_WORKER_PASSWORD,
                RENAVE_DB_PROFILE_PROVISIONER_PASSWORD,
-               RENAVE_DB_PROFILE_READER_PASSWORD
+               RENAVE_DB_PROFILE_READER_PASSWORD,
+               RENAVE_DB_PLATFORM_PROVISIONER_PASSWORD,
+               RENAVE_DB_PLATFORM_READER_PASSWORD
   migrate      Aplica as migrations pendentes como ${MIGRATOR_ROLE}.
                Requer: DATABASE_MIGRATOR_URL
   purge-identity
@@ -105,9 +109,15 @@ async function main(command: string | undefined): Promise<void> {
           "RENAVE_DB_PROFILE_PROVISIONER_PASSWORD",
         ),
         profileReaderPassword: requireEnv("RENAVE_DB_PROFILE_READER_PASSWORD"),
+        platformProvisionerPassword: requireEnv(
+          "RENAVE_DB_PLATFORM_PROVISIONER_PASSWORD",
+        ),
+        platformReaderPassword: requireEnv(
+          "RENAVE_DB_PLATFORM_READER_PASSWORD",
+        ),
       });
       console.log(
-        `Papéis ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE} e ${PROFILE_READER_ROLE} prontos.`,
+        `Papéis ${MIGRATOR_ROLE}, ${APP_ROLE}, ${IDENTITY_APP_ROLE}, ${MAINTENANCE_APP_ROLE}, ${OPERATION_WORKER_ROLE}, ${PROFILE_PROVISIONER_ROLE}, ${PROFILE_READER_ROLE}, ${PLATFORM_PROVISIONER_ROLE} e ${PLATFORM_READER_ROLE} prontos.`,
       );
       return;
     }
@@ -217,6 +227,8 @@ async function main(command: string | undefined): Promise<void> {
         operationWorkerPassword: LOCAL_DEFAULTS.operationWorkerPassword,
         profileProvisionerPassword: LOCAL_DEFAULTS.profileProvisionerPassword,
         profileReaderPassword: LOCAL_DEFAULTS.profileReaderPassword,
+        platformProvisionerPassword: LOCAL_DEFAULTS.platformProvisionerPassword,
+        platformReaderPassword: LOCAL_DEFAULTS.platformReaderPassword,
       });
       const migratorUrl = withCredentials(
         adminUrl,
@@ -246,6 +258,12 @@ async function main(command: string | undefined): Promise<void> {
       );
       console.log(
         `DATABASE_PROFILE_READER_URL=${withCredentials(adminUrl, PROFILE_READER_ROLE, LOCAL_DEFAULTS.profileReaderPassword)}`,
+      );
+      console.log(
+        `DATABASE_PLATFORM_PROVISIONER_URL=${withCredentials(adminUrl, PLATFORM_PROVISIONER_ROLE, LOCAL_DEFAULTS.platformProvisionerPassword)}`,
+      );
+      console.log(
+        `DATABASE_PLATFORM_READER_URL=${withCredentials(adminUrl, PLATFORM_READER_ROLE, LOCAL_DEFAULTS.platformReaderPassword)}`,
       );
       return;
     }
