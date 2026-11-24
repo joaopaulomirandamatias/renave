@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { ReadonlyCanaryPort } from "../features/homologation-canary/index.js";
 import { DashboardPage } from "./DashboardPage.js";
 
 afterEach(cleanup);
@@ -15,6 +16,31 @@ const establishments = [
   { id: "store-belem", label: "Loja Belém" },
   { id: "store-ananindeua", label: "Loja Ananindeua" },
 ] as const;
+
+function canaryPort(): ReadonlyCanaryPort {
+  return {
+    checkEligibility: vi.fn(async () => ({
+      detranUnavailable: false,
+      impediments: [],
+      status: "eligible" as const,
+    })),
+    loadReadiness: vi.fn(async () => ({
+      certificate: "ready" as const,
+      environment: "homologation" as const,
+      establishmentContact: "verified" as const,
+      integration: "configured" as const,
+      link: "enabled" as const,
+      mutations: "blocked" as const,
+      operatorIdentity: "verified" as const,
+      queries: "ready" as const,
+    })),
+    lookupVehicle: vi.fn(async (plate) => ({ placa: plate, restricoes: [] })),
+    runPreflight: vi.fn(async () => undefined),
+    searchStocks: vi.fn(async (plate) => [
+      { estado: "CONFIRMADO" as const, id: 1, placa: plate },
+    ]),
+  };
+}
 
 describe("DashboardPage", () => {
   it("mantém ambiente, estabelecimento e bloqueio operacional visíveis", () => {
@@ -602,5 +628,101 @@ describe("DashboardPage", () => {
       screen.queryByRole("button", { name: "Registrar solicitação local" }),
     ).toBeNull();
     expect(screen.getByText(/capability explícita/i)).toBeVisible();
+  });
+
+  it("monta o ensaio somente no contexto de homologação autorizado", () => {
+    const port = canaryPort();
+    const view = render(
+      <DashboardPage
+        environment="homologation"
+        establishmentManagement="available"
+        establishments={establishments}
+        homologationCanaryPort={port}
+        onLogout={vi.fn()}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Ensaio de homologação RENAVE" }),
+    ).toBeVisible();
+
+    view.rerender(
+      <DashboardPage
+        environment="development"
+        establishmentManagement="available"
+        establishments={establishments}
+        homologationCanaryPort={port}
+        onLogout={vi.fn()}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Ensaio de homologação RENAVE" }),
+    ).toBeNull();
+
+    view.rerender(
+      <DashboardPage
+        environment="homologation"
+        establishmentManagement="mfa_required"
+        establishments={establishments}
+        homologationCanaryPort={port}
+        onLogout={vi.fn()}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Ensaio de homologação RENAVE" }),
+    ).toBeNull();
+  });
+
+  it("limpa o fixture quando muda a seleção ativa", () => {
+    const port = canaryPort();
+    const view = render(
+      <DashboardPage
+        environment="homologation"
+        establishmentManagement="available"
+        establishments={establishments}
+        homologationCanaryPort={port}
+        onLogout={vi.fn()}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+    const plate = screen.getByRole("textbox", { name: "Placa sintética" });
+    const confirmation = screen.getByRole("checkbox");
+    fireEvent.change(plate, { target: { value: "ABC1D23" } });
+    fireEvent.click(confirmation);
+    expect(
+      screen.getByRole("button", { name: "Executar uma vez" }),
+    ).toBeEnabled();
+
+    view.rerender(
+      <DashboardPage
+        environment="homologation"
+        establishmentManagement="available"
+        establishments={establishments}
+        homologationCanaryPort={port}
+        onLogout={vi.fn()}
+        selectedEstablishmentId="store-ananindeua"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+
+    expect(
+      screen.getByRole("textbox", { name: "Placa sintética" }),
+    ).toHaveValue("");
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(
+      screen.getByRole("button", { name: "Executar uma vez" }),
+    ).toBeDisabled();
   });
 });

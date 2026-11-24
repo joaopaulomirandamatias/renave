@@ -578,6 +578,150 @@ describe("App session boundary", () => {
     ).rejects.toThrow("Resposta de prontidão RENAVE inválida");
   });
 
+  it("propaga o cancelamento nas cinco consultas do ensaio sem forjar identidade", async () => {
+    const readiness: BrowserRenaveReadiness = {
+      certificate: "ready",
+      environment: "homologation",
+      establishmentContact: "verified",
+      integration: "configured",
+      link: "enabled",
+      mutations: "blocked",
+      operatorIdentity: "verified",
+      queries: "ready",
+    };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(readiness))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          detranUnavailable: false,
+          impediments: [],
+          status: "eligible",
+        }),
+      )
+      .mockResolvedValueOnce(Response.json([]))
+      .mockResolvedValueOnce(
+        Response.json({ placa: "ABC1D23", restricoes: [] }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    await browserSessionClient.loadRenaveReadiness(
+      "tenant-a",
+      "store-a",
+      controller.signal,
+    );
+    await browserSessionClient.runRenaveLinkPreflight(
+      "tenant-a",
+      "store-a",
+      controller.signal,
+    );
+    await browserSessionClient.checkVehicleEligibility(
+      "tenant-a",
+      "store-a",
+      "ABC1D23",
+      "DIGITAL",
+      controller.signal,
+    );
+    await browserSessionClient.searchStocks(
+      "tenant-a",
+      "store-a",
+      "ABC1D23",
+      controller.signal,
+    );
+    await browserSessionClient.lookupVehicle(
+      "tenant-a",
+      "store-a",
+      "ABC1D23",
+      controller.signal,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    for (const [url, options] of fetchMock.mock.calls) {
+      expect(url).toEqual(expect.stringMatching(/^\/api\//));
+      expect(options).toEqual(
+        expect.objectContaining({
+          credentials: "same-origin",
+          signal: controller.signal,
+        }),
+      );
+      const serializedOptions = JSON.stringify(options).toLowerCase();
+      expect(serializedOptions).not.toContain("authorization");
+      expect(serializedOptions).not.toContain("cookie");
+      expect(serializedOptions).not.toContain("subject");
+    }
+  });
+
+  it("conecta o ensaio a uma porta sem mutação SERPRO do contexto selecionado", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }], "available"),
+    );
+    vi.mocked(client.loadRenaveReadiness).mockResolvedValue({
+      certificate: "ready",
+      environment: "homologation",
+      establishmentContact: "verified",
+      integration: "configured",
+      link: "enabled",
+      mutations: "blocked",
+      operatorIdentity: "verified",
+      queries: "ready",
+    });
+    vi.mocked(client.searchStocks).mockResolvedValue([
+      { estado: "CONFIRMADO", id: 1, placa: "ABC1D23" },
+    ]);
+    render(<App client={client} />);
+
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "Placa sintética" }),
+      { target: { value: "ABC1D23" } },
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Executar uma vez" }));
+
+    expect(
+      await screen.findByText(
+        /Ensaio concluído\. Nenhuma mutação foi enviada ao SERPRO/i,
+      ),
+    ).toBeVisible();
+    expect(client.runRenaveLinkPreflight).toHaveBeenCalledWith(
+      "tenant-a",
+      "store-a",
+      expect.any(AbortSignal),
+    );
+    expect(client.checkVehicleEligibility).toHaveBeenCalledWith(
+      "tenant-a",
+      "store-a",
+      "ABC1D23",
+      "DIGITAL",
+      expect.any(AbortSignal),
+    );
+    expect(client.searchStocks).toHaveBeenCalledWith(
+      "tenant-a",
+      "store-a",
+      "ABC1D23",
+      expect.any(AbortSignal),
+    );
+    expect(client.lookupVehicle).toHaveBeenCalledWith(
+      "tenant-a",
+      "store-a",
+      "ABC1D23",
+      expect.any(AbortSignal),
+    );
+    expect(client.createEstablishment).not.toHaveBeenCalled();
+    expect(client.createStockEntry).not.toHaveBeenCalled();
+  });
+
   it.each([
     "missing",
     "pending",

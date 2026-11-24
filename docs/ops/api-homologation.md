@@ -13,9 +13,10 @@ diretório e recursos locais, mas não compõe preflight ou consultas SERPRO. A
 ausência da integração deve aparecer como `disabled` no relatório autenticado
 de prontidão; não é falha de saúde do serviço.
 
-Produção e mutações permanecem bloqueadas por código. Não crie flags, aliases de
-host ou proxies para contornar esse limite. O primeiro tráfego autorizado é
-sempre read-only em homologação.
+Produção e mutações SERPRO permanecem bloqueadas por código. Não crie flags,
+aliases de host ou proxies para contornar esse limite. O primeiro tráfego
+externo autorizado não envia mutação ao SERPRO. O preflight registra
+evidência/auditoria e pode confirmar ou rejeitar o vínculo local.
 
 ## Material e configuração
 

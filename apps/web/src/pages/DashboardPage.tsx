@@ -24,6 +24,10 @@ import type {
   CreateStockEntryResult,
   EstablishmentManagementCapability,
 } from "../App.js";
+import {
+  HomologationCanaryPanel,
+  type ReadonlyCanaryPort,
+} from "../features/homologation-canary/index.js";
 import { ActivationPage } from "./ActivationPage.js";
 import { AttentionPanel } from "./AttentionPanel.js";
 import { EstablishmentCreationPanel } from "./EstablishmentCreationPanel.js";
@@ -39,6 +43,7 @@ export interface DashboardPageProps {
   environment: AppEnvironment;
   establishmentManagement?: EstablishmentManagementCapability;
   establishments: readonly AppShellEstablishment[];
+  homologationCanaryPort?: ReadonlyCanaryPort;
   logoutPending?: boolean;
   logoutError?: boolean;
   linkStatus?: BrowserRenaveLinkStatus;
@@ -104,6 +109,7 @@ export function DashboardPage({
   environment,
   establishmentManagement = "denied",
   establishments,
+  homologationCanaryPort,
   logoutPending = false,
   logoutError = false,
   linkStatus,
@@ -320,6 +326,18 @@ export function DashboardPage({
           loading={readinessLoading}
           {...(readiness ? { readiness } : {})}
         />
+
+        {environment === "homologation" &&
+        establishmentManagement === "available" &&
+        homologationCanaryPort &&
+        selectedTenantId &&
+        selectedEstablishmentId ? (
+          <HomologationCanaryPanel
+            key={`${selectedTenantId}:${selectedEstablishmentId}`}
+            port={homologationCanaryPort}
+            selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
+          />
+        ) : null}
 
         {onCreateEstablishment && selectedTenantId ? (
           <div id="establishment-creation">

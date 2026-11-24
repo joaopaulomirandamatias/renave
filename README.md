@@ -12,7 +12,7 @@ Fundação de uma plataforma SaaS multi-tenant para operação de estoque veicul
 - gate de concorrência próprio para consulta de sessão, sem consumir o orçamento de login;
 - limite distribuído de volume e concorrência nas consultas SERPRO, com leases recuperáveis;
 - conector SERPRO somente em homologação, com identidade do estabelecimento e da integradora verificadas antes de cada chamada;
-- preflight read-only do vínculo SERPRO por estabelecimento, com resposta pública sem CNPJ e evidência cifrada;
+- preflight do vínculo SERPRO por estabelecimento sem mutação remota, com resposta pública sem CNPJ; ele registra evidência/auditoria e pode confirmar ou rejeitar o vínculo local;
 - mutações e produção bloqueadas por código;
 - trilha de auditoria append-only com hash encadeado e cabeça por tenant;
 - evidência de consulta cifrada com AES-256-GCM e binding criptográfico ao tenant/estabelecimento;

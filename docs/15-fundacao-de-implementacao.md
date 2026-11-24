@@ -17,7 +17,7 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - BFF OIDC com sessão opaca e cookie `HttpOnly`, `Secure`, `SameSite=Lax` — **implementado**;
 - sessão ligada ao `subject` e ao RBAC local por tenant/estabelecimento, sem confiar nos papéis do IdP — **implementado**;
 - primeira consulta de aptidão autenticada, auditada e com evidência cifrada — **implementada e bloqueada por configuração até existirem credenciais reais de homologação**;
-- preflight read-only do certificado/vínculo por estabelecimento, sob RBAC e limite distribuído, com evidência cifrada e sem expor CNPJ — **implementado e bloqueado pela mesma configuração segura**;
+- preflight do certificado/vínculo por estabelecimento sem mutação enviada ao SERPRO, sob RBAC e limite distribuído, com evidência cifrada e sem expor CNPJ; ele registra evidência/auditoria e pode confirmar ou rejeitar o vínculo local — **implementado e bloqueado pela mesma configuração segura**;
 - fornecer por cofre o certificado de homologação, a chave de evidência e confirmar o vínculo da integradora — **pendente externo**;
 - descoberta de tenants/estabelecimentos para a UX e rate limit distribuído no login — **implementados**;
 - manter mutações indisponíveis até cofre/HSM, vínculo, outbox e âncora/WORM;

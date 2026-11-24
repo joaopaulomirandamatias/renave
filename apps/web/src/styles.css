@@ -1067,6 +1067,123 @@ footer {
   padding-left: 1.25rem;
 }
 
+.homologation-canary {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-brand-border);
+  border-radius: var(--sr-radius-card);
+  box-shadow: var(--sr-shadow-card);
+}
+
+.homologation-canary header p,
+.homologation-canary header h2,
+.homologation-canary > p,
+.homologation-canary__summary {
+  margin: 0;
+}
+
+.homologation-canary header p {
+  margin-bottom: 0.25rem;
+  color: var(--sr-color-brand);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.homologation-canary header h2 {
+  font-size: 1.1rem;
+}
+
+.homologation-canary > p {
+  max-width: 72ch;
+  color: var(--sr-color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.homologation-canary form,
+.homologation-canary fieldset {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.homologation-canary fieldset {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-control);
+}
+
+.homologation-canary legend,
+.homologation-canary label {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+#homologation-canary-plate,
+.homologation-canary select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  color: var(--sr-color-text);
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-border-strong);
+  border-radius: var(--sr-radius-control);
+}
+
+.homologation-canary fieldset > label:last-of-type {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  font-weight: 600;
+}
+
+.homologation-canary input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.homologation-canary input:focus-visible,
+.homologation-canary select:focus-visible {
+  outline: 3px solid var(--sr-color-focus);
+  outline-offset: 2px;
+}
+
+.homologation-canary ol {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.homologation-canary li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-control);
+}
+
+.homologation-canary li strong {
+  color: var(--sr-color-navy);
+  font-size: 0.8125rem;
+}
+
+.homologation-canary__summary {
+  min-height: 2.75rem;
+  padding: 0.75rem;
+  color: var(--sr-color-navy);
+  background: var(--sr-color-brand-soft);
+  border-radius: var(--sr-radius-control);
+  line-height: 1.5;
+}
+
 @media (max-width: 46rem) {
   .dashboard-page__stats {
     grid-template-columns: 1fr;
@@ -1136,5 +1253,13 @@ footer {
 
   .stock-entry form .sr-button {
     width: 100%;
+  }
+
+  .homologation-canary .sr-button {
+    width: 100%;
+  }
+
+  .homologation-canary li {
+    grid-template-columns: 1fr;
   }
 }

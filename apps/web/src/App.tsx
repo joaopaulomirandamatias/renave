@@ -3,6 +3,7 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DashboardPage } from "./pages/DashboardPage.js";
+import type { ReadonlyCanaryPort } from "./features/homologation-canary/index.js";
 import { LoginPage } from "./pages/LoginPage.js";
 
 interface AnonymousSession {
@@ -165,6 +166,7 @@ export interface SessionClient {
     establishmentId: string,
     plate: string,
     crvType: BrowserCrvType,
+    signal?: AbortSignal,
   ): Promise<BrowserEligibilitySummary>;
   createEstablishment(
     tenantId: string,
@@ -185,21 +187,25 @@ export interface SessionClient {
   loadRenaveReadiness(
     tenantId: string,
     establishmentId: string,
+    signal?: AbortSignal,
   ): Promise<BrowserRenaveReadiness>;
   logout(): Promise<{ endSessionUrl?: string }>;
   runRenaveLinkPreflight(
     tenantId: string,
     establishmentId: string,
+    signal?: AbortSignal,
   ): Promise<void>;
   searchStocks(
     tenantId: string,
     establishmentId: string,
     plate: string,
+    signal?: AbortSignal,
   ): Promise<readonly BrowserStockSummary[]>;
   lookupVehicle(
     tenantId: string,
     establishmentId: string,
     plate: string,
+    signal?: AbortSignal,
   ): Promise<BrowserVehicle>;
 }
 
@@ -678,7 +684,13 @@ export class StockEntryCreationClientError extends Error {
 }
 
 export const browserSessionClient: SessionClient = {
-  async checkVehicleEligibility(tenantId, establishmentId, plate, crvType) {
+  async checkVehicleEligibility(
+    tenantId,
+    establishmentId,
+    plate,
+    crvType,
+    signal,
+  ) {
     const response = await fetch(
       `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/vehicle-eligibility`,
       {
@@ -690,6 +702,7 @@ export const browserSessionClient: SessionClient = {
           "content-type": "application/json",
         },
         method: "POST",
+        ...(signal ? { signal } : {}),
       },
     );
     const value: unknown = await response.json().catch(() => undefined);
@@ -834,13 +847,14 @@ export const browserSessionClient: SessionClient = {
     if (!response.ok) throw new Error("Não foi possível carregar o vínculo");
     return parseRenaveLink(await response.json());
   },
-  async loadRenaveReadiness(tenantId, establishmentId) {
+  async loadRenaveReadiness(tenantId, establishmentId, signal) {
     const response = await fetch(
       `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/renave-readiness`,
       {
         cache: "no-store",
         credentials: "same-origin",
         headers: { accept: "application/json" },
+        ...(signal ? { signal } : {}),
       },
     );
     if (!response.ok) {
@@ -866,18 +880,19 @@ export const browserSessionClient: SessionClient = {
     }
     return { endSessionUrl: target.href };
   },
-  async runRenaveLinkPreflight(tenantId, establishmentId) {
+  async runRenaveLinkPreflight(tenantId, establishmentId, signal) {
     const response = await fetch(
       `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/renave-link-preflight`,
       {
         method: "POST",
         credentials: "same-origin",
         headers: { accept: "application/json" },
+        ...(signal ? { signal } : {}),
       },
     );
     if (!response.ok) throw new Error("Não foi possível verificar o vínculo");
   },
-  async searchStocks(tenantId, establishmentId, plate) {
+  async searchStocks(tenantId, establishmentId, plate, signal) {
     const response = await fetch(
       `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/stocks/search`,
       {
@@ -889,6 +904,7 @@ export const browserSessionClient: SessionClient = {
           "content-type": "application/json",
         },
         method: "POST",
+        ...(signal ? { signal } : {}),
       },
     );
     const value: unknown = await response.json().catch(() => undefined);
@@ -901,7 +917,7 @@ export const browserSessionClient: SessionClient = {
     }
     return parseStocks(value);
   },
-  async lookupVehicle(tenantId, establishmentId, plate) {
+  async lookupVehicle(tenantId, establishmentId, plate, signal) {
     const response = await fetch(
       `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/vehicles/search`,
       {
@@ -913,6 +929,7 @@ export const browserSessionClient: SessionClient = {
           "content-type": "application/json",
         },
         method: "POST",
+        ...(signal ? { signal } : {}),
       },
     );
     const value: unknown = await response.json().catch(() => undefined);
@@ -1443,6 +1460,49 @@ export function App({
     return result;
   }
 
+  const homologationCanaryPort: ReadonlyCanaryPort | undefined =
+    environment === "homologation" &&
+    establishmentManagement === "available" &&
+    selectedTenantId &&
+    activeEstablishmentId
+      ? {
+          checkEligibility: (plate, crvType, signal) =>
+            client.checkVehicleEligibility(
+              selectedTenantId,
+              activeEstablishmentId,
+              plate,
+              crvType,
+              signal,
+            ),
+          loadReadiness: (signal) =>
+            client.loadRenaveReadiness(
+              selectedTenantId,
+              activeEstablishmentId,
+              signal,
+            ),
+          lookupVehicle: (plate, signal) =>
+            client.lookupVehicle(
+              selectedTenantId,
+              activeEstablishmentId,
+              plate,
+              signal,
+            ),
+          runPreflight: (signal) =>
+            client.runRenaveLinkPreflight(
+              selectedTenantId,
+              activeEstablishmentId,
+              signal,
+            ),
+          searchStocks: (plate, signal) =>
+            client.searchStocks(
+              selectedTenantId,
+              activeEstablishmentId,
+              plate,
+              signal,
+            ),
+        }
+      : undefined;
+
   return (
     <DashboardPage
       establishmentManagement={establishmentManagement}
@@ -1467,6 +1527,7 @@ export function App({
       readinessError={renaveReadinessView.status === "error"}
       readinessLoading={renaveReadinessView.status === "loading"}
       stockEntryOperationsEnabled={stockEntryOperationsEnabled}
+      {...(homologationCanaryPort ? { homologationCanaryPort } : {})}
       onCheckEligibility={(plate, crvType) =>
         client.checkVehicleEligibility(
           selectedTenantId,
