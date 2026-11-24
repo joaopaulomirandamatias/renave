@@ -40,6 +40,8 @@ export interface AppConfig {
   tenantAdminHmacKeyBase64: string | undefined;
   sessionLookupMaxConcurrency: number;
   serproQueryLimitHmacKeyBase64: string | undefined;
+  /** Habilita apenas a criação cifrada em HELD_LOCAL; nunca envia ao SERPRO. */
+  stockEntryLocalEnabled: boolean;
   /** Banco de negócio SaaS; independe de a integração SERPRO estar ligada. */
   databaseUrl: string | undefined;
   databaseTlsCaFile: string | undefined;
@@ -168,6 +170,13 @@ function integrationEnabled(value: string | undefined): boolean {
   throw new Error("RENAVE_INTEGRATION_ENABLED deve ser true ou false");
 }
 
+function stockEntryLocalEnabled(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === "false") return false;
+  if (normalized === "true") return true;
+  throw new Error("RENAVE_STOCK_ENTRY_LOCAL_ENABLED deve ser true ou false");
+}
+
 function loadRenaveIntegration(
   environment: NodeJS.ProcessEnv,
   appEnvironment: AppEnvironment,
@@ -261,6 +270,9 @@ export function loadConfig(
   const tenantAdminHmacKeyBase64 = optionalText(
     environment.TENANT_ADMIN_HMAC_KEY_BASE64,
   );
+  const enableStockEntryLocal = stockEntryLocalEnabled(
+    environment.RENAVE_STOCK_ENTRY_LOCAL_ENABLED,
+  );
   const renave = loadRenaveIntegration(environment, appEnvironment, authMode);
 
   validateDatabaseUrl(
@@ -315,6 +327,24 @@ export function loadConfig(
       "Banco SaaS fora de desenvolvimento exige TENANT_ADMIN_HMAC_KEY_BASE64",
     );
   }
+  if (enableStockEntryLocal) {
+    if (appEnvironment !== "homologation") {
+      throw new Error(
+        "RENAVE_STOCK_ENTRY_LOCAL_ENABLED está restrito à homologação",
+      );
+    }
+    if (authMode !== "oidc") {
+      throw new Error("A entrada de estoque local exige AUTH_MODE=oidc");
+    }
+    if (sessionStore !== "postgres" || !identityDatabaseUrl) {
+      throw new Error(
+        "A entrada de estoque local exige SESSION_STORE=postgres e IDENTITY_DATABASE_URL",
+      );
+    }
+    if (!databaseUrl) {
+      throw new Error("A entrada de estoque local exige DATABASE_URL");
+    }
+  }
 
   return {
     appEnvironment,
@@ -333,6 +363,7 @@ export function loadConfig(
       environment.SESSION_LOOKUP_MAX_CONCURRENCY,
     ),
     serproQueryLimitHmacKeyBase64,
+    stockEntryLocalEnabled: enableStockEntryLocal,
     databaseUrl,
     databaseTlsCaFile,
     renave,

@@ -31,6 +31,10 @@ const IDEMPOTENCY_KEY = "33333333-3333-4333-8333-333333333333";
 const OPERATION_ID = "44444444-4444-4444-8444-444444444444";
 const ORIGIN = "https://app.test";
 const SUBJECT = "oidc|operator-1";
+const KEY_GENERATION = {
+  fingerprint: Buffer.alloc(32, 71),
+  generationId: "held-local-v1",
+};
 const clock: Clock = {
   now: () => new Date("2026-11-24T18:00:00.000Z"),
 };
@@ -542,6 +546,7 @@ describe("PostgresHeldStockEntryOperation", () => {
       environment: "homologation",
       keys: new Map([["request-2026-11", Buffer.alloc(32, 32)]]),
     });
+    const assertKeyGeneration = vi.fn(async () => undefined);
     const useCase = new PostgresHeldStockEntryOperation({
       createOperation,
       digestKeys: {
@@ -550,6 +555,8 @@ describe("PostgresHeldStockEntryOperation", () => {
         vehicle: Buffer.alloc(32, 23),
       },
       environment: "homologation",
+      keyGeneration: KEY_GENERATION,
+      keyGenerationChecker: { assert: assertKeyGeneration },
       principalCrypto,
       projectionCipher,
       requestCipher,
@@ -578,6 +585,10 @@ describe("PostgresHeldStockEntryOperation", () => {
 
     expect([created.replayed, replayed.replayed].sort()).toEqual([false, true]);
     expect(resolver.resolve).toHaveBeenCalledTimes(2);
+    expect(assertKeyGeneration).toHaveBeenCalledTimes(2);
+    expect(assertKeyGeneration.mock.invocationCallOrder[0]).toBeLessThan(
+      resolver.resolve.mock.invocationCallOrder[0]!,
+    );
     expect(resolver.resolve).toHaveBeenCalledWith(expect.anything(), {
       establishmentId: ESTABLISHMENT_ID,
       idempotencyKeyDigest: expect.any(Buffer),
@@ -623,8 +634,10 @@ describe("PostgresHeldStockEntryOperation", () => {
     useCase.destroy();
     const internal = useCase as unknown as {
       digestKeys: { actor: Buffer; idempotency: Buffer; vehicle: Buffer };
+      keyGeneration: { fingerprint: Buffer };
     };
     expect(Object.values(internal.digestKeys).every(allZero)).toBe(true);
+    expect(allZero(internal.keyGeneration.fingerprint)).toBe(true);
     expect(borrowedPrincipalCryptoDestroy).not.toHaveBeenCalled();
     expect(
       hasOperationReconciliationProjectionKey(
@@ -683,6 +696,8 @@ describe("PostgresHeldStockEntryOperation", () => {
         vehicle: Buffer.alloc(32, 43),
       },
       environment: "homologation" as const,
+      keyGeneration: KEY_GENERATION,
+      keyGenerationChecker: { assert: vi.fn(async () => undefined) },
       projectionCipher: new OperationReconciliationProjectionCipher({
         activeKeyId: "projection-failure",
         environment: "homologation",
@@ -769,5 +784,63 @@ describe("PostgresHeldStockEntryOperation", () => {
     });
     expect(allZero(operatorEnvelope.ciphertext)).toBe(true);
     expect(allZero(establishmentEnvelope.ciphertext)).toBe(true);
+  });
+
+  it("recusa geração divergente dentro da transação antes de qualquer escrita", async () => {
+    const resolver = { resolve: vi.fn() };
+    const createOperation = vi.fn();
+    const checker = {
+      assert: vi.fn(async () => {
+        const error = new Error("fingerprint divergente");
+        error.name = "StockEntryRuntimeKeyGenerationError";
+        throw error;
+      }),
+    };
+    const runner: TenantActionRunner = {
+      run: async (input, work) => ({
+        allowed: true,
+        value: await work({
+          authorization: { allowed: true } as never,
+          client: {} as TenantClient,
+          session: input.session,
+        }),
+      }),
+    };
+    const useCase = new PostgresHeldStockEntryOperation({
+      createOperation,
+      digestKeys: {
+        actor: Buffer.alloc(32, 81),
+        idempotency: Buffer.alloc(32, 82),
+        vehicle: Buffer.alloc(32, 83),
+      },
+      environment: "homologation",
+      keyGeneration: KEY_GENERATION,
+      keyGenerationChecker: checker,
+      principalCrypto: {} as RenavePrincipalCrypto,
+      projectionCipher: {} as OperationReconciliationProjectionCipher,
+      requestCipher: {} as OperationRequestCipher,
+      resolver,
+      runner,
+    });
+
+    await expect(
+      useCase.execute({
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        session: {
+          expiresAt: Date.now() + 60_000,
+          mfaVerified: true,
+          roles: [],
+          subject: SUBJECT,
+        },
+        tenantId: TENANT_ID,
+        traceId: "trace",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_ENTRY_OPERATION_UNAVAILABLE" });
+    expect(checker.assert).toHaveBeenCalledOnce();
+    expect(resolver.resolve).not.toHaveBeenCalled();
+    expect(createOperation).not.toHaveBeenCalled();
+    useCase.destroy();
   });
 });

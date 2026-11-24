@@ -2,6 +2,7 @@ import { X509Certificate } from "node:crypto";
 
 import {
   APP_ROLE,
+  assertStockEntryRuntimeKeyGeneration,
   assertRuntimeDatabase,
   decodeLoginRateHmacKeyBase64,
   decodeSerproQueryHmacKeyBase64,
@@ -41,6 +42,18 @@ import { PostgresRenaveLinkPreflightUseCase } from "./renave/preflight-use-case.
 import { PostgresRenaveReadinessUseCase } from "./renave/readiness-use-case.js";
 import type { SerproQueryLimiter } from "./renave/routes.js";
 import { PostgresStockQueryUseCase } from "./renave/stock-query-use-case.js";
+import {
+  composeStockEntryRuntime,
+  type StockEntryRuntimeComposition,
+} from "./renave/stock-entry-runtime.js";
+import {
+  destroyStockEntrySecretBundle,
+  readStockEntrySecretBundle,
+} from "./renave/stock-entry-secret-bundle.js";
+import type {
+  StockEntryMutationRateLimiter,
+  StockEntryOperationUseCase,
+} from "./renave/stock-entry-operations.js";
 import { createPostgresTenantDirectory } from "./tenant/directory.js";
 import type {
   TenantEstablishmentAdministration,
@@ -62,6 +75,8 @@ export interface AppRuntime {
   sessionLookupGate?: SessionLookupGate;
   serproQueryLimiter?: SerproQueryLimiter;
   stockQuery?: PostgresStockQueryUseCase;
+  stockEntryMutationRateLimiter?: StockEntryMutationRateLimiter;
+  stockEntryOperation?: StockEntryOperationUseCase;
   tenantDirectory?: TenantDirectory;
   tenantEstablishmentAdministration?: TenantEstablishmentAdministration;
   tenantMutationRateLimiter?: TenantMutationRateLimiter;
@@ -90,6 +105,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
   let tenantAdminLimiter: PostgresTenantAdminRateLimiter | undefined;
   let tenantAdministration:
     PostgresTenantEstablishmentAdministration | undefined;
+  let stockEntryComposition: StockEntryRuntimeComposition | undefined;
   function registerPool(pool: Pool): Pool {
     pools.push(pool);
     pool.on("error", () => {
@@ -192,6 +208,26 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     const linkStatus = businessPool
       ? new PostgresRenaveLinkStatusUseCase(businessPool)
       : undefined;
+    if (config.stockEntryLocalEnabled) {
+      if (!businessPool || !tenantActionRunner) {
+        throw new Error("A entrada de estoque local está indisponível");
+      }
+      const bundle = await readStockEntrySecretBundle();
+      try {
+        await assertStockEntryRuntimeKeyGeneration(businessPool, {
+          fingerprint: bundle.digests.fingerprint,
+          generationId: bundle.digests.generationId,
+        });
+        stockEntryComposition = composeStockEntryRuntime({
+          bundle,
+          pool: businessPool,
+          runner: tenantActionRunner,
+        });
+      } catch (error) {
+        destroyStockEntrySecretBundle(bundle);
+        throw error;
+      }
+    }
 
     let eligibility: PostgresVehicleEligibilityUseCase | undefined;
     let preflight: PostgresRenaveLinkPreflightUseCase | undefined;
@@ -288,6 +324,13 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       ...(sessionLookupGate ? { sessionLookupGate } : {}),
       ...(serproQueryLimiter ? { serproQueryLimiter } : {}),
       ...(stockQuery ? { stockQuery } : {}),
+      ...(stockEntryComposition
+        ? {
+            stockEntryMutationRateLimiter:
+              stockEntryComposition.mutationRateLimiter,
+            stockEntryOperation: stockEntryComposition.operation,
+          }
+        : {}),
       ...(tenantDirectory ? { tenantDirectory } : {}),
       ...(tenantActionRunner ? { tenantActionRunner } : {}),
       ...(tenantAdministration
@@ -313,6 +356,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
       },
       async close() {
         mtls?.close();
+        stockEntryComposition?.destroy();
         tenantAdministration?.destroy();
         tenantAdminLimiter?.destroy();
         await Promise.all(pools.map((pool) => pool.end()));
@@ -320,6 +364,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
     };
   } catch (error) {
     mtls?.close();
+    stockEntryComposition?.destroy();
     tenantAdministration?.destroy();
     tenantAdminLimiter?.destroy();
     await Promise.allSettled(pools.map((pool) => pool.end()));

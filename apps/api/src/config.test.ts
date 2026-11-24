@@ -10,7 +10,64 @@ const oidc = {
   PROXY_MODE: "direct",
 };
 
+const stockEntryLocal = {
+  ...oidc,
+  APP_ENVIRONMENT: "homologation",
+  DATABASE_URL: "postgres://app@127.0.0.1:54317/renave",
+  IDENTITY_DATABASE_URL: "postgres://identity@127.0.0.1:54317/renave_identity",
+  LOGIN_RATE_LIMIT_HMAC_KEY_BASE64: Buffer.alloc(32, 1).toString("base64"),
+  RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "true",
+  SESSION_STORE: "postgres",
+  TENANT_ADMIN_HMAC_KEY_BASE64: Buffer.alloc(32, 2).toString("base64"),
+};
+
 describe("configuração da API", () => {
+  it("mantém a entrada de estoque local desligada por padrão", () => {
+    expect(loadConfig().stockEntryLocalEnabled).toBe(false);
+    expect(
+      loadConfig({ RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "false" })
+        .stockEntryLocalEnabled,
+    ).toBe(false);
+    expect(() =>
+      loadConfig({ RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "yes" }),
+    ).toThrow("RENAVE_STOCK_ENTRY_LOCAL_ENABLED");
+  });
+
+  it("habilita HELD_LOCAL somente com homologação, OIDC e bancos persistentes", () => {
+    const config = loadConfig(stockEntryLocal);
+    expect(config.stockEntryLocalEnabled).toBe(true);
+    expect(config.renave).toBeUndefined();
+
+    expect(() =>
+      loadConfig({
+        ...stockEntryLocal,
+        APP_ENVIRONMENT: "production",
+        DATABASE_TLS_CA_FILE: "/run/secrets/database-ca.pem",
+        IDENTITY_DATABASE_TLS_CA_FILE: "/run/secrets/identity-ca.pem",
+      }),
+    ).toThrow("restrito à homologação");
+    expect(() =>
+      loadConfig({
+        APP_ENVIRONMENT: "homologation",
+        PROXY_MODE: "direct",
+        RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "true",
+      }),
+    ).toThrow("AUTH_MODE=oidc");
+    expect(() =>
+      loadConfig({
+        ...stockEntryLocal,
+        SESSION_STORE: "memory",
+      }),
+    ).toThrow("SESSION_STORE=postgres");
+    expect(() =>
+      loadConfig({
+        ...stockEntryLocal,
+        DATABASE_URL: undefined,
+        TENANT_ADMIN_HMAC_KEY_BASE64: undefined,
+      }),
+    ).toThrow("DATABASE_URL");
+  });
+
   it("valida a concorrência dedicada das consultas de sessão", () => {
     expect(loadConfig().sessionLookupMaxConcurrency).toBe(4);
     expect(

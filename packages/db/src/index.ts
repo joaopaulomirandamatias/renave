@@ -164,6 +164,15 @@ export {
   type SerproQueryPermitResult,
 } from "./serpro-query-limiter.js";
 export {
+  assertStockEntryRuntimeKeyGeneration,
+  decodeStockEntryRateLimitHmacKeyBase64,
+  PostgresStockEntryRateLimiter,
+  StockEntryRuntimeKeyGenerationError,
+  StockEntryRateLimitInputError,
+  type StockEntryRateLimitResult,
+  type StockEntryRateLimitScope,
+} from "./stock-entry-rate-limiter.js";
+export {
   discoverTenants,
   TenantDirectoryInputError,
   type TenantDirectoryEntry,

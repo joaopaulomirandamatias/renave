@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
+  assertStockEntryRuntimeKeyGeneration,
   createOrReplayHeldLocalOperation,
   resolveVerifiedRenavePrincipals,
   type CreateOperationInput,
@@ -43,6 +44,7 @@ const CNPJ = /^[A-Za-z0-9]{12}\d{2}$/u;
 const SECURITY_CODE = /^\d{11}$/u;
 const CRV_NUMBER = /^\d{12}$/u;
 const RENAVAM = /^\d{11}$/u;
+const KEY_GENERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 const CRV_TYPES = new Set<CrvType>(["AZUL", "VERDE", "BRANCO", "DIGITAL"]);
 const OWNER_DOCUMENT_TYPES = new Set<OwnerDocumentType>(["CPF", "CNPJ"]);
 const MAX_PURCHASE_VALUE = 99_999_999.99;
@@ -154,6 +156,16 @@ export interface VerifiedRenavePrincipalResolver {
 /** Adapter estrutural para o resolver atômico do banco, sem alargar a rota. */
 export const databaseVerifiedRenavePrincipalResolver: VerifiedRenavePrincipalResolver =
   Object.freeze({ resolve: resolveVerifiedRenavePrincipals });
+
+export interface StockEntryRuntimeKeyGenerationChecker {
+  assert(
+    client: TenantClient,
+    input: { fingerprint: Uint8Array; generationId: string },
+  ): Promise<void>;
+}
+
+export const databaseStockEntryRuntimeKeyGenerationChecker: StockEntryRuntimeKeyGenerationChecker =
+  Object.freeze({ assert: assertStockEntryRuntimeKeyGeneration });
 
 export interface StockEntryOperationResult {
   createdAt: Date;
@@ -351,6 +363,30 @@ interface DigestKeys {
   vehicle: Uint8Array;
 }
 
+interface RuntimeKeyGeneration {
+  fingerprint: Uint8Array;
+  generationId: string;
+}
+
+function copyRuntimeKeyGeneration(source: RuntimeKeyGeneration): {
+  fingerprint: Buffer;
+  generationId: string;
+} {
+  if (
+    !source ||
+    typeof source.generationId !== "string" ||
+    !KEY_GENERATION_ID.test(source.generationId) ||
+    !(source.fingerprint instanceof Uint8Array) ||
+    source.fingerprint.byteLength !== 32
+  ) {
+    throw new StockEntryOperationError("STOCK_ENTRY_OPERATION_NOT_CONFIGURED");
+  }
+  return {
+    fingerprint: Buffer.from(source.fingerprint),
+    generationId: source.generationId,
+  };
+}
+
 function copyDigestKeys(source: DigestKeys): {
   actor: Buffer;
   idempotency: Buffer;
@@ -406,19 +442,23 @@ function zeroResolvedPrincipal(principal: ResolvedPrincipal | undefined): void {
 }
 
 /**
- * Possui somente as cópias das três chaves de digest.
+ * Possui somente as cópias das três chaves de digest e do fingerprint da
+ * geração fixada no banco.
  * `principalCrypto`, `requestCipher` e `projectionCipher` são empréstimos: o
  * compositor deve destruí-los, nessa ordem de ciclo de vida, apenas depois de
  * fechar todos os casos de uso que possam compartilhá-los.
  */
 export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCase {
   private readonly digestKeys: ReturnType<typeof copyDigestKeys>;
+  private readonly keyGeneration: ReturnType<typeof copyRuntimeKeyGeneration>;
   private destroyed = false;
 
   constructor(
     private readonly options: {
       digestKeys: DigestKeys;
       environment: "homologation";
+      keyGeneration: RuntimeKeyGeneration;
+      keyGenerationChecker: StockEntryRuntimeKeyGenerationChecker;
       principalCrypto: RenavePrincipalCrypto;
       projectionCipher: OperationReconciliationProjectionCipher;
       requestCipher: OperationRequestCipher;
@@ -428,6 +468,14 @@ export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCa
     },
   ) {
     this.digestKeys = copyDigestKeys(options.digestKeys);
+    try {
+      this.keyGeneration = copyRuntimeKeyGeneration(options.keyGeneration);
+    } catch (error) {
+      this.digestKeys.actor.fill(0);
+      this.digestKeys.idempotency.fill(0);
+      this.digestKeys.vehicle.fill(0);
+      throw error;
+    }
   }
 
   /** Zera só as chaves próprias; nunca destrói recursos criptográficos emprestados. */
@@ -436,6 +484,7 @@ export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCa
     this.digestKeys.actor.fill(0);
     this.digestKeys.idempotency.fill(0);
     this.digestKeys.vehicle.fill(0);
+    this.keyGeneration.fingerprint.fill(0);
     this.destroyed = true;
   }
 
@@ -515,7 +564,15 @@ export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCa
     let vehicleDigest: Buffer | undefined;
     let operationInput: CreateOperationInput | undefined;
     let principals: ResolvedVerifiedRenavePrincipals | undefined;
+    let generationFingerprint: Buffer | undefined;
     try {
+      generationFingerprint = Buffer.from(this.keyGeneration.fingerprint);
+      await this.options.keyGenerationChecker.assert(client, {
+        fingerprint: generationFingerprint,
+        generationId: this.keyGeneration.generationId,
+      });
+      generationFingerprint.fill(0);
+      generationFingerprint = undefined;
       idempotencyDigest = hmac(
         this.digestKeys.idempotency,
         "stock-entry-idempotency",
@@ -615,6 +672,7 @@ export class PostgresHeldStockEntryOperation implements StockEntryOperationUseCa
       actorDigest?.fill(0);
       idempotencyDigest?.fill(0);
       vehicleDigest?.fill(0);
+      generationFingerprint?.fill(0);
       if (operationInput) {
         operationInput.actorSubjectHash.fill(0);
         operationInput.idempotencyKeyDigest.fill(0);

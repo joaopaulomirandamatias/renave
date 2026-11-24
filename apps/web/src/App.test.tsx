@@ -1359,6 +1359,46 @@ describe("App session boundary", () => {
     await waitFor(() => expect(screen.queryByText("Confirmado")).toBeNull());
   });
 
+  it("não contorna perfis verificados mesmo com a feature flag ativa", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja A" }]),
+    );
+    vi.mocked(client.loadRenaveLinkStatus).mockResolvedValue({
+      preflightAvailable: false,
+      status: "enabled",
+    });
+    vi.mocked(client.loadRenaveReadiness).mockResolvedValue({
+      certificate: "ready",
+      environment: "homologation",
+      establishmentContact: "blocked",
+      integration: "configured",
+      link: "enabled",
+      mutations: "blocked",
+      operatorIdentity: "blocked",
+      queries: "ready",
+    });
+
+    render(<App client={client} stockEntryOperationsEnabled />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Olá, Operadora" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Registrar solicitação local" }),
+    ).toBeNull();
+    expect(screen.getByText(/capability explícita/i)).toBeVisible();
+  });
+
   it("distingue indisponibilidade de sessão e permite tentar novamente", async () => {
     const client = clientFor({
       authenticated: false,

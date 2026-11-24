@@ -33,6 +33,7 @@ const config: AppConfig = {
   tenantAdminHmacKeyBase64: undefined,
   sessionLookupMaxConcurrency: 4,
   serproQueryLimitHmacKeyBase64: undefined,
+  stockEntryLocalEnabled: false,
   databaseUrl: undefined,
   databaseTlsCaFile: undefined,
   renave: undefined,

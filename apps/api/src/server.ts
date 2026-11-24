@@ -27,6 +27,14 @@ const app = buildApp({
     ? { renaveReadiness: runtime.renaveReadiness }
     : {}),
   ...(runtime.stockQuery ? { stockQuery: runtime.stockQuery } : {}),
+  ...(runtime.stockEntryMutationRateLimiter
+    ? {
+        stockEntryMutationRateLimiter: runtime.stockEntryMutationRateLimiter,
+      }
+    : {}),
+  ...(runtime.stockEntryOperation
+    ? { stockEntryOperation: runtime.stockEntryOperation }
+    : {}),
   ...(runtime.tenantDirectory
     ? { tenantDirectory: runtime.tenantDirectory }
     : {}),
