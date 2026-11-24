@@ -181,6 +181,28 @@ describe("guard do banco de runtime", () => {
     await expectAppContractReady();
   });
 
+  it("recusa checksum divergente da migration de claim", async () => {
+    const original = await adminPool.query<{ checksum: string }>(
+      `select checksum from renave.schema_migrations
+        where version = '0027_operation_outbox_claim_lease'`,
+    );
+    await adminPool.query(
+      `update renave.schema_migrations set checksum = $1
+        where version = '0027_operation_outbox_claim_lease'`,
+      ["0".repeat(64)],
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `update renave.schema_migrations set checksum = $1
+          where version = '0027_operation_outbox_claim_lease'`,
+        [original.rows[0]!.checksum],
+      );
+    }
+    await expectAppContractReady();
+  });
+
   it("recusa RLS desabilitada nas tabelas do outbox", async () => {
     await adminPool.query(
       "alter table renave.operation_outbox disable row level security",
@@ -303,6 +325,54 @@ describe("guard do banco de runtime", () => {
     await expectAppContractReady();
   });
 
+  it("recusa índice de lease expirado com predicado aberto", async () => {
+    await adminPool.query(
+      "drop index renave.operation_outbox_expired_lease_idx",
+    );
+    await adminPool.query(
+      `create index operation_outbox_expired_lease_idx
+       on renave.operation_outbox (
+         tenant_id, event_type, lease_expires_at, created_at, id
+       ) where delivery_status in ('READY', 'LEASED')`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "drop index renave.operation_outbox_expired_lease_idx",
+      );
+      await adminPool.query(
+        `create index operation_outbox_expired_lease_idx
+         on renave.operation_outbox (
+           tenant_id, event_type, lease_expires_at, created_at, id
+         ) where delivery_status = 'LEASED'`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa índice de token sem unicidade global enquanto ativo", async () => {
+    await adminPool.query("drop index renave.operation_outbox_lease_token_key");
+    await adminPool.query(
+      `create index operation_outbox_lease_token_key
+       on renave.operation_outbox (lease_token)
+       where lease_token is not null`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        "drop index renave.operation_outbox_lease_token_key",
+      );
+      await adminPool.query(
+        `create unique index operation_outbox_lease_token_key
+         on renave.operation_outbox (lease_token)
+         where lease_token is not null`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
   it("recusa trigger protetor desabilitado", async () => {
     await adminPool.query(
       "alter table renave.operation disable trigger operation_guard",
@@ -403,6 +473,52 @@ describe("guard do banco de runtime", () => {
     await expectAppContractReady();
   });
 
+  it("recusa função de claim adulterada ou sem SECURITY DEFINER", async () => {
+    const original = await adminPool.query<{ definition: string }>(
+      `select pg_catalog.pg_get_functiondef(
+         'renave.claim_operation_send_leases(uuid,integer)'::regprocedure
+       ) as definition`,
+    );
+    await adminPool.query(
+      `create or replace function renave.claim_operation_send_leases(
+         p_lease_owner uuid, p_limit integer
+       )
+       returns table (
+         outbox_id uuid, operation_id uuid, event_type text,
+         attempt_count integer, lease_token uuid,
+         lease_expires_at timestamptz
+       )
+       language plpgsql
+       security definer
+       set search_path = pg_catalog
+       as $$
+       begin
+         return;
+       end;
+       $$`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(original.rows[0]!.definition);
+    }
+    await expectAppContractReady();
+
+    await adminPool.query(
+      `alter function renave.claim_operation_send_leases(uuid, integer)
+       security invoker`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `alter function renave.claim_operation_send_leases(uuid, integer)
+         security definer`,
+      );
+    }
+    await expectAppContractReady();
+  });
+
   it("recusa privilégio direto inesperado nas tabelas outbox", async () => {
     await adminPool.query("grant select on renave.operation to renave_app");
     try {
@@ -443,6 +559,26 @@ describe("guard do banco de runtime", () => {
         `revoke execute on function renave.get_operation_summary(uuid)
          from renave_identity_app`,
       );
+    }
+    await expectAppContractReady();
+  });
+
+  it("recusa grant a qualquer papel não enumerado nas funções de lease", async () => {
+    await adminPool.query("create role operation_lease_acl_probe nologin");
+    await adminPool.query(
+      `grant execute on function
+         renave.claim_operation_send_leases(uuid, integer)
+       to operation_lease_acl_probe`,
+    );
+    try {
+      await expectAppContractRejected();
+    } finally {
+      await adminPool.query(
+        `revoke execute on function
+           renave.claim_operation_send_leases(uuid, integer)
+         from operation_lease_acl_probe`,
+      );
+      await adminPool.query("drop role operation_lease_acl_probe");
     }
     await expectAppContractReady();
   });

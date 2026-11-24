@@ -10,22 +10,26 @@ describe("loadMigrations", () => {
     const second = await loadMigrations();
     expect(first.length).toBeGreaterThan(0);
     expect(first[0]?.version).toBe("0001_tenant_establishment");
-    expect(first.at(-3)?.version).toBe("0024_runtime_contract_stock_query");
-    expect(first.at(-2)?.version).toBe("0025_operation_outbox");
-    expect(first.at(-1)?.version).toBe(
+    expect(first.at(-5)?.version).toBe("0024_runtime_contract_stock_query");
+    expect(first.at(-4)?.version).toBe("0025_operation_outbox");
+    expect(first.at(-3)?.version).toBe(
       "0026_runtime_contract_operation_outbox",
     );
+    expect(first.at(-2)?.version).toBe("0027_operation_outbox_claim_lease");
+    expect(first.at(-1)?.version).toBe("0028_runtime_contract_operation_claim");
     expect(first.map((m) => m.checksum)).toEqual(second.map((m) => m.checksum));
     expect(first[0]?.checksum).toMatch(/^[0-9a-f]{64}$/);
     expect(first.at(-1)?.sql).toContain(first.at(-2)?.checksum);
-    expect(first.at(-1)?.sql).toContain("'0025_operation_outbox'");
+    expect(first.at(-1)?.sql).toContain(first.at(-3)?.checksum);
+    expect(first.at(-1)?.sql).toContain("'0027_operation_outbox_claim_lease'");
+    expect(first.at(-2)?.sql).toContain("for update of outbox skip locked");
+    expect(first.at(-1)?.sql).toContain(
+      "operation_outbox_contract_ready_v0026",
+    );
     expect(first.at(-1)?.sql).toContain("pg_catalog.pg_get_expr");
     expect(first.at(-1)?.sql).toContain("pg_catalog.pg_get_indexdef");
-    expect(first.at(-1)?.sql).toContain("objects.relpersistence = 'p'");
-    expect(first.at(-1)?.sql).toContain("triggers.tgqual is null");
-    expect(first.at(-1)?.sql).toContain("triggers.tgattr = ''::int2vector");
     expect(first.at(-1)?.sql).toContain("pg_catalog.sha256");
-    expect(first.at(-1)?.sql).toContain("pg_catalog.has_any_column_privilege");
+    expect(first.at(-2)?.sql).not.toMatch(/grant\s+execute/iu);
   });
 
   it("recusa lacuna na sequência e nome fora do padrão", async () => {
