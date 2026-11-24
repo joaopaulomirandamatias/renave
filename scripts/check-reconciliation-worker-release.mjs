@@ -459,8 +459,58 @@ export function checkManifest(
   return issues;
 }
 
+function jobBlock(source, name) {
+  return new RegExp(
+    `^  ${name}:\\s*$([\\s\\S]*?)(?=^  [A-Za-z0-9_-]+:\\s*$|(?![\\s\\S]))`,
+    "mu",
+  ).exec(source)?.[1];
+}
+
+function namedStepBlock(source, name) {
+  const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(
+    `^([ \\t]*)- name:\\s*${escaped}\\s*$([\\s\\S]*?)(?=^\\1-\\s|(?![\\s\\S]))`,
+    "mu",
+  ).exec(source)?.[2];
+}
+
+function stripInlineComment(line) {
+  let quote;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (quote) {
+      if (quote === '"' && character === "\\") {
+        index += 1;
+        continue;
+      }
+      if (quote === "'" && character === "'" && line[index + 1] === "'") {
+        index += 1;
+        continue;
+      }
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (
+      character === "#" &&
+      (index === 0 || /\s/u.test(line[index - 1] ?? ""))
+    ) {
+      return line.slice(0, index).trimEnd();
+    }
+  }
+  return line;
+}
+
+function executableWorkflow(source) {
+  return source.split(/\r?\n/u).map(stripInlineComment).join("\n");
+}
+
 export function checkWorkflow(source, file = ".github/workflows/ci.yml") {
   const issues = [];
+  const executableSource = executableWorkflow(source);
   const forbidden = [
     [/\bid-token:\s*write\b/u, "WORKFLOW_OIDC_WRITE_FORBIDDEN"],
     [/\bpackages:\s*write\b/u, "WORKFLOW_PACKAGES_WRITE_FORBIDDEN"],
@@ -481,15 +531,24 @@ export function checkWorkflow(source, file = ".github/workflows/ci.yml") {
     ],
   ];
   for (const [pattern, id] of forbidden) {
-    if (pattern.test(source)) {
+    if (pattern.test(executableSource)) {
       issues.push(violation(file, source, id, pattern));
     }
   }
+  const block = jobBlock(executableSource, "reconciliation-worker-image-smoke");
+  if (!block) {
+    issues.push(violation(file, source, "WORKFLOW_IMAGE_JOB_REQUIRED"));
+    return issues;
+  }
+  const executable = block;
+  const uploadPattern =
+    /(?:upload-artifact|upload-release|dependency-snapshot)/iu;
+  if (uploadPattern.test(executable)) {
+    issues.push(
+      violation(file, source, "WORKFLOW_SBOM_UPLOAD_FORBIDDEN", uploadPattern),
+    );
+  }
   const required = [
-    [
-      "WORKFLOW_IMAGE_JOB_REQUIRED",
-      /^\s{2}reconciliation-worker-image-smoke:\s*$/mu,
-    ],
     [
       "WORKFLOW_RELEASE_GUARD_REQUIRED",
       /check-reconciliation-worker-release\.mjs/u,
@@ -497,13 +556,6 @@ export function checkWorkflow(source, file = ".github/workflows/ci.yml") {
     [
       "WORKFLOW_LOCAL_BUILD_REQUIRED",
       /docker\s+build\b[\s\S]*?--tag\s+[^\n]*reconciliation-worker/u,
-    ],
-    ["WORKFLOW_NETWORK_NONE_REQUIRED", /docker\s+run[\s\S]*?--network\s+none/u],
-    ["WORKFLOW_READ_ONLY_REQUIRED", /docker\s+run[\s\S]*?--read-only/u],
-    ["WORKFLOW_CAP_DROP_REQUIRED", /docker\s+run[\s\S]*?--cap-drop\s+ALL/u],
-    [
-      "WORKFLOW_NO_NEW_PRIVILEGES_REQUIRED",
-      /--security-opt\s+no-new-privileges/u,
     ],
     ["WORKFLOW_IMAGE_INSPECT_REQUIRED", /docker\s+image\s+inspect/u],
     ["WORKFLOW_HISTORY_INSPECT_REQUIRED", /docker\s+history\s+--no-trunc/u],
@@ -514,9 +566,97 @@ export function checkWorkflow(source, file = ".github/workflows/ci.yml") {
     ],
     ["WORKFLOW_DISABLED_LOG_REQUIRED", /"event":"disabled"/u],
     ["WORKFLOW_ALWAYS_CLEANUP_REQUIRED", /if:\s*always\(\)/u],
+    [
+      "WORKFLOW_CHECKOUT_CREDENTIALS_DISABLED_REQUIRED",
+      /persist-credentials:\s*false\b/u,
+    ],
+    [
+      "WORKFLOW_SBOM_CLEANUP_REQUIRED",
+      /rm\s+-f[\s\S]*?\/tmp\/reconciliation-worker-image\.tar[\s\S]*?\/tmp\/reconciliation-worker-sbom\.cdx\.json/u,
+    ],
   ];
   for (const [id, pattern] of required) {
-    if (!pattern.test(source)) issues.push(violation(file, source, id));
+    if (!pattern.test(executable)) issues.push(violation(file, source, id));
+  }
+
+  const runtime = namedStepBlock(
+    executable,
+    "Run disabled image in hardened sandbox",
+  );
+  for (const [id, pattern] of [
+    ["WORKFLOW_NETWORK_NONE_REQUIRED", /docker\s+run[\s\S]*?--network\s+none/u],
+    ["WORKFLOW_READ_ONLY_REQUIRED", /docker\s+run[\s\S]*?--read-only/u],
+    ["WORKFLOW_CAP_DROP_REQUIRED", /docker\s+run[\s\S]*?--cap-drop\s+ALL/u],
+    [
+      "WORKFLOW_NO_NEW_PRIVILEGES_REQUIRED",
+      /--security-opt\s+no-new-privileges/u,
+    ],
+  ]) {
+    if (!runtime || !pattern.test(runtime))
+      issues.push(violation(file, source, id));
+  }
+
+  const sbom = namedStepBlock(executable, "Generate and validate worker SBOM");
+  if (!sbom) {
+    issues.push(violation(file, source, "WORKFLOW_SBOM_STEP_REQUIRED"));
+  } else {
+    for (const [id, pattern] of [
+      [
+        "WORKFLOW_SBOM_IMAGE_SAVE_REQUIRED",
+        /docker\s+save\s+seu-renave\/reconciliation-worker:ci\s*(?:\\\s*)?--output\s+\/tmp\/reconciliation-worker-image\.tar/u,
+      ],
+      [
+        "WORKFLOW_SYFT_DIGEST_REQUIRED",
+        /ghcr\.io\/anchore\/syft:v1\.57\.2-nonroot@sha256:00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3/u,
+      ],
+      ["WORKFLOW_SBOM_NETWORK_NONE_REQUIRED", /--network\s+none\b/u],
+      ["WORKFLOW_SBOM_READ_ONLY_REQUIRED", /--read-only\b/u],
+      ["WORKFLOW_SBOM_CAP_DROP_REQUIRED", /--cap-drop\s+ALL\b/u],
+      [
+        "WORKFLOW_SBOM_NO_NEW_PRIVILEGES_REQUIRED",
+        /--security-opt\s+no-new-privileges\b/u,
+      ],
+      [
+        "WORKFLOW_SBOM_TMPFS_REQUIRED",
+        /--tmpfs\s+\/tmp:rw,noexec,nosuid,nodev,size=1g\b/u,
+      ],
+      [
+        "WORKFLOW_SBOM_CACHE_TMPFS_REQUIRED",
+        /--tmpfs\s+\/home\/nonroot\/\.cache:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700\b/u,
+      ],
+      [
+        "WORKFLOW_SBOM_UPDATE_CHECK_DISABLED_REQUIRED",
+        /SYFT_CHECK_FOR_APP_UPDATE=false\b/u,
+      ],
+      [
+        "WORKFLOW_SBOM_ARCHIVE_MOUNT_REQUIRED",
+        /--volume\s+\/tmp\/reconciliation-worker-image\.tar:\/scan\/image\.tar:ro\b/u,
+      ],
+      [
+        "WORKFLOW_SBOM_CYCLONEDX_REQUIRED",
+        /scan\s+docker-archive:\/scan\/image\.tar\s+--output\s+cyclonedx-json\s*(?:\\\s*)?>\s*\/tmp\/reconciliation-worker-sbom\.cdx\.json/u,
+      ],
+      [
+        "WORKFLOW_SBOM_VALIDATION_REQUIRED",
+        /node\s+scripts\/check-image-sbom\.mjs\s*(?:\\\s*)?\/tmp\/reconciliation-worker-sbom\.cdx\.json/u,
+      ],
+    ]) {
+      if (!pattern.test(sbom)) issues.push(violation(file, source, id));
+    }
+    for (const [id, pattern] of [
+      ["WORKFLOW_SBOM_DOCKER_SOCKET_FORBIDDEN", /docker\.sock/u],
+      [
+        "WORKFLOW_SBOM_UPLOAD_FORBIDDEN",
+        /(?:upload-artifact|upload-release|dependency-snapshot)/iu,
+      ],
+      [
+        "WORKFLOW_SBOM_BYPASS_FORBIDDEN",
+        /continue-on-error:\s*true|\|\|\s*true/u,
+      ],
+      ["WORKFLOW_SBOM_REMOTE_INSTALL_FORBIDDEN", /\b(?:curl|wget)\b/u],
+    ]) {
+      if (pattern.test(sbom)) issues.push(violation(file, source, id, pattern));
+    }
   }
   return issues;
 }

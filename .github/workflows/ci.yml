@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -149,6 +151,27 @@ jobs:
             exit 1
           fi
 
+      - name: Generate and validate API SBOM
+        run: |
+          set -euo pipefail
+          syft_image='ghcr.io/anchore/syft:v1.57.2-nonroot@sha256:00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3'
+          docker pull "$syft_image"
+          docker save seu-renave/api:ci --output /tmp/renave-api-image.tar
+          chmod 0444 /tmp/renave-api-image.tar
+          docker run --rm \
+            --network none \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g \
+            --tmpfs /home/nonroot/.cache:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --env SYFT_CHECK_FOR_APP_UPDATE=false \
+            --volume /tmp/renave-api-image.tar:/scan/image.tar:ro \
+            "$syft_image" \
+            scan docker-archive:/scan/image.tar --output cyclonedx-json \
+            > /tmp/renave-api-sbom.cdx.json
+          node scripts/check-image-sbom.mjs /tmp/renave-api-sbom.cdx.json
+
       - name: Run dormant API image in hardened sandbox
         run: |
           set -euo pipefail
@@ -186,17 +209,17 @@ jobs:
           docker rm --force renave-api-disabled renave-api-rootfs 2>/dev/null || true
           docker image rm --force seu-renave/api:ci 2>/dev/null || true
           rm -f /tmp/renave-api-image.json \
+            /tmp/renave-api-image.tar \
             /tmp/renave-api-history.txt \
             /tmp/renave-api-rootfs.tar \
-            /tmp/renave-api-files.txt
+            /tmp/renave-api-files.txt \
+            /tmp/renave-api-sbom.cdx.json
           if test -d /tmp/renave-api-rootfs; then
             chmod --recursive u+w /tmp/renave-api-rootfs
             find /tmp/renave-api-rootfs -depth -delete
           fi
 
   reconciliation-worker-image-smoke:
-    # Pendente: SBOM/vulnerability scan somente após escolher uma ferramenta
-    # com binário/action pinado por digest e baseline de exceções versionado.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -204,6 +227,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -323,6 +348,29 @@ jobs:
             exit 1
           fi
 
+      - name: Generate and validate worker SBOM
+        run: |
+          set -euo pipefail
+          syft_image='ghcr.io/anchore/syft:v1.57.2-nonroot@sha256:00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3'
+          docker pull "$syft_image"
+          docker save seu-renave/reconciliation-worker:ci \
+            --output /tmp/reconciliation-worker-image.tar
+          chmod 0444 /tmp/reconciliation-worker-image.tar
+          docker run --rm \
+            --network none \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g \
+            --tmpfs /home/nonroot/.cache:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --env SYFT_CHECK_FOR_APP_UPDATE=false \
+            --volume /tmp/reconciliation-worker-image.tar:/scan/image.tar:ro \
+            "$syft_image" \
+            scan docker-archive:/scan/image.tar --output cyclonedx-json \
+            > /tmp/reconciliation-worker-sbom.cdx.json
+          node scripts/check-image-sbom.mjs \
+            /tmp/reconciliation-worker-sbom.cdx.json
+
       - name: Run disabled image in hardened sandbox
         run: |
           set -euo pipefail
@@ -353,9 +401,11 @@ jobs:
           docker rm --force reconciliation-worker-disabled reconciliation-worker-rootfs 2>/dev/null || true
           docker image rm --force seu-renave/reconciliation-worker:ci 2>/dev/null || true
           rm -f /tmp/reconciliation-worker-image.json \
+            /tmp/reconciliation-worker-image.tar \
             /tmp/reconciliation-worker-history.txt \
             /tmp/reconciliation-worker-rootfs.tar \
-            /tmp/reconciliation-worker-files.txt
+            /tmp/reconciliation-worker-files.txt \
+            /tmp/reconciliation-worker-sbom.cdx.json
           if test -d /tmp/reconciliation-worker-rootfs; then
             chmod --recursive u+w /tmp/reconciliation-worker-rootfs
             find /tmp/reconciliation-worker-rootfs -depth -delete

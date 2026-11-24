@@ -13,6 +13,14 @@ diretório e recursos locais, mas não compõe preflight ou consultas SERPRO. A
 ausência da integração deve aparecer como `disabled` no relatório autenticado
 de prontidão; não é falha de saúde do serviço.
 
+O CI gera um SBOM CycloneDX da imagem final da API com Syft non-root preso por
+digest. O scanner recebe um `docker save` somente leitura, roda sem rede, sem
+socket Docker e com capacidades removidas. Um validador local confirma formato,
+raiz `container`, componentes e ausência de sentinelas antes de apagar os
+artefatos temporários. Scan de CVEs, assinatura e provenance continuam gates
+separados para uma futura publicação imutável; o SBOM isoladamente não autoriza
+release nem deploy.
+
 Produção e mutações SERPRO permanecem bloqueadas por código. Não crie flags,
 aliases de host ou proxies para contornar esse limite. O primeiro tráfego
 externo autorizado não envia mutação ao SERPRO. O preflight registra

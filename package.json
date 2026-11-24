@@ -28,7 +28,7 @@
     "reconciliation-worker:start": "pnpm --filter @seu-renave/reconciliation-worker-app start",
     "release:guard:api": "node scripts/check-api-release.mjs",
     "release:guard:reconciliation-worker": "node scripts/check-reconciliation-worker-release.mjs",
-    "security:guards": "node scripts/check-security-guards.mjs --self-test && node scripts/check-security-guards.mjs && node --test scripts/check-homologation-canary-boundary.test.mjs && node scripts/check-homologation-canary-boundary.mjs && node --test scripts/check-reconciliation-worker-release.test.mjs apps/reconciliation-worker/scripts/runtime-imports.test.mjs && node scripts/check-reconciliation-worker-release.mjs && node --test scripts/check-api-release.test.mjs apps/api/scripts/runtime-imports.test.mjs && node scripts/check-api-release.mjs",
+    "security:guards": "node scripts/check-security-guards.mjs --self-test && node scripts/check-security-guards.mjs && node --test scripts/check-image-sbom.test.mjs scripts/check-homologation-canary-boundary.test.mjs && node scripts/check-homologation-canary-boundary.mjs && node --test scripts/check-reconciliation-worker-release.test.mjs apps/reconciliation-worker/scripts/runtime-imports.test.mjs && node scripts/check-reconciliation-worker-release.mjs && node --test scripts/check-api-release.test.mjs apps/api/scripts/runtime-imports.test.mjs && node scripts/check-api-release.mjs",
     "smoke:serpro:fallback": "node scripts/smoke-serpro-fallback.mjs",
     "smoke:serpro:hml": "pnpm --filter @seu-renave/renave-connector build && node scripts/smoke-serpro-homologation.mjs",
     "stock-entry:bundle:generate": "pnpm --filter @seu-renave/stock-entry-provisioning cli generate-bundle",

@@ -624,10 +624,53 @@ function jobBlock(source, name) {
   ).exec(source)?.[1];
 }
 
+function namedStepBlock(source, name) {
+  const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(
+    `^([ \\t]*)- name:\\s*${escaped}\\s*$([\\s\\S]*?)(?=^\\1-\\s|(?![\\s\\S]))`,
+    "mu",
+  ).exec(source)?.[2];
+}
+
+function stripInlineComment(line) {
+  let quote;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (quote) {
+      if (quote === '"' && character === "\\") {
+        index += 1;
+        continue;
+      }
+      if (quote === "'" && character === "'" && line[index + 1] === "'") {
+        index += 1;
+        continue;
+      }
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (
+      character === "#" &&
+      (index === 0 || /\s/u.test(line[index - 1] ?? ""))
+    ) {
+      return line.slice(0, index).trimEnd();
+    }
+  }
+  return line;
+}
+
+function executableWorkflow(source) {
+  return source.split(/\r?\n/u).map(stripInlineComment).join("\n");
+}
+
 export function checkApiWorkflow(source, file = ".github/workflows/ci.yml") {
   const issues = [];
   const block = jobBlock(source, "api-image-smoke");
   if (!block) return [issue(file, source, "API_WORKFLOW_JOB_REQUIRED")];
+  const executable = executableWorkflow(block);
   for (const [id, pattern] of [
     [
       "API_WORKFLOW_CONTENTS_READ_REQUIRED",
@@ -641,6 +684,26 @@ export function checkApiWorkflow(source, file = ".github/workflows/ci.yml") {
     ["API_WORKFLOW_INSPECT_REQUIRED", /docker\s+image\s+inspect/u],
     ["API_WORKFLOW_HISTORY_REQUIRED", /docker\s+history\s+--no-trunc/u],
     ["API_WORKFLOW_ROOTFS_REQUIRED", /docker\s+export/u],
+    ["API_WORKFLOW_HEALTH_REQUIRED", /\.State\.Health\.Status/u],
+    ["API_WORKFLOW_RUNNING_REQUIRED", /\.State\.Running/u],
+    ["API_WORKFLOW_CLEANUP_REQUIRED", /if:\s*always\(\)/u],
+    [
+      "API_WORKFLOW_CHECKOUT_CREDENTIALS_DISABLED_REQUIRED",
+      /persist-credentials:\s*false\b/u,
+    ],
+    [
+      "API_WORKFLOW_SBOM_CLEANUP_REQUIRED",
+      /rm\s+-f[\s\S]*?\/tmp\/renave-api-image\.tar[\s\S]*?\/tmp\/renave-api-sbom\.cdx\.json/u,
+    ],
+  ]) {
+    if (!pattern.test(executable)) issues.push(issue(file, source, id));
+  }
+
+  const runtime = namedStepBlock(
+    executable,
+    "Run dormant API image in hardened sandbox",
+  );
+  for (const [id, pattern] of [
     [
       "API_WORKFLOW_NETWORK_NONE_REQUIRED",
       /docker\s+run[\s\S]*?--network\s+none/u,
@@ -651,11 +714,72 @@ export function checkApiWorkflow(source, file = ".github/workflows/ci.yml") {
       "API_WORKFLOW_NO_NEW_PRIVILEGES_REQUIRED",
       /--security-opt\s+no-new-privileges/u,
     ],
-    ["API_WORKFLOW_HEALTH_REQUIRED", /\.State\.Health\.Status/u],
-    ["API_WORKFLOW_RUNNING_REQUIRED", /\.State\.Running/u],
-    ["API_WORKFLOW_CLEANUP_REQUIRED", /if:\s*always\(\)/u],
   ]) {
-    if (!pattern.test(block)) issues.push(issue(file, source, id));
+    if (!runtime || !pattern.test(runtime))
+      issues.push(issue(file, source, id));
+  }
+
+  const sbom = namedStepBlock(executable, "Generate and validate API SBOM");
+  if (!sbom) {
+    issues.push(issue(file, source, "API_WORKFLOW_SBOM_STEP_REQUIRED"));
+  } else {
+    for (const [id, pattern] of [
+      [
+        "API_WORKFLOW_SBOM_IMAGE_SAVE_REQUIRED",
+        /docker\s+save\s+seu-renave\/api:ci\s+--output\s+\/tmp\/renave-api-image\.tar/u,
+      ],
+      [
+        "API_WORKFLOW_SYFT_DIGEST_REQUIRED",
+        /ghcr\.io\/anchore\/syft:v1\.57\.2-nonroot@sha256:00a4400827744854ef77b10679e38f991bf74fd20e3f03ffada8d6ee492520c3/u,
+      ],
+      ["API_WORKFLOW_SBOM_NETWORK_NONE_REQUIRED", /--network\s+none\b/u],
+      ["API_WORKFLOW_SBOM_READ_ONLY_REQUIRED", /--read-only\b/u],
+      ["API_WORKFLOW_SBOM_CAP_DROP_REQUIRED", /--cap-drop\s+ALL\b/u],
+      [
+        "API_WORKFLOW_SBOM_NO_NEW_PRIVILEGES_REQUIRED",
+        /--security-opt\s+no-new-privileges\b/u,
+      ],
+      [
+        "API_WORKFLOW_SBOM_TMPFS_REQUIRED",
+        /--tmpfs\s+\/tmp:rw,noexec,nosuid,nodev,size=1g\b/u,
+      ],
+      [
+        "API_WORKFLOW_SBOM_CACHE_TMPFS_REQUIRED",
+        /--tmpfs\s+\/home\/nonroot\/\.cache:rw,noexec,nosuid,nodev,size=64m,uid=65532,gid=65532,mode=0700\b/u,
+      ],
+      [
+        "API_WORKFLOW_SBOM_UPDATE_CHECK_DISABLED_REQUIRED",
+        /SYFT_CHECK_FOR_APP_UPDATE=false\b/u,
+      ],
+      [
+        "API_WORKFLOW_SBOM_ARCHIVE_MOUNT_REQUIRED",
+        /--volume\s+\/tmp\/renave-api-image\.tar:\/scan\/image\.tar:ro\b/u,
+      ],
+      [
+        "API_WORKFLOW_SBOM_CYCLONEDX_REQUIRED",
+        /scan\s+docker-archive:\/scan\/image\.tar\s+--output\s+cyclonedx-json\s*(?:\\\s*)?>\s*\/tmp\/renave-api-sbom\.cdx\.json/u,
+      ],
+      [
+        "API_WORKFLOW_SBOM_VALIDATION_REQUIRED",
+        /node\s+scripts\/check-image-sbom\.mjs\s+\/tmp\/renave-api-sbom\.cdx\.json/u,
+      ],
+    ]) {
+      if (!pattern.test(sbom)) issues.push(issue(file, source, id));
+    }
+    for (const [id, pattern] of [
+      ["API_WORKFLOW_SBOM_DOCKER_SOCKET_FORBIDDEN", /docker\.sock/u],
+      [
+        "API_WORKFLOW_SBOM_UPLOAD_FORBIDDEN",
+        /(?:upload-artifact|upload-release|dependency-snapshot)/iu,
+      ],
+      [
+        "API_WORKFLOW_SBOM_BYPASS_FORBIDDEN",
+        /continue-on-error:\s*true|\|\|\s*true/u,
+      ],
+      ["API_WORKFLOW_SBOM_REMOTE_INSTALL_FORBIDDEN", /\b(?:curl|wget)\b/u],
+    ]) {
+      if (pattern.test(sbom)) issues.push(issue(file, source, id, pattern));
+    }
   }
   for (const [pattern, id] of [
     [/\bid-token:\s*write\b/u, "API_WORKFLOW_OIDC_WRITE_FORBIDDEN"],
@@ -667,8 +791,12 @@ export function checkApiWorkflow(source, file = ".github/workflows/ci.yml") {
       /(?:docker\/login-action|google-github-actions\/auth|aws-actions\/configure-aws-credentials)@/u,
       "API_WORKFLOW_CLOUD_LOGIN_FORBIDDEN",
     ],
+    [
+      /(?:upload-artifact|upload-release|dependency-snapshot)/iu,
+      "API_WORKFLOW_SBOM_UPLOAD_FORBIDDEN",
+    ],
   ]) {
-    if (pattern.test(block)) issues.push(issue(file, source, id, pattern));
+    if (pattern.test(executable)) issues.push(issue(file, source, id, pattern));
   }
   return issues;
 }
