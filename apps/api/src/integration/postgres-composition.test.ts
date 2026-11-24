@@ -8,7 +8,9 @@ import {
   listAuditEvents,
   listCredentialLinkHistory,
   provisionTenant,
+  transitionCredentialLink,
   withTenant,
+  type CredentialLinkStatus,
   type Establishment,
   type Tenant,
 } from "@seu-renave/db";
@@ -47,12 +49,113 @@ let tenant: Tenant;
 let operatorStore: Establishment;
 let otherStore: Establishment;
 
+interface PreflightScenario {
+  store: Establishment;
+  tenant: Tenant;
+}
+
+interface EvidenceState {
+  failure_code: string | null;
+  response_ciphertext_present: boolean;
+  status: string;
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => {
     resolve = next;
   });
   return { promise, resolve };
+}
+
+async function createPreflightScenario(
+  slug: string,
+): Promise<PreflightScenario> {
+  const scenarioTenant = await provisionTenant(migratorPool, {
+    displayName: `Preflight ${slug}`,
+    slug: `preflight-${slug}`,
+  });
+  const store = await withTenant(appPool, scenarioTenant.id, (client) =>
+    createEstablishment(client, {
+      cnpj: "11222333000181",
+      tradeName: `Loja ${slug}`,
+    }),
+  );
+  await withTenant(migratorPool, scenarioTenant.id, (client) =>
+    grantTenantUserAccess(client, ADMIN, [{ role: "tenant_admin" }]),
+  );
+  return { store, tenant: scenarioTenant };
+}
+
+function createPreflightUseCase(
+  connector: Pick<RenaveConnector, "verifyIdentity">,
+): PostgresRenaveLinkPreflightUseCase {
+  return new PostgresRenaveLinkPreflightUseCase({
+    certificateThumbprintSha256: "e".repeat(64),
+    cipher: new EvidenceCipher({
+      activeKeyId: "preflight-failure-key",
+      keys: new Map([["preflight-failure-key", Buffer.alloc(32, 9)]]),
+    }),
+    connector: connector as RenaveConnector,
+    integratorCnpj: INTEGRATOR_CNPJ,
+    pool: appPool,
+  });
+}
+
+async function prepareCredentialLink(
+  scenario: PreflightScenario,
+  status: CredentialLinkStatus | "not_started",
+): Promise<void> {
+  if (status === "not_started") return;
+  const path: CredentialLinkStatus[] = ["pending", "confirmed", "enabled"];
+  for (const nextStatus of path) {
+    await withTenant(appPool, scenario.tenant.id, (client) =>
+      transitionCredentialLink(client, {
+        changedBySubject: ADMIN,
+        establishmentId: scenario.store.id,
+        source: "manual",
+        status: nextStatus,
+      }),
+    );
+    if (nextStatus === status) return;
+  }
+}
+
+async function evidenceState(
+  scenario: PreflightScenario,
+): Promise<EvidenceState[]> {
+  const { rows } = await adminPool.query<EvidenceState>(
+    `select status, failure_code,
+            response_ciphertext is not null as response_ciphertext_present
+       from renave.protected_evidence
+      where tenant_id = $1
+        and establishment_id = $2
+        and action = 'renave.identity.verify'
+      order by created_at`,
+    [scenario.tenant.id, scenario.store.id],
+  );
+  return rows;
+}
+
+async function preflightAuditOutcomes(
+  scenario: PreflightScenario,
+): Promise<string[]> {
+  const audits = await withTenant(appPool, scenario.tenant.id, (client) =>
+    listAuditEvents(client),
+  );
+  return audits
+    .filter(({ action }) => action === "renave.identity.verify")
+    .map(({ outcome }) => outcome);
+}
+
+function preflightInput(scenario: PreflightScenario, traceId: string) {
+  return {
+    actorIp: "198.51.100.12",
+    establishmentId: scenario.store.id,
+    subject: ADMIN,
+    tenantId: scenario.tenant.id,
+    traceId,
+  };
 }
 
 beforeAll(async () => {
@@ -300,5 +403,175 @@ describe("composição PostgreSQL real da API", () => {
         tenantId: tenant.id,
       }),
     ).rejects.toMatchObject({ code: "AUTHORIZATION_DENIED" });
+  });
+
+  it.each([
+    {
+      expectedHistory: ["pending", "rejected"],
+      expectedStatus: "rejected",
+      initialStatus: "not_started",
+      slug: "mismatch-new",
+    },
+    {
+      expectedHistory: ["pending", "rejected"],
+      expectedStatus: "rejected",
+      initialStatus: "pending",
+      slug: "mismatch-pending",
+    },
+    {
+      expectedHistory: ["pending", "confirmed", "rejected"],
+      expectedStatus: "rejected",
+      initialStatus: "confirmed",
+      slug: "mismatch-confirmed",
+    },
+    {
+      expectedHistory: ["pending", "confirmed", "enabled", "deactivated"],
+      expectedStatus: "deactivated",
+      initialStatus: "enabled",
+      slug: "mismatch-enabled",
+    },
+  ] as const)(
+    "materializa RENAVE_IDENTITY_MISMATCH de $initialStatus para $expectedStatus",
+    async ({ expectedHistory, expectedStatus, initialStatus, slug }) => {
+      const scenario = await createPreflightScenario(slug);
+      await prepareCredentialLink(scenario, initialStatus);
+      const mismatch = Object.assign(new Error("Identidade divergente"), {
+        code: "RENAVE_IDENTITY_MISMATCH",
+      });
+      const useCase = createPreflightUseCase({
+        verifyIdentity: vi.fn(async () => Promise.reject(mismatch)),
+      });
+
+      await expect(
+        useCase.execute(preflightInput(scenario, `${slug}-trace`)),
+      ).rejects.toBe(mismatch);
+
+      const { history, link } = await withTenant(
+        appPool,
+        scenario.tenant.id,
+        async (client) => ({
+          history: await listCredentialLinkHistory(client, scenario.store.id),
+          link: await getCredentialLink(client, scenario.store.id),
+        }),
+      );
+      expect(link?.status).toBe(expectedStatus);
+      expect(history.map(({ status }) => status)).toEqual(expectedHistory);
+      expect(await evidenceState(scenario)).toEqual([
+        {
+          failure_code: "RENAVE_IDENTITY_MISMATCH",
+          response_ciphertext_present: false,
+          status: "failed",
+        },
+      ]);
+      expect(await preflightAuditOutcomes(scenario)).toEqual([
+        "attempted",
+        "rejected",
+      ]);
+    },
+  );
+
+  it("preserva vínculo confirmado em falha transitória e registra a rejeição operacional", async () => {
+    const scenario = await createPreflightScenario("transient-confirmed");
+    await prepareCredentialLink(scenario, "confirmed");
+    const linkBefore = await withTenant(appPool, scenario.tenant.id, (client) =>
+      getCredentialLink(client, scenario.store.id),
+    );
+    const transient = Object.assign(new Error("Timeout no SERPRO"), {
+      code: "RENAVE_UPSTREAM_TIMEOUT",
+    });
+    const useCase = createPreflightUseCase({
+      verifyIdentity: vi.fn(async () => Promise.reject(transient)),
+    });
+
+    await expect(
+      useCase.execute(preflightInput(scenario, "transient-confirmed-trace")),
+    ).rejects.toBe(transient);
+
+    const { history, link } = await withTenant(
+      appPool,
+      scenario.tenant.id,
+      async (client) => ({
+        history: await listCredentialLinkHistory(client, scenario.store.id),
+        link: await getCredentialLink(client, scenario.store.id),
+      }),
+    );
+    expect(link).toMatchObject({
+      status: linkBefore?.status,
+      version: linkBefore?.version,
+    });
+    expect(history.map(({ status }) => status)).toEqual([
+      "pending",
+      "confirmed",
+    ]);
+    expect(await evidenceState(scenario)).toEqual([
+      {
+        failure_code: "RENAVE_UPSTREAM_TIMEOUT",
+        response_ciphertext_present: false,
+        status: "failed",
+      },
+    ]);
+    expect(await preflightAuditOutcomes(scenario)).toEqual([
+      "attempted",
+      "rejected",
+    ]);
+  });
+
+  it("reverte toda a finalização de sucesso quando a transição local falha", async () => {
+    const scenario = await createPreflightScenario("atomic-rollback");
+    const functionName = "renave.test_fail_preflight_link_history";
+    const triggerName = "test_fail_preflight_link_history";
+    await adminPool.query(
+      `create function ${functionName}()
+       returns trigger
+       language plpgsql
+       as $$
+       begin
+         raise exception 'falha local induzida no histórico do vínculo';
+       end
+       $$`,
+    );
+    await adminPool.query(
+      `create trigger ${triggerName}
+       before insert on renave.credential_link_history
+       for each row execute function ${functionName}()`,
+    );
+
+    try {
+      const useCase = createPreflightUseCase({
+        verifyIdentity: vi.fn(async () => ({
+          confirmedEstablishmentCnpj: scenario.store.cnpj,
+          confirmedIntegratorCnpj: INTEGRATOR_CNPJ,
+          environment: "homologation" as const,
+          establishmentId: scenario.store.id,
+          tenantId: scenario.tenant.id,
+        })),
+      });
+
+      await expect(
+        useCase.execute(preflightInput(scenario, "atomic-rollback-trace")),
+      ).rejects.toMatchObject({ code: "P0001" });
+
+      await expect(
+        withTenant(appPool, scenario.tenant.id, (client) =>
+          getCredentialLink(client, scenario.store.id),
+        ),
+      ).resolves.toBeNull();
+      expect(await evidenceState(scenario)).toEqual([
+        {
+          failure_code: "P0001",
+          response_ciphertext_present: false,
+          status: "failed",
+        },
+      ]);
+      expect(await preflightAuditOutcomes(scenario)).toEqual([
+        "attempted",
+        "rejected",
+      ]);
+    } finally {
+      await adminPool.query(
+        `drop trigger if exists ${triggerName} on renave.credential_link_history`,
+      );
+      await adminPool.query(`drop function if exists ${functionName}()`);
+    }
   });
 });
