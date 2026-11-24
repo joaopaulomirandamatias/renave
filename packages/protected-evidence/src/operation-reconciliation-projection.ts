@@ -900,6 +900,86 @@ function snapshotEnvelope(
   };
 }
 
+function decryptProjectionWithState(
+  state: CipherState,
+  payload: EncryptedOperationReconciliationProjection,
+  binding: OperationReconciliationProjectionBinding,
+): PreparedOperationReconciliationProjection {
+  try {
+    const normalized = normalizeBinding(binding);
+    const envelope = snapshotEnvelope(payload);
+    if (
+      normalized.environment !== state.environment ||
+      envelope.generation !== normalized.generation
+    ) {
+      envelope.nonce.fill(0);
+      envelope.authTag.fill(0);
+      envelope.ciphertext.fill(0);
+      throw new OperationReconciliationProjectionDecryptionError();
+    }
+    const key = state.effectiveKeys.get(envelope.keyId);
+    if (!key) {
+      envelope.nonce.fill(0);
+      envelope.authTag.fill(0);
+      envelope.ciphertext.fill(0);
+      throw new OperationReconciliationProjectionDecryptionError();
+    }
+    const chunks: Buffer[] = [];
+    let plaintext: Buffer | undefined;
+    try {
+      const decipher = createDecipheriv("aes-256-gcm", key, envelope.nonce, {
+        authTagLength: TAG_BYTES,
+      });
+      decipher.setAAD(
+        aad(normalized, envelope.keyId, envelope.projectionByteLength),
+      );
+      decipher.setAuthTag(envelope.authTag);
+      chunks.push(decipher.update(envelope.ciphertext));
+      chunks.push(decipher.final());
+      plaintext = Buffer.concat(chunks);
+      return restoreOperationReconciliationProjection(
+        plaintext,
+        normalized.sourceRequestSha256,
+      );
+    } finally {
+      envelope.nonce.fill(0);
+      envelope.authTag.fill(0);
+      envelope.ciphertext.fill(0);
+      for (const chunk of chunks) chunk.fill(0);
+      plaintext?.fill(0);
+    }
+  } catch {
+    throw new OperationReconciliationProjectionDecryptionError();
+  }
+}
+
+/**
+ * Autentica e lê somente o DTO mínimo da projeção pelo estado nominal do
+ * pacote. Nenhum método sobrescrevível do cipher recebido é executado.
+ */
+export function decryptOperationReconciliationProjection(
+  cipher: OperationReconciliationProjectionCipher,
+  payload: EncryptedOperationReconciliationProjection,
+  binding: OperationReconciliationProjectionBinding,
+): StockEntryReconciliationProjectionV1 {
+  const state = cipherState(cipher);
+  let prepared: PreparedOperationReconciliationProjection | undefined;
+  let plaintext: OwnedBytes | undefined;
+  try {
+    prepared = decryptProjectionWithState(state, payload, binding);
+    plaintext = prepared.copyBodyBytes();
+    return validateProjection(parseJson(plaintext));
+  } catch (error) {
+    if (error instanceof OperationReconciliationProjectionConfigurationError) {
+      throw error;
+    }
+    throw new OperationReconciliationProjectionDecryptionError();
+  } finally {
+    plaintext?.fill(0);
+    prepared?.destroy();
+  }
+}
+
 export class OperationReconciliationProjectionCipher {
   constructor(config: {
     activeKeyId: string;
@@ -986,53 +1066,7 @@ export class OperationReconciliationProjectionCipher {
     payload: EncryptedOperationReconciliationProjection,
     binding: OperationReconciliationProjectionBinding,
   ): PreparedOperationReconciliationProjection {
-    const state = cipherState(this);
-    try {
-      const normalized = normalizeBinding(binding);
-      const envelope = snapshotEnvelope(payload);
-      if (
-        normalized.environment !== state.environment ||
-        envelope.generation !== normalized.generation
-      ) {
-        envelope.nonce.fill(0);
-        envelope.authTag.fill(0);
-        envelope.ciphertext.fill(0);
-        throw new OperationReconciliationProjectionDecryptionError();
-      }
-      const key = state.effectiveKeys.get(envelope.keyId);
-      if (!key) {
-        envelope.nonce.fill(0);
-        envelope.authTag.fill(0);
-        envelope.ciphertext.fill(0);
-        throw new OperationReconciliationProjectionDecryptionError();
-      }
-      const chunks: Buffer[] = [];
-      let plaintext: Buffer | undefined;
-      try {
-        const decipher = createDecipheriv("aes-256-gcm", key, envelope.nonce, {
-          authTagLength: TAG_BYTES,
-        });
-        decipher.setAAD(
-          aad(normalized, envelope.keyId, envelope.projectionByteLength),
-        );
-        decipher.setAuthTag(envelope.authTag);
-        chunks.push(decipher.update(envelope.ciphertext));
-        chunks.push(decipher.final());
-        plaintext = Buffer.concat(chunks);
-        return restoreOperationReconciliationProjection(
-          plaintext,
-          normalized.sourceRequestSha256,
-        );
-      } finally {
-        envelope.nonce.fill(0);
-        envelope.authTag.fill(0);
-        envelope.ciphertext.fill(0);
-        for (const chunk of chunks) chunk.fill(0);
-        plaintext?.fill(0);
-      }
-    } catch {
-      throw new OperationReconciliationProjectionDecryptionError();
-    }
+    return decryptProjectionWithState(cipherState(this), payload, binding);
   }
 
   destroy(): void {

@@ -14,9 +14,11 @@ import {
 } from "./mutation-request.js";
 import { normalizeStockPlate } from "./plate.js";
 import {
+  InvalidStockEntryReconciliationError,
   reconcileStockEntry as reconcileStockEntryRecords,
   type RenaveStockRecord,
   type StockEntryReconciliation,
+  type StockEntryReconciliationRequest,
   type StockEntryReconciliationWindow,
 } from "./reconciliation.js";
 
@@ -55,28 +57,80 @@ export interface StockQueryResult {
   publicResult: readonly StockSummary[];
 }
 
+export interface RenaveReadOptions {
+  signal?: AbortSignal;
+}
+
 export type EstablishmentHeaders = Readonly<{
   "CNPJ-Estabelecimento": string;
 }>;
 
-export interface RenaveTransport {
+export interface RenaveReadOnlyTransport {
   readonly environment: RenaveEnvironment;
   getAuthenticatedClient(
     headers: EstablishmentHeaders,
+    options?: RenaveReadOptions,
   ): Promise<AuthenticatedClientIdentity>;
+  findStocksByPlate(
+    headers: EstablishmentHeaders,
+    plate: string,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveStockRecord[]>;
+}
+
+export interface RenaveTransport extends RenaveReadOnlyTransport {
   getVehicleEligibility(
     headers: EstablishmentHeaders,
     query: VehicleEligibilityQuery,
   ): Promise<VehicleEligibilityResponse>;
-  findStocksByPlate(
-    headers: EstablishmentHeaders,
-    plate: string,
-  ): Promise<RenaveStockRecord[]>;
   mutate<TResult>(
     headers: EstablishmentHeaders,
     prepared: PreparedRenaveMutation,
   ): Promise<TResult>;
 }
+
+export type ReconciliationReadErrorCategory =
+  "TRANSIENT" | "IDENTITY_MISMATCH" | "PROTOCOL" | "ABORTED";
+
+export class RenaveReconciliationReadError extends Error {
+  readonly code = "RENAVE_RECONCILIATION_READ_FAILED";
+
+  override get name(): string {
+    return "RenaveReconciliationReadError";
+  }
+
+  constructor(readonly category: ReconciliationReadErrorCategory) {
+    super("A leitura de reconciliação RENAVE não pôde ser concluída");
+  }
+}
+
+export type ReconciliationReadResult =
+  | {
+      observedAt: Date;
+      outcome: "confirmed";
+      remoteRecordId: number;
+      remoteState: RenaveStockState;
+    }
+  | { observedAt: Date; outcome: "manual_review" }
+  | { observedAt: Date; outcome: "not_observed" }
+  | { observedAt: Date; outcome: "window_expired" };
+
+export interface RenaveReconciliationReaderOptions {
+  now: () => Date;
+  transport: RenaveReadOnlyTransport;
+}
+
+interface RenaveReconciliationReaderState {
+  environment: RenaveEnvironment;
+  findStocksByPlate: RenaveReadOnlyTransport["findStocksByPlate"];
+  getAuthenticatedClient: RenaveReadOnlyTransport["getAuthenticatedClient"];
+  now: () => Date;
+}
+
+const reconciliationReaderStates = new WeakMap<
+  RenaveReconciliationReader,
+  RenaveReconciliationReaderState
+>();
 
 export interface MutationResult<TResult> {
   result: TResult;
@@ -222,6 +276,214 @@ function verifyIdentity(
   };
 }
 
+async function authorizeRead(
+  transport: RenaveReadOnlyTransport,
+  context: RenaveServerContext,
+  options?: RenaveReadOptions,
+): Promise<{
+  headers: EstablishmentHeaders;
+  verifiedIdentity: VerifiedRenaveIdentity;
+}> {
+  if (context.environment === "production") {
+    throw new RenaveProductionBlockedError();
+  }
+  if (transport.environment !== context.environment) {
+    throw new RenaveEnvironmentMismatchError();
+  }
+  const headers: EstablishmentHeaders = Object.freeze({
+    "CNPJ-Estabelecimento": normalizeCnpj(context.establishmentCnpj),
+  });
+  const identity = options
+    ? await transport.getAuthenticatedClient(headers, options)
+    : await transport.getAuthenticatedClient(headers);
+  return { headers, verifiedIdentity: verifyIdentity(context, identity) };
+}
+
+function errorMetadata(error: unknown): {
+  code?: string;
+  status?: number;
+} {
+  if (error !== null && typeof error === "object") {
+    const candidate = error as { code?: unknown; status?: unknown };
+    const code = candidate.code;
+    const status = candidate.status;
+    return {
+      ...(typeof code === "string" ? { code } : {}),
+      ...(typeof status === "number" && Number.isInteger(status)
+        ? { status }
+        : {}),
+    };
+  }
+  return {};
+}
+
+function sanitizedReadError(
+  error: unknown,
+  signal: AbortSignal | undefined,
+): RenaveReconciliationReadError {
+  if (signal?.aborted) return new RenaveReconciliationReadError("ABORTED");
+  try {
+    const metadata = errorMetadata(error);
+    if (error instanceof RenaveIdentityMismatchError) {
+      return new RenaveReconciliationReadError("IDENTITY_MISMATCH");
+    }
+    if (
+      metadata.code === "RENAVE_HTTP_ERROR" &&
+      (metadata.status === 401 || metadata.status === 403)
+    ) {
+      return new RenaveReconciliationReadError("IDENTITY_MISMATCH");
+    }
+    if (
+      error instanceof RenaveStockQueryResultError ||
+      error instanceof InvalidStockEntryReconciliationError ||
+      error instanceof RenaveEnvironmentMismatchError ||
+      error instanceof RenaveProductionBlockedError ||
+      metadata.code === "RENAVE_PROTOCOL_ERROR" ||
+      (metadata.code === "RENAVE_HTTP_ERROR" &&
+        metadata.status !== undefined &&
+        metadata.status !== 0 &&
+        metadata.status !== 408 &&
+        metadata.status !== 425 &&
+        metadata.status !== 429 &&
+        metadata.status < 500)
+    ) {
+      return new RenaveReconciliationReadError("PROTOCOL");
+    }
+  } catch {
+    // Erros exóticos (incluindo Proxy hostil) também são fechados e sanitizados.
+  }
+  return new RenaveReconciliationReadError("TRANSIENT");
+}
+
+/** Capacidade nominal read-only; transporte e relógio ficam apenas no WeakMap. */
+export class RenaveReconciliationReader {
+  constructor(options: RenaveReconciliationReaderOptions) {
+    if (new.target !== RenaveReconciliationReader) {
+      throw new RenaveReconciliationReadError("PROTOCOL");
+    }
+    try {
+      const transport = options.transport;
+      const environment = transport.environment;
+      const getAuthenticatedClient = transport.getAuthenticatedClient;
+      const findStocksByPlate = transport.findStocksByPlate;
+      const now = options.now;
+      if (
+        environment !== "homologation" ||
+        typeof getAuthenticatedClient !== "function" ||
+        typeof findStocksByPlate !== "function" ||
+        typeof now !== "function"
+      ) {
+        throw new RenaveReconciliationReadError("PROTOCOL");
+      }
+      reconciliationReaderStates.set(this, {
+        environment,
+        findStocksByPlate: findStocksByPlate.bind(transport),
+        getAuthenticatedClient: getAuthenticatedClient.bind(transport),
+        now: now.bind(undefined),
+      });
+      Object.freeze(this);
+    } catch (error) {
+      if (error instanceof RenaveReconciliationReadError) throw error;
+      throw new RenaveReconciliationReadError("PROTOCOL");
+    }
+  }
+
+  async reconcileStockEntry(
+    context: RenaveServerContext,
+    request: StockEntryReconciliationRequest,
+    window: Pick<StockEntryReconciliationWindow, "sentAt"> & RenaveReadOptions,
+  ): Promise<ReconciliationReadResult> {
+    return readRenaveReconciliation(this, context, request, window);
+  }
+}
+
+export function isRenaveReconciliationReader(
+  candidate: unknown,
+): candidate is RenaveReconciliationReader {
+  return (
+    candidate !== null &&
+    typeof candidate === "object" &&
+    reconciliationReaderStates.has(candidate as RenaveReconciliationReader)
+  );
+}
+
+/** Lê pelo estado nominal; não executa métodos sobrescrevíveis do reader. */
+export async function readRenaveReconciliation(
+  reader: RenaveReconciliationReader,
+  context: RenaveServerContext,
+  request: StockEntryReconciliationRequest,
+  window: Pick<StockEntryReconciliationWindow, "sentAt"> & RenaveReadOptions,
+): Promise<ReconciliationReadResult> {
+  const state = reconciliationReaderStates.get(reader);
+  if (!state) throw new RenaveReconciliationReadError("PROTOCOL");
+  const signal = window.signal;
+  try {
+    if (signal?.aborted) {
+      throw new RenaveReconciliationReadError("ABORTED");
+    }
+    if (context.environment === "production") {
+      throw new RenaveProductionBlockedError();
+    }
+    if (context.environment !== state.environment) {
+      throw new RenaveEnvironmentMismatchError();
+    }
+    const headers: EstablishmentHeaders = Object.freeze({
+      "CNPJ-Estabelecimento": normalizeCnpj(context.establishmentCnpj),
+    });
+    const identity = await state.getAuthenticatedClient(headers, {
+      ...(signal ? { signal } : {}),
+    });
+    verifyIdentity(context, identity);
+    const records = await state.findStocksByPlate(
+      headers,
+      request.veiculo.placa,
+      { ...(signal ? { signal } : {}) },
+    );
+    // A primeira instrução após o GET captura a fronteira de observação.
+    const observedAt = state.now();
+    if (
+      !(observedAt instanceof Date) ||
+      !Number.isFinite(observedAt.getTime()) ||
+      !(window.sentAt instanceof Date) ||
+      !Number.isFinite(window.sentAt.getTime()) ||
+      observedAt.getTime() < window.sentAt.getTime()
+    ) {
+      throw new InvalidStockEntryReconciliationError("WINDOW");
+    }
+    const observedAtCopy = new Date(observedAt);
+    if (observedAt.getTime() - window.sentAt.getTime() > 60 * 60 * 1_000) {
+      return { observedAt: observedAtCopy, outcome: "window_expired" };
+    }
+    const result = reconcileStockEntryRecords(request, records, {
+      observedAt,
+      sentAt: window.sentAt,
+    });
+    if (result.outcome === "confirmed") {
+      const matched = records.find(({ id }) => id === result.stockId);
+      if (!matched?.estado || !STOCK_STATES.has(matched.estado)) {
+        throw new RenaveStockQueryResultError();
+      }
+      return {
+        observedAt: observedAtCopy,
+        outcome: "confirmed",
+        remoteRecordId: result.stockId,
+        remoteState: matched.estado,
+      };
+    }
+    return { observedAt: observedAtCopy, outcome: result.outcome };
+  } catch (error) {
+    try {
+      if (error instanceof RenaveReconciliationReadError) throw error;
+    } catch (candidate) {
+      if (candidate === error) throw candidate;
+    }
+    throw sanitizedReadError(error, signal);
+  }
+}
+
+Object.freeze(RenaveReconciliationReader.prototype);
+Object.freeze(RenaveReconciliationReader);
+
 function validateVehicleEligibilityQuery(
   query: VehicleEligibilityQuery,
 ): VehicleEligibilityQuery {
@@ -267,18 +529,7 @@ export class RenaveConnector {
     headers: EstablishmentHeaders;
     verifiedIdentity: VerifiedRenaveIdentity;
   }> {
-    if (context.environment === "production") {
-      throw new RenaveProductionBlockedError();
-    }
-    if (this.transport.environment !== context.environment) {
-      throw new RenaveEnvironmentMismatchError();
-    }
-
-    const headers: EstablishmentHeaders = Object.freeze({
-      "CNPJ-Estabelecimento": normalizeCnpj(context.establishmentCnpj),
-    });
-    const identity = await this.transport.getAuthenticatedClient(headers);
-    return { headers, verifiedIdentity: verifyIdentity(context, identity) };
+    return authorizeRead(this.transport, context);
   }
 
   /** Confirma o vínculo sem executar consulta veicular nem mutação. */

@@ -2,6 +2,7 @@ import type {
   AuthenticatedClientIdentity,
   EstablishmentHeaders,
   RenaveEnvironment,
+  RenaveReadOptions,
   RenaveTransport,
 } from "./connector.js";
 import { RenaveProductionBlockedError } from "./connector.js";
@@ -37,6 +38,18 @@ export interface HttpRenaveTransportOptions {
   readTimeoutMs?: number;
   mutationTimeoutMs?: number;
 }
+
+interface HttpRenaveTransportState {
+  environment: RenaveEnvironment;
+  mutationTimeoutMs: number;
+  readTimeoutMs: number;
+  request: RenaveHttpRequest;
+}
+
+const httpTransportStates = new WeakMap<
+  HttpRenaveTransport,
+  HttpRenaveTransportState
+>();
 
 type RenaveHttpOperation =
   | "get-authenticated-client"
@@ -406,31 +419,63 @@ function mutationResultFrom(
 }
 
 export class HttpRenaveTransport implements RenaveTransport {
-  readonly environment: RenaveEnvironment;
-  private readonly request: RenaveHttpRequest;
-  private readonly readTimeoutMs: number;
-  private readonly mutationTimeoutMs: number;
-
   constructor(options: HttpRenaveTransportOptions) {
-    this.environment = options.environment;
-    this.request = options.request;
-    this.readTimeoutMs = options.readTimeoutMs ?? options.timeoutMs ?? 60_000;
-    this.mutationTimeoutMs =
-      options.mutationTimeoutMs ?? options.timeoutMs ?? 120_000;
+    if (new.target !== HttpRenaveTransport) {
+      throw new RenaveProtocolError("get-authenticated-client");
+    }
+    try {
+      const environment = options.environment;
+      const request = options.request;
+      const timeoutMs = options.timeoutMs;
+      const readTimeoutMs = options.readTimeoutMs ?? timeoutMs ?? 60_000;
+      const mutationTimeoutMs =
+        options.mutationTimeoutMs ?? timeoutMs ?? 120_000;
+      if (
+        (environment !== "homologation" && environment !== "production") ||
+        typeof request !== "function" ||
+        !Number.isInteger(readTimeoutMs) ||
+        readTimeoutMs < 1 ||
+        !Number.isInteger(mutationTimeoutMs) ||
+        mutationTimeoutMs < 1
+      ) {
+        throw new RenaveProtocolError("get-authenticated-client");
+      }
+      httpTransportStates.set(this, {
+        environment,
+        mutationTimeoutMs,
+        readTimeoutMs,
+        request: request.bind(undefined),
+      });
+      Object.freeze(this);
+    } catch (error) {
+      if (error instanceof RenaveProtocolError) throw error;
+      throw new RenaveProtocolError("get-authenticated-client");
+    }
+  }
+
+  get environment(): RenaveEnvironment {
+    return httpTransportState(this, "get-authenticated-client").environment;
   }
 
   async getAuthenticatedClient(
     headers: EstablishmentHeaders,
+    options?: RenaveReadOptions,
   ): Promise<AuthenticatedClientIdentity> {
+    const state = httpTransportState(this, "get-authenticated-client");
     let response: Response;
     try {
-      response = await this.request(
-        `${baseUrls[this.environment]}/api/cliente-autenticado`,
+      response = await state.request(
+        `${baseUrls[state.environment]}/api/cliente-autenticado`,
         {
           headers: { accept: "application/json", ...headers },
           method: "GET",
           redirect: "error",
-          signal: AbortSignal.timeout(this.readTimeoutMs),
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
         },
       );
     } catch {
@@ -447,6 +492,7 @@ export class HttpRenaveTransport implements RenaveTransport {
     headers: EstablishmentHeaders,
     query: VehicleEligibilityQuery,
   ): Promise<VehicleEligibilityResponse> {
+    const state = httpTransportState(this, "get-vehicle-eligibility");
     const search = new URLSearchParams({ tipoCrv: query.tipoCrv });
     if (query.placa !== undefined) search.set("placa", query.placa);
     if (query.renavam !== undefined) search.set("renavam", query.renavam);
@@ -454,13 +500,13 @@ export class HttpRenaveTransport implements RenaveTransport {
 
     let response: Response;
     try {
-      response = await this.request(
-        `${baseUrls[this.environment]}/api/aptidao-veiculo-estoque?${search.toString()}`,
+      response = await state.request(
+        `${baseUrls[state.environment]}/api/aptidao-veiculo-estoque?${search.toString()}`,
         {
           headers: { accept: "application/json", ...headers },
           method: "GET",
           redirect: "error",
-          signal: AbortSignal.timeout(this.readTimeoutMs),
+          signal: AbortSignal.timeout(state.readTimeoutMs),
         },
       );
     } catch {
@@ -478,18 +524,25 @@ export class HttpRenaveTransport implements RenaveTransport {
   async findStocksByPlate(
     headers: EstablishmentHeaders,
     plate: string,
+    options?: RenaveReadOptions,
   ): Promise<RenaveStockRecord[]> {
+    const state = httpTransportState(this, "find-stocks-by-plate");
     const normalizedPlate = normalizeStockPlate(plate);
     const search = new URLSearchParams({ placa: normalizedPlate });
     let response: Response;
     try {
-      response = await this.request(
-        `${baseUrls[this.environment]}/api/estoques?${search.toString()}`,
+      response = await state.request(
+        `${baseUrls[state.environment]}/api/estoques?${search.toString()}`,
         {
           headers: { accept: "application/json", ...headers },
           method: "GET",
           redirect: "error",
-          signal: AbortSignal.timeout(this.readTimeoutMs),
+          signal: options?.signal
+            ? AbortSignal.any([
+                options.signal,
+                AbortSignal.timeout(state.readTimeoutMs),
+              ])
+            : AbortSignal.timeout(state.readTimeoutMs),
         },
       );
     } catch {
@@ -510,7 +563,8 @@ export class HttpRenaveTransport implements RenaveTransport {
     headers: EstablishmentHeaders,
     prepared: PreparedRenaveMutation,
   ): Promise<TResult> {
-    if (this.environment === "production") {
+    const state = httpTransportState(this, "request-stock-entry");
+    if (state.environment === "production") {
       throw new RenaveProductionBlockedError();
     }
     // Copiado antes do primeiro await e enviado sem nova serialização.
@@ -520,8 +574,8 @@ export class HttpRenaveTransport implements RenaveTransport {
     let response: Response;
 
     try {
-      response = await this.request(
-        `${baseUrls[this.environment]}${route.path}`,
+      response = await state.request(
+        `${baseUrls[state.environment]}${route.path}`,
         {
           body,
           headers: {
@@ -531,7 +585,7 @@ export class HttpRenaveTransport implements RenaveTransport {
           },
           method: route.method,
           redirect: "error",
-          signal: AbortSignal.timeout(this.mutationTimeoutMs),
+          signal: AbortSignal.timeout(state.mutationTimeoutMs),
         },
       );
     } catch {
@@ -570,3 +624,15 @@ export class HttpRenaveTransport implements RenaveTransport {
     }
   }
 }
+
+function httpTransportState(
+  transport: HttpRenaveTransport,
+  operation: RenaveHttpOperation,
+): HttpRenaveTransportState {
+  const state = httpTransportStates.get(transport);
+  if (!state) throw new RenaveProtocolError(operation);
+  return state;
+}
+
+Object.freeze(HttpRenaveTransport.prototype);
+Object.freeze(HttpRenaveTransport);

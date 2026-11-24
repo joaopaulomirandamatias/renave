@@ -15,6 +15,7 @@ import {
   type OperationRequestBinding,
 } from "./operation-request-crypto.js";
 import {
+  decryptOperationReconciliationProjection,
   encryptOperationReconciliationProjection,
   OperationReconciliationProjectionCipher,
   OperationReconciliationProjectionConfigurationError,
@@ -550,6 +551,117 @@ describe("codec fechado da projeção de reconciliação", () => {
 });
 
 describe("cifra da projeção de reconciliação", () => {
+  it("helper nominal de leitura devolve somente DTO mínimo congelado", async () => {
+    const { prepared, localBinding } = await preparedProjection();
+    const projectionCipher = cipher();
+    const encrypted = encryptOperationReconciliationProjection(
+      projectionCipher,
+      prepared,
+      localBinding,
+    );
+    const originalEnvelope = cloneEnvelope(encrypted);
+    const originalBinding = { ...localBinding };
+
+    const dto = decryptOperationReconciliationProjection(
+      projectionCipher,
+      encrypted,
+      localBinding,
+    );
+
+    expect(dto).toEqual({
+      schemaVersion: 1,
+      cpfOperadorResponsavel: "12345678901",
+      veiculo: {
+        codigoSegurancaCrv: "12345678901",
+        placa: "QTP4H82",
+        tipoCrv: "DIGITAL",
+        renavam: "10987654321",
+        numeroCrv: "123456789012",
+      },
+    });
+    expect(Object.isFrozen(dto)).toBe(true);
+    expect(Object.isFrozen(dto.veiculo)).toBe(true);
+    expect(Object.keys(dto)).toEqual([
+      "schemaVersion",
+      "cpfOperadorResponsavel",
+      "veiculo",
+    ]);
+    expect(encrypted).toEqual(originalEnvelope);
+    expect(localBinding).toEqual(originalBinding);
+  });
+
+  it("helper nominal de leitura recusa fake, prototype, Proxy e subclass", async () => {
+    const { prepared, localBinding } = await preparedProjection();
+    const projectionCipher = cipher();
+    const encrypted = encryptOperationReconciliationProjection(
+      projectionCipher,
+      prepared,
+      localBinding,
+    );
+    let virtualDispatchCalled = false;
+    const fake = {
+      decrypt() {
+        virtualDispatchCalled = true;
+        return {};
+      },
+    } as unknown as OperationReconciliationProjectionCipher;
+    const prototypeOnly = Object.create(
+      OperationReconciliationProjectionCipher.prototype,
+    ) as OperationReconciliationProjectionCipher;
+    const proxied = new Proxy(projectionCipher, {});
+    class Subclass extends OperationReconciliationProjectionCipher {}
+    const subclassPrototypeOnly = Object.create(
+      Subclass.prototype,
+    ) as OperationReconciliationProjectionCipher;
+
+    for (const candidate of [
+      fake,
+      prototypeOnly,
+      proxied,
+      subclassPrototypeOnly,
+    ]) {
+      expect(() =>
+        decryptOperationReconciliationProjection(
+          candidate,
+          encrypted,
+          localBinding,
+        ),
+      ).toThrow(OperationReconciliationProjectionConfigurationError);
+    }
+    expect(virtualDispatchCalled).toBe(false);
+  });
+
+  it("helper nominal de leitura sanitiza falha e não altera o envelope", async () => {
+    const { prepared, localBinding } = await preparedProjection();
+    const projectionCipher = cipher();
+    const tampered = cloneEnvelope(
+      encryptOperationReconciliationProjection(
+        projectionCipher,
+        prepared,
+        localBinding,
+      ),
+    );
+    tampered.authTag[0] = tampered.authTag[0]! ^ 1;
+    const original = cloneEnvelope(tampered);
+    let error: unknown;
+    try {
+      decryptOperationReconciliationProjection(
+        projectionCipher,
+        tampered,
+        localBinding,
+      );
+    } catch (candidate) {
+      error = candidate;
+    }
+    expect(error).toBeInstanceOf(
+      OperationReconciliationProjectionDecryptionError,
+    );
+    expect(tampered).toEqual(original);
+    expect(`${String(error)} ${JSON.stringify(error)}`).not.toMatch(
+      /12345678901|QTP4H82|11111111|22222222|33333333|projection-key/iu,
+    );
+  });
+
   it("helper nominal cifra sem despachar para o método público", async () => {
     const { prepared, localBinding } = await preparedProjection();
     const projectionCipher = cipher();

@@ -1,8 +1,4 @@
-import type {
-  CrvType,
-  RenaveStockState,
-  StockEntryRequest,
-} from "./operations.js";
+import type { CrvType, RenaveStockState } from "./operations.js";
 
 const MAX_RECONCILIATION_WINDOW_MS = 60 * 60 * 1_000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1_000;
@@ -29,6 +25,18 @@ export interface StockEntryReconciliationWindow {
   clockSkewMs?: number;
   observedAt: Date;
   sentAt: Date;
+}
+
+/** Subconjunto mínimo da solicitação necessário para comparar o estoque. */
+export interface StockEntryReconciliationRequest {
+  cpfOperadorResponsavel: string;
+  veiculo: {
+    codigoSegurancaCrv: string;
+    numeroCrv?: string;
+    placa: string;
+    renavam?: string;
+    tipoCrv: CrvType;
+  };
 }
 
 export type StockEntryReconciliation =
@@ -65,7 +73,7 @@ function normalized(value: unknown): string | null {
 }
 
 function sameVehicleIdentity(
-  request: StockEntryRequest,
+  request: StockEntryReconciliationRequest,
   record: RenaveStockRecord,
 ): boolean {
   const requestVehicle = request.veiculo;
@@ -89,7 +97,7 @@ function activeRecord(record: RenaveStockRecord): boolean {
 }
 
 export function reconcileStockEntry(
-  request: StockEntryRequest,
+  request: StockEntryReconciliationRequest,
   records: readonly RenaveStockRecord[],
   window: StockEntryReconciliationWindow,
 ): StockEntryReconciliation {

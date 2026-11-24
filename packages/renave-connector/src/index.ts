@@ -42,6 +42,10 @@ export {
   RenaveEnvironmentMismatchError,
   RenaveIdentityMismatchError,
   RenaveProductionBlockedError,
+  isRenaveReconciliationReader,
+  readRenaveReconciliation,
+  RenaveReconciliationReadError,
+  RenaveReconciliationReader,
   RenaveStockQueryResultError,
   type AuthenticatedClientIdentity,
   type EstablishmentHeaders,
@@ -49,10 +53,15 @@ export {
   type MutationResult,
   type MutationExecutionResult,
   type RenaveEnvironment,
+  type RenaveReadOnlyTransport,
+  type RenaveReadOptions,
+  type RenaveReconciliationReaderOptions,
   type RenaveServerContext,
   type RenaveTransport,
   type StockQueryResult,
   type StockSummary,
+  type ReconciliationReadErrorCategory,
+  type ReconciliationReadResult,
   type VerifiedRenaveIdentity,
 } from "./connector.js";
 export {
@@ -70,5 +79,6 @@ export {
   reconcileStockEntry,
   type RenaveStockRecord,
   type StockEntryReconciliation,
+  type StockEntryReconciliationRequest,
   type StockEntryReconciliationWindow,
 } from "./reconciliation.js";
