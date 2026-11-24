@@ -40,6 +40,18 @@ describe("fundação da API", () => {
     expect(response.json()).toMatchObject({ code: "AUTH_NOT_CONFIGURED" });
   });
 
+  it.each(["/api/platform/access", "/api/platform/renave-link-queue"])(
+    "oculta a rota global desabilitada em %s com o contrato 404 sanitizado",
+    async (url) => {
+      const response = await createApp().inject({ method: "GET", url });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({
+        code: "PLATFORM_RESOURCE_NOT_FOUND",
+      });
+    },
+  );
+
   it("readiness reflete dependências sem revelar qual falhou", async () => {
     const app = buildApp({
       config: loadConfig(),

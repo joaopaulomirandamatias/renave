@@ -192,7 +192,7 @@ describe("PlatformConsolePage", () => {
       .fn<PlatformConsoleClient["loadQueue"]>()
       .mockResolvedValueOnce(firstPage)
       .mockRejectedValueOnce(
-        new PlatformConsoleClientError(403, "ACCESS_DENIED"),
+        new PlatformConsoleClientError(404, "PLATFORM_RESOURCE_NOT_FOUND"),
       );
     setup(loadQueue);
 
@@ -201,7 +201,7 @@ describe("PlatformConsolePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Carregar mais" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Acesso global não autorizado");
+    expect(alert).toHaveTextContent("Console global indisponível");
     expect(screen.queryByText("Loja Norte")).toBeNull();
     expect(screen.queryByRole("button", { name: "Carregar mais" })).toBeNull();
   });

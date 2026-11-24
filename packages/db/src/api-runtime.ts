@@ -43,6 +43,10 @@ export {
   type PlatformConsoleRateLimitDecision,
 } from "./platform-console-rate-limiter.js";
 export {
+  authorizePlatformConsoleAccess,
+  PlatformAccessContractError,
+} from "./platform-console-access.js";
+export {
   listPlatformCredentialLinkQueue,
   PlatformQueueContractError,
   type ListPlatformQueueInput,

@@ -81,6 +81,13 @@ function guardApp(options: {
     if (!result.ok) return;
     return { allowed: true };
   });
+  app.get("/mfa-after-authorization", async (request, reply) => {
+    const result = await guard.authenticate(request, reply);
+    if (!result.ok) return;
+    const mfa = await guard.enforceRecentMfa(result.session, reply, 300);
+    if (!mfa.ok) return;
+    return { allowed: true };
+  });
   apps.push(app);
   return { app, getSession };
 }
@@ -241,6 +248,37 @@ describe("RequestAccessGuard", () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ code: "MFA_RECENT_REQUIRED" });
+  });
+
+  it("permite aplicar MFA recente depois de uma autorização externa", async () => {
+    const lowAssurance = guardApp({
+      getSession: vi.fn(async () => session() as never),
+    });
+    const recent = guardApp({
+      getSession: vi.fn(
+        async () =>
+          session({
+            mfaVerified: true,
+            mfaVerifiedAt: Date.now(),
+          }) as never,
+      ),
+    });
+
+    const denied = await lowAssurance.app.inject({
+      method: "GET",
+      url: "/mfa-after-authorization",
+      headers: { cookie: SESSION_COOKIE },
+    });
+    const allowed = await recent.app.inject({
+      method: "GET",
+      url: "/mfa-after-authorization",
+      headers: { cookie: SESSION_COOKIE },
+    });
+
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json()).toEqual({ code: "MFA_REQUIRED" });
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.json()).toEqual({ allowed: true });
   });
 });
 

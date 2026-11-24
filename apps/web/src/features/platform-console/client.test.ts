@@ -49,6 +49,7 @@ describe("browserPlatformConsoleClient", () => {
       expect.objectContaining({
         cache: "no-store",
         credentials: "same-origin",
+        redirect: "error",
         headers: expect.objectContaining({
           accept: "application/json",
           "x-renave-reason-ticket": "SEC-1234",

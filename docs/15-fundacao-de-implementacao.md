@@ -20,6 +20,8 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - preflight do certificado/vínculo por estabelecimento sem mutação enviada ao SERPRO, sob RBAC e limite distribuído, com evidência cifrada e sem expor CNPJ; ele registra evidência/auditoria e pode confirmar ou rejeitar o vínculo local — **implementado e bloqueado pela mesma configuração segura**;
 - fornecer por cofre o certificado de homologação, a chave de evidência e confirmar o vínculo da integradora — **pendente externo**;
 - descoberta de tenants/estabelecimentos para a UX e rate limit distribuído no login — **implementados**;
+- workspace do cliente separado em Painel, Estoque, Entrada, Compliance e Estabelecimentos, com allowlist exata, 404 fail-closed e componentes de página independentes — **implementado**;
+- console global protegido por capability de banco antes da apresentação, com grant verificado antes de MFA e reautorização atômica em cada leitura da fila — **implementado**;
 - manter mutações indisponíveis até cofre/HSM, vínculo, outbox e âncora/WORM;
 - adicionar outbox/idempotência somente quando a primeira mutação entrar no escopo.
 
@@ -32,7 +34,9 @@ Em 23/11/2026, o repositório continha apenas a especificação versionada e os 
 - callback OIDC passa pelo mesmo limite público; `/api/session` usa um gate local separado para preservar o pool sem consumir o orçamento de login; erros de sessão/callback/logout retornam indisponibilidade controlada sem detalhes internos;
 - tela de acesso sem coleta local de senha ou TOTP, com ambiente somente informativo;
 - tokens oficiais da marca, foco visível e alvos interativos de no mínimo 44 px;
+- primitivas compartilhadas `PageHeader`, `Card`, `StatusBadge` e `EmptyState`, sem fontes ou dependências externas e com semântica acessível;
 - `AppShell` responsivo com navegação semântica, link de salto, ambiente persistente e seletor de estabelecimento por identificador interno;
+- rotas desconhecidas, módulos desligados e console global sem grant não carregam contratos operacionais nem revelam a finalidade da área privilegiada;
 - painel autenticado isolado do fluxo público, exibindo explicitamente o bloqueio da integração até a validação do vínculo no RENAVE;
 - diretório global mínimo com hash do `subject`, seleção de tenant e estabelecimentos filtrados pelo mesmo RBAC da operação;
 - PostgreSQL 17.12 com papéis separados para migração e aplicação, `tenant`/`establishment` e RLS habilitada e forçada;

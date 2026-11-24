@@ -362,6 +362,13 @@ describe("loadMigrations", () => {
       ({ version }) =>
         version === "0073_runtime_contract_held_local_regulatory_promotion",
     );
+    const platformConsoleAccess = loaded.find(
+      ({ version }) => version === "0076_platform_console_access",
+    );
+    const platformConsoleAccessRuntime = loaded.find(
+      ({ version }) =>
+        version === "0077_runtime_contract_platform_console_access",
+    );
 
     expect(identityIssuer?.sql).toContain("mfa_authenticated_at_ms");
     expect(identityIssuer?.sql).toContain("add column issuer text");
@@ -418,6 +425,18 @@ describe("loadMigrations", () => {
     );
     expect(heldLocalPromotionRuntime?.sql).toContain(
       "renave_operation_promoter",
+    );
+    expect(platformConsoleAccess?.sql).toContain(
+      "is_platform_operator_authorized",
+    );
+    expect(platformConsoleAccess?.sql).toContain(
+      "grant_item.role='integrator_link_reviewer'",
+    );
+    expect(platformConsoleAccessRuntime?.sql).toContain(
+      platformConsoleAccess?.checksum,
+    );
+    expect(platformConsoleAccessRuntime?.sql).toContain(
+      "platform_console_access_contract_ready_v0077",
     );
   });
 

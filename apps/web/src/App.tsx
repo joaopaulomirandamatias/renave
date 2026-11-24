@@ -4,9 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DashboardPage } from "./pages/DashboardPage.js";
 import {
+  browserPlatformAccessClient,
   browserPlatformConsoleClient,
   PLATFORM_CONSOLE_PATH,
   PlatformConsolePage,
+  type PlatformAccessClient,
+  type PlatformAccessResult,
   type PlatformConsoleClient,
 } from "./features/platform-console/index.js";
 import type { ReadonlyCanaryPort } from "./features/homologation-canary/index.js";
@@ -1038,6 +1041,7 @@ export interface AppProps {
   locationPathname?: string;
   locationSearch?: string;
   onAuthErrorConsumed?: () => void;
+  platformAccessClient?: PlatformAccessClient;
   platformConsoleClient?: PlatformConsoleClient;
   platformConsoleEnabled?: boolean;
   redirect?: (url: string) => void;
@@ -1125,6 +1129,10 @@ type CredentialLinkQueueView =
   | { status: "idle" | "loading" | "error" }
   | { queue: BrowserCredentialLinkQueue; status: "ready" };
 
+type PlatformAccessView =
+  | { status: "idle" | "loading" }
+  | { result: PlatformAccessResult; status: "ready" };
+
 function RouteNotFound() {
   return (
     <main className="session-state">
@@ -1150,6 +1158,7 @@ export function App({
   locationPathname = window.location.pathname,
   locationSearch = window.location.search,
   onAuthErrorConsumed = clearCurrentAuthError,
+  platformAccessClient = browserPlatformAccessClient,
   platformConsoleClient = browserPlatformConsoleClient,
   platformConsoleEnabled = false,
   redirect = (url) => window.location.assign(url),
@@ -1179,6 +1188,10 @@ export function App({
     useState<RenaveReadinessView>({ status: "idle" });
   const [credentialLinkQueueView, setCredentialLinkQueueView] =
     useState<CredentialLinkQueueView>({ status: "idle" });
+  const [platformAccessView, setPlatformAccessView] =
+    useState<PlatformAccessView>({ status: "idle" });
+  const [platformAccessReloadVersion, setPlatformAccessReloadVersion] =
+    useState(0);
   const [
     credentialLinkQueueReloadVersion,
     setCredentialLinkQueueReloadVersion,
@@ -1202,6 +1215,7 @@ export function App({
   const linkLoadVersion = useRef(0);
   const readinessLoadVersion = useRef(0);
   const credentialLinkQueueLoadVersion = useRef(0);
+  const platformAccessLoadVersion = useRef(0);
   const activeSelectionKeyRef = useRef("");
   const selectedTenantIdRef = useRef("");
   selectedTenantIdRef.current = selectedTenantId;
@@ -1328,6 +1342,37 @@ export function App({
     linkReloadVersion,
     renaveOperationalContextRequested,
     selectedTenantId,
+    view,
+  ]);
+
+  useEffect(() => {
+    const authenticated = view.status === "ready" && view.session.authenticated;
+    if (!authenticated || !platformConsoleRequested) {
+      platformAccessLoadVersion.current += 1;
+      setPlatformAccessView({ status: "idle" });
+      return;
+    }
+    const requestVersion = ++platformAccessLoadVersion.current;
+    setPlatformAccessView({ status: "loading" });
+    void platformAccessClient
+      .load()
+      .then((result) => {
+        if (platformAccessLoadVersion.current === requestVersion) {
+          setPlatformAccessView({ result, status: "ready" });
+        }
+      })
+      .catch(() => {
+        if (platformAccessLoadVersion.current === requestVersion) {
+          setPlatformAccessView({
+            result: { status: "unavailable" },
+            status: "ready",
+          });
+        }
+      });
+  }, [
+    platformAccessClient,
+    platformAccessReloadVersion,
+    platformConsoleRequested,
     view,
   ]);
 
@@ -1510,6 +1555,8 @@ export function App({
       linkLoadVersion.current += 1;
       readinessLoadVersion.current += 1;
       credentialLinkQueueLoadVersion.current += 1;
+      platformAccessLoadVersion.current += 1;
+      setPlatformAccessView({ status: "idle" });
       if (result.endSessionUrl) redirect(result.endSessionUrl);
     } catch {
       setLogoutError(true);
@@ -1565,6 +1612,72 @@ export function App({
   }
 
   if (platformConsoleRequested) {
+    const loginHref = `/api/auth/login?returnTo=${encodeURIComponent(PLATFORM_CONSOLE_PATH)}`;
+    if (platformAccessView.status !== "ready") {
+      return (
+        <main className="session-state" aria-busy="true">
+          <p role="status">Verificando autorização segura…</p>
+        </main>
+      );
+    }
+    const access = platformAccessView.result;
+    if (access.status === "not_found") return <RouteNotFound />;
+    if (access.status === "auth_required") {
+      return <LoginPage environment={environment} loginHref={loginHref} />;
+    }
+    if (access.status === "mfa_required") {
+      return (
+        <main className="session-state">
+          <section
+            className="session-error"
+            aria-labelledby="platform-access-mfa-title"
+          >
+            <AlertCircle size={24} aria-hidden="true" />
+            <div>
+              <h1 id="platform-access-mfa-title">Confirme seu acesso</h1>
+              <p>
+                Esta área exige uma autenticação corporativa recente com
+                verificação adicional.
+              </p>
+              <Button href={loginHref} variant="secondary">
+                Confirmar acesso corporativo
+              </Button>
+            </div>
+          </section>
+        </main>
+      );
+    }
+    if (access.status === "unavailable") {
+      return (
+        <main className="session-state">
+          <section
+            className="session-error"
+            aria-labelledby="platform-access-error-title"
+            role="alert"
+          >
+            <AlertCircle size={24} aria-hidden="true" />
+            <div>
+              <h1 id="platform-access-error-title">
+                Não foi possível verificar o acesso
+              </h1>
+              <p>
+                Nenhum recurso protegido foi exibido. Tente novamente antes de
+                continuar.
+              </p>
+              <Button
+                variant="secondary"
+                leadingIcon={<RefreshCw size={18} />}
+                onClick={() =>
+                  setPlatformAccessReloadVersion((current) => current + 1)
+                }
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          </section>
+        </main>
+      );
+    }
     return (
       <PlatformConsolePage
         client={platformConsoleClient}

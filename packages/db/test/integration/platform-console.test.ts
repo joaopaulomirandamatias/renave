@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, inject } from "vitest";
 
 import { createEstablishment } from "../../src/establishments.js";
+import { authorizePlatformConsoleAccess } from "../../src/platform-console-access.js";
 import {
   acquirePlatformConsolePermit,
   derivePlatformActorDigest,
@@ -48,6 +49,112 @@ afterAll(async () => {
 });
 
 describe.sequential("console global da integradora", () => {
+  it("autoriza somente grant ativo e vigente", async () => {
+    const actor = digest(`platform-access-${randomUUID()}`);
+    await expect(authorizePlatformConsoleAccess(reader, actor)).resolves.toBe(
+      false,
+    );
+
+    await provisioner.query(
+      `select renave_platform.grant_operator(
+        $1,clock_timestamp(),clock_timestamp()+interval '1 hour',$2,$3,$4,$5)`,
+      [
+        actor,
+        digest("access-grant-ticket"),
+        digest("access-grant-admin"),
+        "127.0.0.1",
+        digest("access-grant-trace"),
+      ],
+    );
+    await expect(authorizePlatformConsoleAccess(reader, actor)).resolves.toBe(
+      true,
+    );
+
+    await provisioner.query(
+      "select renave_platform.revoke_operator($1,$2,$3,$4,$5)",
+      [
+        actor,
+        digest("access-revoke-ticket"),
+        digest("access-revoke-admin"),
+        "127.0.0.1",
+        digest("access-revoke-trace"),
+      ],
+    );
+    await expect(authorizePlatformConsoleAccess(reader, actor)).resolves.toBe(
+      false,
+    );
+
+    const expiredActor = digest(`platform-expired-${randomUUID()}`);
+    await provisioner.query(
+      `select renave_platform.grant_operator(
+        $1,clock_timestamp(),clock_timestamp()+interval '1 hour',$2,$3,$4,$5)`,
+      [
+        expiredActor,
+        digest("access-expired-ticket"),
+        digest("access-expired-admin"),
+        "127.0.0.1",
+        digest("access-expired-trace"),
+      ],
+    );
+    await migrator.query(
+      `update renave_platform.operator_grant
+       set valid_from=clock_timestamp()-interval '2 hours',
+           expires_at=clock_timestamp()-interval '1 hour'
+       where actor_digest=$1`,
+      [expiredActor],
+    );
+    await expect(
+      authorizePlatformConsoleAccess(reader, expiredActor),
+    ).resolves.toBe(false);
+
+    const futureActor = digest(`platform-future-${randomUUID()}`);
+    await provisioner.query(
+      `select renave_platform.grant_operator(
+        $1,clock_timestamp()+interval '4 minutes',
+        clock_timestamp()+interval '1 hour',$2,$3,$4,$5)`,
+      [
+        futureActor,
+        digest("access-future-ticket"),
+        digest("access-future-admin"),
+        "127.0.0.1",
+        digest("access-future-trace"),
+      ],
+    );
+    await expect(
+      authorizePlatformConsoleAccess(reader, futureActor),
+    ).resolves.toBe(false);
+  });
+
+  it("recusa digest inválido, ACL cruzada e fecha o runtime adulterado", async () => {
+    const functionName = "renave_platform.is_platform_operator_authorized";
+    const signature = "renave_platform.is_platform_operator_authorized(bytea)";
+    await expect(
+      reader.query(`select ${functionName}($1)`, [Buffer.alloc(31)]),
+    ).rejects.toMatchObject({ code: "22023" });
+    await expect(
+      app.query(`select ${functionName}($1)`, [Buffer.alloc(32)]),
+    ).rejects.toMatchObject({ code: "42501" });
+    await expect(
+      provisioner.query(`select ${functionName}($1)`, [Buffer.alloc(32)]),
+    ).rejects.toMatchObject({ code: "42501" });
+
+    await migrator.query(
+      `grant execute on function ${signature} to renave_platform_provisioner`,
+    );
+    try {
+      await expect(
+        app.query("select renave_runtime.api_contract_ready() as ready"),
+      ).resolves.toMatchObject({ rows: [{ ready: false }] });
+    } finally {
+      await migrator.query(
+        `revoke execute on function ${signature} from renave_platform_provisioner`,
+      );
+    }
+    await expect(
+      app.query("select renave_runtime.api_contract_ready() as ready"),
+    ).resolves.toMatchObject({ rows: [{ ready: true }] });
+  });
+
   it("mantém fingerprint esperado", async () => {
     const result = await migrator.query<{
       fingerprint: string;

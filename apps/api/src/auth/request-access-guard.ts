@@ -35,6 +35,8 @@ export type SessionLookupResult =
 type RequiredSessionLookupResult =
   { ok: true; session: AuthenticatedSession } | { ok: false };
 
+export type MfaEnforcementResult = { ok: true } | { ok: false };
+
 export interface RequestAccessGuard {
   authenticate<Required extends boolean = true>(
     request: FastifyRequest,
@@ -43,6 +45,11 @@ export interface RequestAccessGuard {
   ): Promise<
     Required extends false ? SessionLookupResult : RequiredSessionLookupResult
   >;
+  enforceRecentMfa(
+    session: AuthenticatedSession,
+    reply: FastifyReply,
+    maxAgeSeconds?: number,
+  ): Promise<MfaEnforcementResult>;
 }
 
 export function createRequestAccessGuard(options: {
@@ -53,6 +60,29 @@ export function createRequestAccessGuard(options: {
 }): RequestAccessGuard {
   const sessionCookie = cookieNames(options.secure).session;
   const clock = options.clock ?? { now: () => Date.now() };
+
+  const enforceRecentMfa: RequestAccessGuard["enforceRecentMfa"] = async (
+    session,
+    reply,
+    maxAgeSeconds,
+  ) => {
+    if (session.mfaVerified !== true) {
+      await reply.code(403).send({ code: "MFA_REQUIRED" });
+      return { ok: false };
+    }
+    if (maxAgeSeconds === undefined) return { ok: true };
+    const now = clock.now();
+    if (
+      typeof session.mfaVerifiedAt !== "number" ||
+      !Number.isFinite(session.mfaVerifiedAt) ||
+      session.mfaVerifiedAt > now ||
+      now - session.mfaVerifiedAt > maxAgeSeconds * 1_000
+    ) {
+      await reply.code(403).send({ code: "MFA_RECENT_REQUIRED" });
+      return { ok: false };
+    }
+    return { ok: true };
+  };
 
   const authenticate = async (
     request: FastifyRequest,
@@ -104,21 +134,13 @@ export function createRequestAccessGuard(options: {
         }
         return { ok: true, session: undefined };
       }
-      if (requirement.mfa === "required" && session.mfaVerified !== true) {
-        await reply.code(403).send({ code: "MFA_REQUIRED" });
-        return { ok: false };
-      }
-      const now = clock.now();
-      if (
-        requirement.mfa === "required" &&
-        requirement.mfaMaxAgeSeconds !== undefined &&
-        (typeof session.mfaVerifiedAt !== "number" ||
-          !Number.isFinite(session.mfaVerifiedAt) ||
-          session.mfaVerifiedAt > now ||
-          now - session.mfaVerifiedAt > requirement.mfaMaxAgeSeconds * 1_000)
-      ) {
-        await reply.code(403).send({ code: "MFA_RECENT_REQUIRED" });
-        return { ok: false };
+      if (requirement.mfa === "required") {
+        const mfa = await enforceRecentMfa(
+          session,
+          reply,
+          requirement.mfaMaxAgeSeconds,
+        );
+        if (!mfa.ok) return { ok: false };
       }
       return { ok: true, session };
     } catch {
@@ -137,6 +159,7 @@ export function createRequestAccessGuard(options: {
   };
   return {
     authenticate: authenticate as RequestAccessGuard["authenticate"],
+    enforceRecentMfa,
   };
 }
 

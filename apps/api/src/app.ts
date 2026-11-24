@@ -13,7 +13,10 @@ import {
 } from "./auth/routes.js";
 import type { AppConfig } from "./config.js";
 import type { PlatformConsole } from "./platform/console.js";
-import { registerPlatformRoutes } from "./platform/routes.js";
+import {
+  registerPlatformRoutes,
+  registerUnavailablePlatformRoutes,
+} from "./platform/routes.js";
 import {
   registerRenaveRoutes,
   type SerproQueryLimiter,
@@ -261,6 +264,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         mfaMaxAgeSeconds: options.config.platformConsole.mfaMaxAgeSeconds,
       });
     }
+  }
+
+  if (!options.config.platformConsole) {
+    registerUnavailablePlatformRoutes(app);
   }
 
   return app;

@@ -1,6 +1,7 @@
 import { isIP } from "node:net";
 
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { AuthenticatedSession } from "@seu-renave/identity";
 
 import type { RequestAccessGuard } from "../auth/request-access-guard.js";
 import { PlatformConsoleInputError, type PlatformConsole } from "./console.js";
@@ -32,6 +33,14 @@ export interface PlatformRoutesOptions {
   accessGuard: RequestAccessGuard;
   console: PlatformConsole;
   mfaMaxAgeSeconds: number;
+}
+
+export function registerUnavailablePlatformRoutes(app: FastifyInstance): void {
+  const notFound = async (_request: FastifyRequest, reply: FastifyReply) =>
+    reply.code(404).send({ code: "PLATFORM_RESOURCE_NOT_FOUND" });
+
+  app.get("/api/platform/access", notFound);
+  app.get("/api/platform/renave-link-queue", notFound);
 }
 
 function singleHeader(request: FastifyRequest): string | undefined {
@@ -69,21 +78,67 @@ export function registerPlatformRoutes(
   options: PlatformRoutesOptions,
 ): void {
   const localGate = new PlatformLocalRequestGate();
+
+  const authenticateAuthorized = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<AuthenticatedSession | undefined> => {
+    const lookup = await options.accessGuard.authenticate(request, reply);
+    if (!lookup.ok) return undefined;
+    const session = lookup.session;
+    if (!session.issuer || !session.subject) {
+      await reply.code(404).send({ code: "PLATFORM_RESOURCE_NOT_FOUND" });
+      return undefined;
+    }
+    try {
+      const authorized = await options.console.authorize({
+        issuer: session.issuer,
+        subject: session.subject,
+      });
+      if (!authorized) {
+        await reply.code(404).send({ code: "PLATFORM_RESOURCE_NOT_FOUND" });
+        return undefined;
+      }
+      return session;
+    } catch {
+      request.log.error({
+        event: "platform.access.unavailable",
+        traceId: request.id,
+      });
+      await reply.code(503).send({
+        code: "PLATFORM_ACCESS_UNAVAILABLE",
+        traceId: request.id,
+      });
+      return undefined;
+    }
+  };
+
+  app.get("/api/platform/access", async (request, reply) => {
+    const session = await authenticateAuthorized(request, reply);
+    if (!session) return;
+    const mfa = await options.accessGuard.enforceRecentMfa(
+      session,
+      reply,
+      options.mfaMaxAgeSeconds,
+    );
+    if (!mfa.ok) return;
+    return reply.code(204).send();
+  });
+
   app.get("/api/platform/renave-link-queue", async (request, reply) => {
-    const lookup = await options.accessGuard.authenticate(request, reply, {
-      mfa: "required",
-      mfaMaxAgeSeconds: options.mfaMaxAgeSeconds,
-    });
-    if (!lookup.ok) return;
+    const session = await authenticateAuthorized(request, reply);
+    if (!session) return;
+    const mfa = await options.accessGuard.enforceRecentMfa(
+      session,
+      reply,
+      options.mfaMaxAgeSeconds,
+    );
+    if (!mfa.ok) return;
     const reasonTicket = singleHeader(request);
     const pagination = query(request);
     if (!reasonTicket || !pagination || isIP(request.ip) === 0) {
       request.log.warn({ event: "platform.queue.input_rejected" });
       return reply.code(400).send({ code: "INVALID_PLATFORM_REQUEST" });
-    }
-    const session = lookup.session;
-    if (!session.issuer) {
-      return reply.code(403).send({ code: "ACCESS_DENIED" });
     }
     const release = localGate.tryAcquire(
       `${session.issuer}\0${session.subject}`,
@@ -115,7 +170,7 @@ export function registerPlatformRoutes(
         traceId: request.id,
       });
       if (!result.authorized) {
-        return reply.code(403).send({ code: "ACCESS_DENIED" });
+        return reply.code(404).send({ code: "PLATFORM_RESOURCE_NOT_FOUND" });
       }
       return {
         items: result.entries.map((entry) => ({

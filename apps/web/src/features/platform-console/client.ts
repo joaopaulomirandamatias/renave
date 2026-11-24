@@ -189,6 +189,7 @@ export const browserPlatformConsoleClient: PlatformConsoleClient = {
             accept: "application/json",
             "x-renave-reason-ticket": reasonTicket,
           },
+          redirect: "error",
           ...(signal ? { signal } : {}),
         },
       );

@@ -27,6 +27,36 @@ const denied = {
 };
 
 describe("PostgresPlatformConsole", () => {
+  it("deriva o digest do ator para a capability sem enviar identidade bruta", async () => {
+    let captured: unknown[] = [];
+    const database = {
+      query: vi.fn(async (_sql: string, parameters: unknown[]) => {
+        captured = parameters.map((value) =>
+          Buffer.isBuffer(value) ? Buffer.from(value) : value,
+        );
+        return { rows: [{ authorized: true }] };
+      }),
+    } as unknown as Pool;
+    const console = new PostgresPlatformConsole(database, Buffer.alloc(32, 7));
+
+    await expect(
+      console.authorize({
+        issuer: "https://idp.test",
+        subject: "subject-1",
+      }),
+    ).resolves.toBe(true);
+    expect(captured).toEqual([
+      derivePlatformActorDigest(
+        Buffer.alloc(32, 7),
+        "https://idp.test",
+        "subject-1",
+      ),
+    ]);
+    expect(JSON.stringify(captured)).not.toContain("subject-1");
+    expect(JSON.stringify(captured)).not.toContain("https://idp.test");
+    console.destroy();
+  });
+
   it("usa o mesmo digest de ator no limitador distribuído", async () => {
     let captured: unknown[] = [];
     const database = {

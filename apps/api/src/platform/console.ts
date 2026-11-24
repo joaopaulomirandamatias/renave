@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import {
   acquirePlatformConsolePermit,
+  authorizePlatformConsoleAccess,
   decodePlatformOperatorHmacKeyBase64 as decodeSharedPlatformOperatorHmacKey,
   derivePlatformActorDigest,
   derivePlatformCursorDigest,
@@ -29,6 +30,7 @@ export interface PlatformConsole {
     issuer: string;
     subject: string;
   }): Promise<{ allowed: boolean; retryAfterSeconds: number }>;
+  authorize(input: { issuer: string; subject: string }): Promise<boolean>;
   destroy(): void;
   list(input: {
     actorIp: string;
@@ -163,6 +165,20 @@ export class PostgresPlatformConsole implements PlatformConsole {
     );
     try {
       return await acquirePlatformConsolePermit(this.pool, actor);
+    } finally {
+      actor.fill(0);
+    }
+  }
+
+  async authorize(input: { issuer: string; subject: string }) {
+    if (this.#destroyed) throw new PlatformConsoleInputError();
+    const actor = derivePlatformActorDigest(
+      this.#key,
+      input.issuer,
+      input.subject,
+    );
+    try {
+      return await authorizePlatformConsoleAccess(this.pool, actor);
     } finally {
       actor.fill(0);
     }
