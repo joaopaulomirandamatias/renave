@@ -30,6 +30,7 @@ const apiRuntimeDbFiles = new Set(
     "serpro-query-limiter",
     "session-store",
     "stock-entry-rate-limiter",
+    "stock-exit-municipality-catalog",
     "tenant-admin-rate-limiter",
     "tenant-administration",
     "tenant-context",

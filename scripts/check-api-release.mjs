@@ -814,6 +814,9 @@ export function checkApiRuntimePreparation(
   if (!source.includes('"credential-service-scopes"')) {
     issues.push(issue(file, source, "API_CREDENTIAL_SCOPE_RUNTIME_REQUIRED"));
   }
+  if (!source.includes('"stock-exit-municipality-catalog"')) {
+    issues.push(issue(file, source, "API_STOCK_EXIT_CATALOG_RUNTIME_REQUIRED"));
+  }
   for (const module of [
     "platform-console-rate-limiter",
     "platform-console-reader",
