@@ -1,4 +1,4 @@
-# Banco local do Seu Renave. Somente desenvolvimento e testes de integração:
+# Banco local do RenavEstoque. Somente desenvolvimento e testes de integração:
 # a porta fica presa ao loopback e o banco é descartável.
 #
 # A senha do superusuário abaixo é um valor-padrão local e não secreto, sem uso

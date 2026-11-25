@@ -1,4 +1,4 @@
-# Banco de dados do Seu Renave
+# Banco de dados do RenavEstoque
 
 PostgreSQL 17 com isolamento multi-tenant por _row level security_ (RLS).
 SQL versionado em `db/migrations/`; runner, helpers e testes em `packages/db`
