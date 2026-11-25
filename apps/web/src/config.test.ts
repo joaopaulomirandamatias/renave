@@ -5,6 +5,7 @@ import { loadWebFeatures } from "./config.js";
 describe("web feature configuration", () => {
   it("mantém a entrada local desligada quando a flag está ausente", () => {
     expect(loadWebFeatures({}).stockEntryOperationsEnabled).toBe(false);
+    expect(loadWebFeatures({}).stockExitOperationsEnabled).toBe(false);
     expect(loadWebFeatures({}).platformConsoleEnabled).toBe(false);
   });
 
@@ -39,6 +40,24 @@ describe("web feature configuration", () => {
         loadWebFeatures({
           VITE_RENAVE_STOCK_ENTRY_LOCAL_ENABLED: value,
         }).stockEntryOperationsEnabled,
+      ).toBe(false);
+    },
+  );
+
+  it("habilita a saída local somente com true canônico", () => {
+    expect(
+      loadWebFeatures({ VITE_RENAVE_STOCK_EXIT_LOCAL_ENABLED: "true" })
+        .stockExitOperationsEnabled,
+    ).toBe(true);
+  });
+
+  it.each(["false", "TRUE", " true ", "1", "", true, null])(
+    "mantém a saída local fechada para o valor inválido %j",
+    (value) => {
+      expect(
+        loadWebFeatures({
+          VITE_RENAVE_STOCK_EXIT_LOCAL_ENABLED: value,
+        }).stockExitOperationsEnabled,
       ).toBe(false);
     },
   );

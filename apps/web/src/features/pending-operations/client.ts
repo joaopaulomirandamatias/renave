@@ -5,7 +5,7 @@ const DATE_TIME_PATTERN =
 const REASON_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u;
 const POSITIVE_BIGINT_PATTERN = /^[1-9]\d{0,18}$/u;
 
-export type PendingOperationKind = "USED_STOCK_ENTRY";
+export type PendingOperationKind = "USED_STOCK_ENTRY" | "USED_STOCK_EXIT";
 export type PendingOperationStatus = "PENDING_RECONCILIATION" | "MANUAL_REVIEW";
 export type OperationTimelineStatus =
   | "HELD_LOCAL"
@@ -117,7 +117,10 @@ function reasonCode(value: unknown): value is string {
   return typeof value === "string" && REASON_CODE_PATTERN.test(value);
 }
 
-const kinds = new Set<PendingOperationKind>(["USED_STOCK_ENTRY"]);
+const kinds = new Set<PendingOperationKind>([
+  "USED_STOCK_ENTRY",
+  "USED_STOCK_EXIT",
+]);
 const pendingStatuses = new Set<PendingOperationStatus>([
   "PENDING_RECONCILIATION",
   "MANUAL_REVIEW",
@@ -233,7 +236,8 @@ function parseDetailOperation(value: unknown): PendingOperationDetailRecord {
     !UUID_PATTERN.test(value.operationId) ||
     typeof value.correlationId !== "string" ||
     !UUID_PATTERN.test(value.correlationId) ||
-    value.kind !== "USED_STOCK_ENTRY" ||
+    typeof value.kind !== "string" ||
+    !kinds.has(value.kind as PendingOperationKind) ||
     typeof value.status !== "string" ||
     !detailStatuses.has(value.status as OperationDetailStatus) ||
     (value.reasonCode !== null && !reasonCode(value.reasonCode)) ||
@@ -256,7 +260,7 @@ function parseDetailOperation(value: unknown): PendingOperationDetailRecord {
     correlationId: value.correlationId,
     createdAt: value.createdAt,
     finalizedAt: value.finalizedAt as string | null,
-    kind: "USED_STOCK_ENTRY",
+    kind: value.kind as PendingOperationKind,
     operationId: value.operationId,
     reasonCode: value.reasonCode as string | null,
     remoteRecordId: value.remoteRecordId as number | null,

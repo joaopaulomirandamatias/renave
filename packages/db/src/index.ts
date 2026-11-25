@@ -2,16 +2,25 @@ export { bootstrapRoles, type BootstrapOptions } from "./bootstrap.js";
 export {
   getAuthorizationContext,
   grantTenantUserAccess,
+  listTenantMembers,
   TenantAccessInputError,
+  type TenantMemberRoleSummary,
   type TenantUserAccessGrant,
+  type TenantUserStatus,
 } from "./authorization.js";
 export {
+  AUDIT_OUTCOMES,
   appendAuditEvent,
   listAuditEvents,
+  listTenantAuditEvents,
+  TenantAuditQueryInputError,
   verifyAuditChain,
   type AppendAuditEventInput,
   type AuditEvent,
   type AuditOutcome,
+  type ListTenantAuditEventsInput,
+  type TenantAuditEventItem,
+  type TenantAuditEventsPage,
 } from "./audit-events.js";
 export {
   computeCnpjCheckDigits,
@@ -168,6 +177,7 @@ export {
   OperationPendingReaderInputError,
   OperationPendingReaderStorageError,
   pendingOperationStatuses,
+  readableOperationKinds,
   readableOperationStatuses,
   readableRemoteStates,
   type PendingOperationDetail,
@@ -176,6 +186,7 @@ export {
   type PendingOperationStatus,
   type PendingOperationSummary,
   type PendingOperationTimelineEntry,
+  type ReadableOperationKind,
   type ReadableOperationStatus,
   type ReadableRemoteState,
 } from "./operation-pending-reader.js";

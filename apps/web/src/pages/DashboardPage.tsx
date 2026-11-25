@@ -8,12 +8,15 @@ import {
 } from "@seu-renave/ui";
 import {
   ArrowDownToLine,
+  ArrowUpFromLine,
   Building2,
   CarFront,
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  ScrollText,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type {
@@ -28,13 +31,20 @@ import type {
   CreateEstablishmentResult,
   CreateStockEntryInput,
   CreateStockEntryResult,
+  CreateStockExitInput,
+  CreateStockExitResult,
   EstablishmentManagementCapability,
 } from "../App.js";
+import type {
+  LoadTenantAuditEventsInput,
+  TenantAuditEventsResult,
+} from "../features/audit/client.js";
 import { type ReadonlyCanaryPort } from "../features/homologation-canary/index.js";
 import type {
   PendingOperationDetail,
   PendingOperationsPage as PendingOperationsPageResult,
 } from "../features/pending-operations/client.js";
+import type { TenantUsersResult } from "../features/tenant-users/client.js";
 import type { StockInventoryItem } from "./StockInventoryPanel.js";
 import { StockDetailPage, type StockDetail } from "./StockDetailPage.js";
 import {
@@ -42,13 +52,16 @@ import {
   workspaceNavigation,
 } from "../workspace-routes.js";
 import {
+  AuditPage,
   CompliancePage,
   DashboardHomePage,
   EstablishmentsPage,
   PendingOperationDetailPage,
   PendingOperationsPage,
   StockEntryPage,
+  StockExitPage,
   StockPage,
+  UsersPage,
 } from "./workspace/index.js";
 
 export interface DashboardPageProps {
@@ -63,6 +76,8 @@ export interface DashboardPageProps {
   establishmentManagement?: EstablishmentManagementCapability;
   establishments: readonly AppShellEstablishment[];
   homologationCanaryPort?: ReadonlyCanaryPort;
+  initialStockExitPlate?: string;
+  initialStockExitStockId?: number;
   logoutPending?: boolean;
   logoutError?: boolean;
   linkStatus?: BrowserRenaveLinkStatus;
@@ -78,6 +93,9 @@ export interface DashboardPageProps {
   onCreateStockEntry?: (
     input: CreateStockEntryInput,
   ) => Promise<CreateStockEntryResult>;
+  onCreateStockExit?: (
+    input: CreateStockExitInput,
+  ) => Promise<CreateStockExitResult>;
   onEstablishmentChange?: (establishmentId: string) => void;
   onLogout: () => void | Promise<void>;
   onReloadLinkStatus?: () => void;
@@ -95,6 +113,10 @@ export interface DashboardPageProps {
     stockId: number,
     signal: AbortSignal,
   ) => Promise<StockDetail>;
+  onLoadAuditEvents?: (
+    input: Omit<LoadTenantAuditEventsInput, "tenantId">,
+  ) => Promise<TenantAuditEventsResult>;
+  onLoadTenantUsers?: (signal: AbortSignal) => Promise<TenantUsersResult>;
   onLoadPendingOperations?: (
     signal: AbortSignal,
   ) => Promise<PendingOperationsPageResult>;
@@ -104,6 +126,7 @@ export interface DashboardPageProps {
   onBackStockDetail?: () => void;
   onBackPendingOperationDetail?: () => void;
   onReloadCredentialLinkQueue?: () => void;
+  onStartStockExit?: (detail: { id: number; placa: string }) => void;
   onTenantChange?: (tenantId: string) => void;
   selectedEstablishmentId?: string;
   selectedTenantId?: string;
@@ -117,6 +140,7 @@ export interface DashboardPageProps {
   pendingOperationId?: string;
   stockDetailId?: number;
   stockEntryOperationsEnabled?: boolean;
+  stockExitOperationsEnabled?: boolean;
   tenants?: readonly { id: string; label: string }[];
   userDisplayName: string;
 }
@@ -126,10 +150,13 @@ const navigationIcons: Record<WorkspaceRoute, ReactNode> = {
   stock: <CarFront size={19} />,
   "stock-detail": <CarFront size={19} />,
   "stock-entry": <ArrowDownToLine size={19} />,
+  "stock-exit": <ArrowUpFromLine size={19} />,
   pending: <ClipboardList size={19} />,
   "pending-detail": <ClipboardList size={19} />,
   compliance: <ShieldCheck size={19} />,
+  audit: <ScrollText size={19} />,
   establishments: <Building2 size={19} />,
+  users: <Users size={19} />,
 };
 
 const routeHeadings: Record<
@@ -152,6 +179,10 @@ const routeHeadings: Record<
     eyebrow: "Operação de estoque",
     title: () => "Dar entrada — veículo usado",
   },
+  "stock-exit": {
+    eyebrow: "Operação de estoque",
+    title: () => "Registrar saída — veículo usado",
+  },
   pending: {
     eyebrow: "Operação e compliance",
     title: () => "Pendências",
@@ -164,9 +195,17 @@ const routeHeadings: Record<
     eyebrow: "Compliance",
     title: () => "Conformidade e integração",
   },
+  audit: {
+    eyebrow: "Operação e compliance",
+    title: () => "Auditoria",
+  },
   establishments: {
     eyebrow: "Configurações",
     title: () => "Estabelecimentos e certificados",
+  },
+  users: {
+    eyebrow: "Configurações",
+    title: () => "Usuários & Perfis",
   },
 };
 
@@ -182,6 +221,8 @@ export function DashboardPage({
   establishmentManagement = "denied",
   establishments,
   homologationCanaryPort,
+  initialStockExitPlate,
+  initialStockExitStockId,
   logoutPending = false,
   logoutError = false,
   linkStatus,
@@ -190,6 +231,7 @@ export function DashboardPage({
   onCheckEligibility,
   onCreateEstablishment,
   onCreateStockEntry,
+  onCreateStockExit,
   onEstablishmentChange,
   onLogout,
   onReloadLinkStatus,
@@ -198,11 +240,14 @@ export function DashboardPage({
   onLookupVehicle,
   onLoadRecentStocks,
   onLoadStockDetail,
+  onLoadAuditEvents,
+  onLoadTenantUsers,
   onLoadPendingOperations,
   onLoadPendingOperationDetail,
   onBackStockDetail,
   onBackPendingOperationDetail,
   onReloadCredentialLinkQueue,
+  onStartStockExit,
   onTenantChange,
   selectedEstablishmentId,
   selectedTenantId,
@@ -216,6 +261,7 @@ export function DashboardPage({
   pendingOperationId,
   stockDetailId,
   stockEntryOperationsEnabled = false,
+  stockExitOperationsEnabled = false,
   tenants = [],
   userDisplayName,
 }: DashboardPageProps) {
@@ -223,7 +269,9 @@ export function DashboardPage({
     .filter(
       (item) =>
         (item.id !== "stock-entry" || stockEntryOperationsEnabled) &&
-        (item.id !== "establishments" || establishmentManagement !== "denied"),
+        (item.id !== "stock-exit" || stockExitOperationsEnabled) &&
+        ((item.id !== "establishments" && item.id !== "users") ||
+          establishmentManagement !== "denied"),
     )
     .map((item) => ({
       ...item,
@@ -254,8 +302,12 @@ export function DashboardPage({
           readinessError={readinessError}
           readinessLoading={readinessLoading}
           {...(linkStatus ? { linkStatus } : {})}
+          {...(onLoadPendingOperations ? { onLoadPendingOperations } : {})}
           {...(onReloadLinkStatus ? { onReloadLinkStatus } : {})}
           {...(readiness ? { readiness } : {})}
+          {...(selectedTenantId && selectedEstablishmentId
+            ? { selectionKey: `${selectedTenantId}:${selectedEstablishmentId}` }
+            : {})}
         />
       );
       break;
@@ -313,6 +365,9 @@ export function DashboardPage({
             <StockDetailPage
               onBack={onBackStockDetail}
               onLoad={onLoadStockDetail}
+              {...(stockExitOperationsEnabled && onStartStockExit
+                ? { onStartStockExit }
+                : {})}
               selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
               stockId={stockDetailId}
             />
@@ -325,6 +380,24 @@ export function DashboardPage({
           stockEntryOperationsEnabled={stockEntryOperationsEnabled}
           {...(linkStatus ? { linkStatus } : {})}
           {...(onCreateStockEntry ? { onCreateStockEntry } : {})}
+          {...(readiness ? { readiness } : {})}
+          {...(selectedEstablishmentId ? { selectedEstablishmentId } : {})}
+          {...(selectedTenantId ? { selectedTenantId } : {})}
+        />
+      );
+      break;
+    case "stock-exit":
+      routeContent = (
+        <StockExitPage
+          stockExitOperationsEnabled={stockExitOperationsEnabled}
+          {...(initialStockExitPlate
+            ? { initialPlate: initialStockExitPlate }
+            : {})}
+          {...(initialStockExitStockId !== undefined
+            ? { initialStockId: initialStockExitStockId }
+            : {})}
+          {...(linkStatus ? { linkStatus } : {})}
+          {...(onCreateStockExit ? { onCreateStockExit } : {})}
           {...(readiness ? { readiness } : {})}
           {...(selectedEstablishmentId ? { selectedEstablishmentId } : {})}
           {...(selectedTenantId ? { selectedTenantId } : {})}
@@ -390,6 +463,20 @@ export function DashboardPage({
         />
       );
       break;
+    case "audit":
+      routeContent =
+        onLoadAuditEvents && selectedTenantId ? (
+          <AuditPage
+            onLoad={onLoadAuditEvents}
+            {...(selectedEstablishmentId ? { selectedEstablishmentId } : {})}
+            selectionKey={`${selectedTenantId}:${selectedEstablishmentId ?? ""}`}
+          />
+        ) : (
+          <p className="context-feedback" role="status">
+            Selecione uma organização para consultar a trilha de auditoria.
+          </p>
+        );
+      break;
     case "establishments":
       routeContent = (
         <EstablishmentsPage
@@ -398,6 +485,20 @@ export function DashboardPage({
           {...(selectedTenantId ? { selectedTenantId } : {})}
         />
       );
+      break;
+    case "users":
+      routeContent =
+        onLoadTenantUsers && selectedTenantId ? (
+          <UsersPage
+            establishments={establishments}
+            onLoad={onLoadTenantUsers}
+            selectionKey={selectedTenantId}
+          />
+        ) : (
+          <p className="context-feedback" role="status">
+            Selecione uma organização para consultar usuários e perfis.
+          </p>
+        );
       break;
   }
   return (

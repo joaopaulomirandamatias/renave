@@ -18,11 +18,29 @@ describe("workspace routes", () => {
     );
   });
 
+  it("publica a rota de saída somente no caminho exato", () => {
+    expect(resolveWorkspaceRoute("/estoque/saida")).toBe("stock-exit");
+  });
+
+  it("publica a rota de auditoria somente no caminho exato", () => {
+    expect(resolveWorkspaceRoute("/auditoria")).toBe("audit");
+  });
+
+  it("publica a rota de usuários somente no caminho exato", () => {
+    expect(resolveWorkspaceRoute("/configuracoes/usuarios")).toBe("users");
+  });
+
   it.each([
     `/pendencias/${operationId.toUpperCase()}`,
     `/pendencias/${operationId}/eventos`,
     "/pendencias/nao-e-uuid",
     "/pendencias/",
+    "/estoque/saida/",
+    "/estoque/saida/123",
+    "/auditoria/",
+    "/auditoria/123",
+    "/configuracoes/usuarios/",
+    "/configuracoes/usuarios/123",
   ])("mantém caminho não canônico fora do workspace: %s", (pathname) => {
     expect(resolveWorkspaceRoute(pathname)).toBeUndefined();
     expect(resolvePendingOperationId(pathname)).toBeUndefined();

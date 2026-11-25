@@ -91,7 +91,7 @@ describe("DashboardPage", () => {
     expect(
       within(navigation).getByRole("link", { name: "Painel" }),
     ).toHaveAttribute("aria-current", "page");
-    expect(within(navigation).getAllByRole("link")).toHaveLength(6);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(8);
     expect(
       within(navigation).getByRole("link", { name: "Estoque" }),
     ).toHaveAttribute("href", "/estoque");
@@ -99,13 +99,16 @@ describe("DashboardPage", () => {
       within(navigation).getByRole("link", { name: "Pendências" }),
     ).toHaveAttribute("href", "/pendencias");
     expect(
-      within(navigation).queryByRole("link", { name: "Auditoria" }),
-    ).toBeNull();
+      within(navigation).getByRole("link", { name: "Auditoria" }),
+    ).toHaveAttribute("href", "/auditoria");
     expect(
       within(navigation).getByRole("link", {
         name: "Estabelecimentos & Certificados",
       }),
     ).toHaveAttribute("href", "/configuracoes/estabelecimentos");
+    expect(
+      within(navigation).getByRole("link", { name: "Usuários & Perfis" }),
+    ).toHaveAttribute("href", "/configuracoes/usuarios");
     expect(screen.getByRole("button", { name: "Sair" })).toHaveAttribute(
       "type",
       "button",
@@ -160,7 +163,10 @@ describe("DashboardPage", () => {
         name: "Estabelecimentos & Certificados",
       }),
     ).toBeNull();
-    expect(within(navigation).getAllByRole("link")).toHaveLength(4);
+    expect(
+      within(navigation).queryByRole("link", { name: "Usuários & Perfis" }),
+    ).toBeNull();
+    expect(within(navigation).getAllByRole("link")).toHaveLength(5);
   });
 
   it.each([
@@ -456,7 +462,7 @@ describe("DashboardPage", () => {
     ).toBeVisible();
   });
 
-  it("não apresenta zeros fictícios antes de existir uma fonte agregada", () => {
+  it("não apresenta zeros fictícios quando a fonte de pendências ou prontidão está indisponível", () => {
     render(
       <DashboardPage
         environment="homologation"
@@ -470,13 +476,122 @@ describe("DashboardPage", () => {
     const summary = screen.getByRole("region", {
       name: "Resumo do estabelecimento",
     });
-    expect(summary).toHaveTextContent("Indisponível nesta etapa");
+    expect(summary).toHaveTextContent("Pendências abertas");
+    expect(summary).toHaveTextContent("Vínculo RENAVE");
+    expect(summary).toHaveTextContent("Prontidão de consultas");
+    expect(within(summary).getAllByText("Indisponível agora")).toHaveLength(3);
     expect(summary).not.toHaveTextContent("Operações confirmadas");
-    expect(summary).not.toHaveTextContent("Pendências abertas");
-    expect(summary).not.toHaveTextContent("Resultados incertos");
     expect(
       screen.queryByRole("region", { name: "Ativação do estabelecimento" }),
     ).toBeNull();
+  });
+
+  it("exibe o resumo operacional real com pendências separadas, vínculo e prontidão de consultas", async () => {
+    const onLoadPendingOperations = vi.fn(async () => ({
+      items: [
+        {
+          correlationId: "11111111-1111-4111-8111-111111111111",
+          createdAt: "2026-11-24T12:00:00.000Z",
+          kind: "USED_STOCK_ENTRY" as const,
+          operationId: "22222222-2222-4222-8222-222222222222",
+          reasonCode: "RENAVE_TIMEOUT",
+          sentAt: "2026-11-24T12:00:01.000Z",
+          status: "PENDING_RECONCILIATION" as const,
+          updatedAt: "2026-11-24T12:01:00.000Z",
+        },
+        {
+          correlationId: "33333333-3333-4333-8333-333333333333",
+          createdAt: "2026-11-24T12:05:00.000Z",
+          kind: "USED_STOCK_ENTRY" as const,
+          operationId: "44444444-4444-4444-8444-444444444444",
+          reasonCode: "RECONCILIATION_EXHAUSTED",
+          sentAt: "2026-11-24T12:05:01.000Z",
+          status: "MANUAL_REVIEW" as const,
+          updatedAt: "2026-11-24T12:15:00.000Z",
+        },
+      ],
+      truncated: false,
+    }));
+
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="enabled"
+        onLoadPendingOperations={onLoadPendingOperations}
+        onLogout={vi.fn()}
+        readiness={{
+          certificate: "ready",
+          environment: "homologation",
+          establishmentContact: "verified",
+          integration: "configured",
+          link: "enabled",
+          mutations: "blocked",
+          operatorIdentity: "verified",
+          queries: "ready",
+        }}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+
+    const summary = screen.getByRole("region", {
+      name: "Resumo do estabelecimento",
+    });
+    expect(await within(summary).findByText("2")).toBeVisible();
+    expect(summary).toHaveTextContent(
+      "1 em verificação automática · 1 em revisão humana",
+    );
+    expect(summary).toHaveTextContent("Habilitado");
+    expect(summary).toHaveTextContent("Pronta");
+    expect(
+      within(summary).getByRole("link", { name: "Abrir pendências" }),
+    ).toHaveAttribute("href", "/pendencias");
+    expect(
+      within(summary).getByRole("link", { name: "Ver compliance" }),
+    ).toHaveAttribute("href", "/compliance");
+    expect(
+      within(summary).getByRole("link", { name: "Abrir estoque" }),
+    ).toHaveAttribute("href", "/estoque");
+  });
+
+  it("trata falha na carga do resumo de pendências sem inventar zeros", async () => {
+    const onLoadPendingOperations = vi.fn(async () =>
+      Promise.reject(new Error("unavailable")),
+    );
+
+    render(
+      <DashboardPage
+        environment="homologation"
+        establishments={establishments}
+        linkStatus="confirmed"
+        onLoadPendingOperations={onLoadPendingOperations}
+        onLogout={vi.fn()}
+        readiness={{
+          certificate: "ready",
+          environment: "homologation",
+          establishmentContact: "verified",
+          integration: "configured",
+          link: "confirmed",
+          mutations: "blocked",
+          operatorIdentity: "verified",
+          queries: "blocked",
+        }}
+        selectedEstablishmentId="store-belem"
+        selectedTenantId="tenant-a"
+        userDisplayName="Operador"
+      />,
+    );
+
+    const summary = screen.getByRole("region", {
+      name: "Resumo do estabelecimento",
+    });
+    expect(
+      await within(summary).findByText("Indisponível agora"),
+    ).toBeVisible();
+    expect(summary).toHaveTextContent("Confirmado");
+    expect(summary).toHaveTextContent("Bloqueada");
   });
 
   it("mantém o painel e anuncia falhas de contexto e logout", () => {

@@ -13,6 +13,7 @@ createRoot(document.getElementById("root")!).render(
     <App
       platformConsoleEnabled={features.platformConsoleEnabled}
       stockEntryOperationsEnabled={features.stockEntryOperationsEnabled}
+      stockExitOperationsEnabled={features.stockExitOperationsEnabled}
     />
   </StrictMode>,
 );

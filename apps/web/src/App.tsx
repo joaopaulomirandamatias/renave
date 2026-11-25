@@ -4,9 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DashboardPage } from "./pages/DashboardPage.js";
 import {
+  browserTenantAuditClient,
+  type TenantAuditClient,
+} from "./features/audit/client.js";
+import {
   browserPendingOperationsClient,
   type PendingOperationsClient,
 } from "./features/pending-operations/client.js";
+import {
+  browserTenantUsersClient,
+  type TenantUsersClient,
+} from "./features/tenant-users/client.js";
 import {
   browserPlatformAccessClient,
   browserPlatformConsoleClient,
@@ -95,6 +103,40 @@ export interface CreateStockEntryInput {
 }
 
 export interface CreateStockEntryResult {
+  createdAt: string;
+  operationId: string;
+  replayed: boolean;
+  status: "HELD_LOCAL";
+}
+
+export interface CreateStockExitInput {
+  comprador: {
+    email: string;
+    endereco: {
+      bairro: string;
+      cep: string;
+      codigoMunicipio: number;
+      complemento?: string;
+      logradouro: string;
+      numero: string;
+    };
+    nome: string;
+    numeroDocumento: string;
+    tipoDocumento: "CPF" | "CNPJ";
+  };
+  dataVenda: string;
+  idempotencyKey: string;
+  stockId: number;
+  valorVenda: number;
+  veiculo: {
+    codigoSegurancaCrv: string;
+    numeroCrv: string;
+    placa: string;
+    renavam: string;
+  };
+}
+
+export interface CreateStockExitResult {
   createdAt: string;
   operationId: string;
   replayed: boolean;
@@ -210,6 +252,11 @@ export interface SessionClient {
     establishmentId: string,
     input: CreateStockEntryInput,
   ): Promise<CreateStockEntryResult>;
+  createStockExit?(
+    tenantId: string,
+    establishmentId: string,
+    input: CreateStockExitInput,
+  ): Promise<CreateStockExitResult>;
   load(): Promise<BrowserSession>;
   loadEstablishments(tenantId: string): Promise<BrowserEstablishmentCollection>;
   loadCredentialLinkQueue(
@@ -421,6 +468,37 @@ function parseCreatedStockEntry(value: unknown): CreateStockEntryResult {
     !Number.isFinite(Date.parse(value.createdAt))
   ) {
     throw new Error("Resposta de criação da operação inválida");
+  }
+  return {
+    createdAt: value.createdAt,
+    operationId: value.operationId.toLowerCase(),
+    replayed: value.replayed,
+    status: "HELD_LOCAL",
+  };
+}
+
+function parseCreatedStockExit(value: unknown): CreateStockExitResult {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 4 ||
+    Object.keys(value).some(
+      (key) =>
+        key !== "operationId" &&
+        key !== "status" &&
+        key !== "replayed" &&
+        key !== "createdAt",
+    ) ||
+    typeof value.operationId !== "string" ||
+    !UUID_PATTERN.test(value.operationId) ||
+    value.status !== "HELD_LOCAL" ||
+    typeof value.replayed !== "boolean" ||
+    typeof value.createdAt !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/u.test(
+      value.createdAt,
+    ) ||
+    !Number.isFinite(Date.parse(value.createdAt))
+  ) {
+    throw new Error("Resposta de criação da saída inválida");
   }
   return {
     createdAt: value.createdAt,
@@ -980,6 +1058,17 @@ export class StockEntryCreationClientError extends Error {
   }
 }
 
+export class StockExitCreationClientError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code?: string,
+    readonly retryAfterSeconds?: number,
+  ) {
+    super("Criação local da saída de estoque não concluída");
+    this.name = "StockExitCreationClientError";
+  }
+}
+
 export const browserSessionClient: SessionClient = {
   async checkVehicleEligibility(
     tenantId,
@@ -1105,6 +1194,60 @@ export const browserSessionClient: SessionClient = {
     } catch {
       // Um 2xx ilegível é ambíguo; uma repetição precisa manter a chave.
       throw new StockEntryCreationClientError(0, "INVALID_RESPONSE");
+    }
+  },
+  async createStockExit(tenantId, establishmentId, input) {
+    let response: Response;
+    try {
+      response = await fetch(
+        `/api/tenants/${encodeURIComponent(tenantId)}/establishments/${encodeURIComponent(establishmentId)}/stock-exit-operations`,
+        {
+          body: JSON.stringify({
+            comprador: input.comprador,
+            dataVenda: input.dataVenda,
+            stockId: input.stockId,
+            valorVenda: input.valorVenda,
+            veiculo: input.veiculo,
+          }),
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            "idempotency-key": input.idempotencyKey,
+          },
+          method: "POST",
+        },
+      );
+    } catch {
+      throw new StockExitCreationClientError(0, "NETWORK_ERROR");
+    }
+    const value: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      throw new StockExitCreationClientError(
+        response.status,
+        isRecord(value) && typeof value.code === "string"
+          ? value.code
+          : undefined,
+        Number.isInteger(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+      );
+    }
+    try {
+      const result = parseCreatedStockExit(value);
+      if (
+        (response.status === 202 && result.replayed) ||
+        (response.status === 200 &&
+          (!result.replayed ||
+            response.headers.get("idempotency-replayed") !== "true")) ||
+        (response.status !== 200 && response.status !== 202)
+      ) {
+        throw new Error("Semântica HTTP incompatível");
+      }
+      return result;
+    } catch {
+      // Um 2xx ilegível é ambíguo; uma repetição precisa manter a chave.
+      throw new StockExitCreationClientError(0, "INVALID_RESPONSE");
     }
   },
   async load() {
@@ -1310,6 +1453,9 @@ export interface AppProps {
   pendingOperationsClient?: PendingOperationsClient;
   redirect?: (url: string) => void;
   stockEntryOperationsEnabled?: boolean;
+  stockExitOperationsEnabled?: boolean;
+  tenantAuditClient?: TenantAuditClient;
+  tenantUsersClient?: TenantUsersClient;
 }
 
 export interface AuthFeedback {
@@ -1428,6 +1574,9 @@ export function App({
   pendingOperationsClient = browserPendingOperationsClient,
   redirect = (url) => window.location.assign(url),
   stockEntryOperationsEnabled = false,
+  stockExitOperationsEnabled = false,
+  tenantAuditClient = browserTenantAuditClient,
+  tenantUsersClient = browserTenantUsersClient,
 }: AppProps) {
   const platformConsolePathRequested =
     locationPathname === PLATFORM_CONSOLE_PATH;
@@ -1440,8 +1589,13 @@ export function App({
     !platformConsolePathRequested && workspaceRoute === undefined;
   const disabledStockEntryPath =
     workspaceRoute === "stock-entry" && !stockEntryOperationsEnabled;
+  const disabledStockExitPath =
+    workspaceRoute === "stock-exit" && !stockExitOperationsEnabled;
   const [authFeedback] = useState(() => authFeedbackFromSearch(locationSearch));
   const [view, setView] = useState<ViewState>({ status: "loading" });
+  const [stockExitPrefill, setStockExitPrefill] = useState<
+    { placa: string; stockId: number } | undefined
+  >(undefined);
   const [logoutPending, setLogoutPending] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
   const [contextLoading, setContextLoading] = useState(false);
@@ -1474,9 +1628,12 @@ export function App({
   const [selectedEstablishmentByTenant, setSelectedEstablishmentByTenant] =
     useState<Record<string, string>>({});
   const administrativeRouteDenied =
-    workspaceRoute === "establishments" && establishmentManagement === "denied";
+    (workspaceRoute === "establishments" || workspaceRoute === "users") &&
+    establishmentManagement === "denied";
   const renaveOperationalContextRequested =
-    workspaceRoute !== undefined && workspaceRoute !== "establishments";
+    workspaceRoute !== undefined &&
+    workspaceRoute !== "establishments" &&
+    workspaceRoute !== "users";
   const tenantRequestVersion = useRef(0);
   const loadRequestVersion = useRef(0);
   const linkLoadVersion = useRef(0);
@@ -1497,6 +1654,7 @@ export function App({
     if (
       unknownWorkspacePath ||
       disabledStockEntryPath ||
+      disabledStockExitPath ||
       (platformConsolePathRequested && !platformConsoleEnabled)
     ) {
       setView({ status: "not_found" });
@@ -1563,6 +1721,7 @@ export function App({
   }, [
     client,
     disabledStockEntryPath,
+    disabledStockExitPath,
     platformConsoleEnabled,
     platformConsolePathRequested,
     platformConsoleRequested,
@@ -1575,6 +1734,14 @@ export function App({
 
   const activeEstablishmentId = selectedEstablishmentByTenant[selectedTenantId];
   activeSelectionKeyRef.current = `${selectedTenantId}:${activeEstablishmentId ?? ""}`;
+  useEffect(() => {
+    if (workspaceRoute !== "stock-exit" && workspaceRoute !== "stock-detail") {
+      setStockExitPrefill(undefined);
+    }
+  }, [workspaceRoute]);
+  useEffect(() => {
+    setStockExitPrefill(undefined);
+  }, [activeEstablishmentId, selectedTenantId]);
   useEffect(() => {
     const authenticated = view.status === "ready" && view.session.authenticated;
     if (
@@ -1732,6 +1899,7 @@ export function App({
   if (
     unknownWorkspacePath ||
     disabledStockEntryPath ||
+    disabledStockExitPath ||
     (platformConsolePathRequested && !platformConsoleEnabled)
   ) {
     return <RouteNotFound />;
@@ -2179,6 +2347,13 @@ export function App({
       readinessError={renaveReadinessView.status === "error"}
       readinessLoading={renaveReadinessView.status === "loading"}
       stockEntryOperationsEnabled={stockEntryOperationsEnabled}
+      stockExitOperationsEnabled={stockExitOperationsEnabled}
+      {...(workspaceRoute === "stock-exit" && stockExitPrefill
+        ? {
+            initialStockExitPlate: stockExitPrefill.placa,
+            initialStockExitStockId: stockExitPrefill.stockId,
+          }
+        : {})}
       {...(homologationCanaryPort ? { homologationCanaryPort } : {})}
       onCheckEligibility={(plate, crvType) =>
         client.checkVehicleEligibility(
@@ -2196,6 +2371,24 @@ export function App({
           input,
         )
       }
+      {...(client.createStockExit
+        ? {
+            onCreateStockExit: (input: CreateStockExitInput) =>
+              client.createStockExit!(
+                selectedTenantId,
+                activeEstablishmentId ?? "",
+                input,
+              ),
+          }
+        : {})}
+      {...(stockExitOperationsEnabled
+        ? {
+            onStartStockExit: (detail: { id: number; placa: string }) => {
+              setStockExitPrefill({ placa: detail.placa, stockId: detail.id });
+              redirect("/estoque/saida");
+            },
+          }
+        : {})}
       onReloadCredentialLinkQueue={() =>
         setCredentialLinkQueueReloadVersion((current) => current + 1)
       }
@@ -2234,6 +2427,18 @@ export function App({
                 signal,
               ),
           })}
+      onLoadAuditEvents={(input) =>
+        tenantAuditClient.loadEvents({
+          ...input,
+          tenantId: selectedTenantId,
+        })
+      }
+      onLoadTenantUsers={(signal) =>
+        tenantUsersClient.loadUsers({
+          signal,
+          tenantId: selectedTenantId,
+        })
+      }
       onLoadPendingOperations={(signal) =>
         pendingOperationsClient.loadPage({
           establishmentId: activeEstablishmentId ?? "",

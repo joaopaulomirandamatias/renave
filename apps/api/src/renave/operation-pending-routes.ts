@@ -1,8 +1,10 @@
 import {
   getPendingOperationDetail,
   listPendingOperations,
+  readableOperationKinds,
   type PendingOperationDetail,
   type PendingOperationPage,
+  type ReadableOperationKind,
   type TenantClient,
 } from "@seu-renave/db/api-runtime";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -126,6 +128,15 @@ function publicReasonCode(value: string | null): string | null {
   return value !== null && PUBLIC_REASON_CODES.has(value) ? value : null;
 }
 
+const PUBLIC_OPERATION_KINDS = new Set<string>(readableOperationKinds);
+
+function publicOperationKind(value: unknown): ReadableOperationKind {
+  if (typeof value !== "string" || !PUBLIC_OPERATION_KINDS.has(value)) {
+    throw new Error("invalid operation kind");
+  }
+  return value as ReadableOperationKind;
+}
+
 type SummaryPresentationInput = Pick<
   PendingOperationDetail["operation"],
   | "operationId"
@@ -141,7 +152,7 @@ type SummaryPresentationInput = Pick<
 function presentSummary(value: SummaryPresentationInput) {
   return {
     operationId: value.operationId,
-    kind: value.kind,
+    kind: publicOperationKind(value.kind),
     status: value.status,
     reasonCode: publicReasonCode(value.reasonCode),
     correlationId: value.correlationId,

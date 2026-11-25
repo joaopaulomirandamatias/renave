@@ -116,3 +116,106 @@ export async function getAuthorizationContext(
     tenantId: rows[0]!.tenant_id,
   };
 }
+
+export type TenantUserStatus = "active" | "suspended";
+
+export interface TenantMemberRoleSummary {
+  active: boolean;
+  createdAt: string;
+  establishmentIds: readonly string[];
+  memberId: string;
+  role: TenantRole;
+  status: TenantUserStatus;
+}
+
+interface TenantMemberRow {
+  created_at: Date | string;
+  establishment_id: string | null;
+  member_digest: string;
+  role: TenantRole;
+  status: TenantUserStatus;
+}
+
+function digestToOpaqueUuid(hexDigest: string): string {
+  const hex = hexDigest.toLowerCase().slice(0, 32).padEnd(32, "0");
+  const versioned = `${hex.slice(0, 12)}5${hex.slice(13, 16)}`;
+  const variantNibble = (parseInt(hex[16]!, 16) & 0x3) | 0x8;
+  const variant = variantNibble.toString(16);
+  return `${versioned.slice(0, 8)}-${versioned.slice(8, 12)}-${versioned.slice(12, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * Lista vínculos de papéis do tenant atual sob FORCE RLS sem selecionar ou
+ * expor `subject`, e-mail, CPF ou qualquer identificador do IdP.
+ */
+export async function listTenantMembers(
+  client: TenantClient,
+): Promise<readonly TenantMemberRoleSummary[]> {
+  const { rows } = await client.query<TenantMemberRow>(
+    `select
+       pg_catalog.encode(
+         pg_catalog.sha256(
+           pg_catalog.convert_to(
+             'renave.tenant_member.v1:' || u.tenant_id::text || ':' || u.subject,
+             'UTF8'
+           )
+         ),
+         'hex'
+       ) as member_digest,
+       g.role,
+       u.status,
+       g.created_at,
+       s.establishment_id
+     from renave.tenant_user u
+     join renave.tenant_role_grant g
+       on g.tenant_id = u.tenant_id and g.subject = u.subject
+     left join renave.establishment_role_scope s
+       on s.tenant_id = g.tenant_id
+      and s.subject = g.subject
+      and s.role = g.role
+     order by g.created_at asc, member_digest asc, g.role asc, s.establishment_id asc`,
+  );
+
+  const grouped = new Map<
+    string,
+    {
+      createdAt: string;
+      establishmentIds: Set<string>;
+      memberId: string;
+      role: TenantRole;
+      status: TenantUserStatus;
+    }
+  >();
+
+  for (const row of rows) {
+    const memberId = digestToOpaqueUuid(row.member_digest);
+    const key = `${memberId}:${row.role}`;
+    let entry = grouped.get(key);
+    if (!entry) {
+      const createdAt =
+        row.created_at instanceof Date
+          ? row.created_at.toISOString()
+          : new Date(row.created_at).toISOString();
+      entry = {
+        createdAt,
+        establishmentIds: new Set<string>(),
+        memberId,
+        role: row.role,
+        status: row.status,
+      };
+      grouped.set(key, entry);
+    }
+    if (row.establishment_id !== null) {
+      entry.establishmentIds.add(row.establishment_id);
+    }
+  }
+
+  return [...grouped.values()].map((entry) => ({
+    active: entry.status === "active",
+    createdAt: entry.createdAt,
+    establishmentIds: [...entry.establishmentIds].sort(),
+    memberId: entry.memberId,
+    role: entry.role,
+    status: entry.status,
+  }));
+}

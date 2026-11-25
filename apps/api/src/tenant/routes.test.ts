@@ -420,3 +420,385 @@ describe("diretório autenticado de tenants", () => {
     expect(getEstablishment).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("trilha de auditoria paginada do tenant", () => {
+  const OTHER_ESTABLISHMENT_ID = "33333333-3333-4333-8333-333333333333";
+
+  function runnerWithAuditRows(
+    rows: readonly Record<string, unknown>[],
+    options: {
+      authRows?: readonly Record<string, unknown>[];
+      deny?: boolean;
+    } = {},
+  ) {
+    const query = vi.fn(async (sql: string, _params?: unknown[]) => {
+      if (sql.includes("from renave.tenant_user")) {
+        return {
+          rows: options.authRows ?? [
+            {
+              establishment_id: null,
+              role: "compliance_auditor",
+              subject: "oidc|tenant-user",
+              tenant_id: TENANT_ID,
+            },
+          ],
+        };
+      }
+      return { rows };
+    });
+    const runSpy = vi.fn();
+    const runner: TenantActionRunner = {
+      async run(input, work) {
+        runSpy(input, work);
+        if (options.deny) return { allowed: false, reason: "ACCESS_DENIED" };
+        const value = await work({
+          authorization: {
+            allowed: true,
+            matchedRole: "compliance_auditor",
+            subject: input.session.subject,
+            tenantId: input.tenantId,
+          },
+          client: { query } as never,
+          session: input.session,
+        });
+        return { allowed: true, value };
+      },
+    };
+    return { query, runSpy, runner };
+  }
+
+  it("retorna página sanitizada com paginação, filtros e Cache-Control: no-store", async () => {
+    const { query, runSpy, runner } = runnerWithAuditRows([
+      {
+        action: "renave.stock.read",
+        actor_ip: "198.51.100.99",
+        actor_subject: "oidc|sensitive-actor",
+        cnpj_sent: "11222333000181",
+        establishment_id: ESTABLISHMENT_ID,
+        event_hash_prefix: "abcdef0123456789",
+        occurred_at: new Date("2026-11-24T12:02:00.000Z"),
+        outcome: "succeeded",
+        payload: { cpf: "12345678901", secret: "must-not-leak" },
+        payload_reference: "pev1_11111111-1111-4111-8111-111111111111",
+        sequence: "25",
+        trace_id: "trace-25",
+      },
+      {
+        action: "renave.stock.read",
+        establishment_id: ESTABLISHMENT_ID,
+        event_hash_prefix: "fedcba987654",
+        occurred_at: new Date("2026-11-24T12:01:00.000Z"),
+        outcome: "succeeded",
+        sequence: "24",
+        trace_id: null,
+      },
+    ]);
+    const { app } = setup({ tenantActionRunner: runner });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/audit-events?limit=1&beforeSequence=30&establishmentId=${ESTABLISHMENT_ID}&action=renave.stock.read&outcome=succeeded`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      hasMore: true,
+      items: [
+        {
+          action: "renave.stock.read",
+          entityType: "renave",
+          establishmentId: ESTABLISHMENT_ID,
+          eventHashPrefix: "abcdef012345",
+          occurredAt: "2026-11-24T12:02:00.000Z",
+          outcome: "succeeded",
+          sequence: 25,
+          traceId: "trace-25",
+        },
+      ],
+      nextBeforeSequence: 25,
+    });
+    expect(response.body).not.toContain("actorSubject");
+    expect(response.body).not.toContain("actorIp");
+    expect(response.body).not.toContain("sensitive-actor");
+    expect(response.body).not.toContain("198.51.100.99");
+    expect(response.body).not.toContain("must-not-leak");
+    expect(response.body).not.toContain("11222333000181");
+    expect(response.body).not.toContain("pev1_");
+    expect(runSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "audit.read",
+        tenantId: TENANT_ID,
+      }),
+      expect.any(Function),
+    );
+    const auditCall = query.mock.calls.find(([sql]) =>
+      sql.includes("from renave.audit_event"),
+    );
+    expect(auditCall).toBeDefined();
+    expect(auditCall?.[1]).toEqual([
+      30,
+      ESTABLISHMENT_ID,
+      "renave.stock.read",
+      "succeeded",
+      2,
+    ]);
+  });
+
+  it("recusa sessão ausente com 401", async () => {
+    const { runSpy, runner } = runnerWithAuditRows([]);
+    const { app } = setup({
+      authenticated: false,
+      tenantActionRunner: runner,
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/audit-events`,
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(runSpy).not.toHaveBeenCalled();
+  });
+
+  it("nega acesso (deny-by-default) quando RBAC ou papel não autoriza audit.read", async () => {
+    const denied = runnerWithAuditRows([], { deny: true });
+    const { app: appDenied } = setup({ tenantActionRunner: denied.runner });
+    const responseDenied = await appDenied.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/audit-events`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(responseDenied.statusCode).toBe(404);
+    expect(responseDenied.json()).toEqual({
+      code: "TENANT_RESOURCE_NOT_FOUND",
+    });
+
+    const operatorOnly = runnerWithAuditRows([], {
+      authRows: [
+        {
+          establishment_id: OTHER_ESTABLISHMENT_ID,
+          role: "renave_operator",
+          subject: "oidc|tenant-user",
+          tenant_id: TENANT_ID,
+        },
+      ],
+    });
+    const { app: appOperator } = setup({
+      tenantActionRunner: operatorOnly.runner,
+    });
+    const responseOperator = await appOperator.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/audit-events`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(responseOperator.statusCode).toBe(404);
+    expect(responseOperator.json()).toEqual({
+      code: "TENANT_RESOURCE_NOT_FOUND",
+    });
+  });
+
+  it.each([
+    ["parâmetro desconhecido", "unknown=1"],
+    ["parâmetro repetido", "limit=10&limit=20"],
+    ["limit zero", "limit=0"],
+    ["limit acima de 50", "limit=51"],
+    ["limit não numérico", "limit=abc"],
+    ["beforeSequence zero", "beforeSequence=0"],
+    ["beforeSequence negativo", "beforeSequence=-5"],
+    ["establishmentId inválido", "establishmentId=not-a-uuid"],
+    ["action inválida", "action=INVALID%20ACTION"],
+    ["outcome inválido", "outcome=unknown"],
+  ])(
+    "rejeita query inválida (%s) com 400 antes do banco",
+    async (_label, qs) => {
+      const { runSpy, runner } = runnerWithAuditRows([]);
+      const { app } = setup({ tenantActionRunner: runner });
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/tenants/${TENANT_ID}/audit-events?${qs}`,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ code: "INVALID_AUDIT_QUERY" });
+      expect(runSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejeita tenantId malformado com 404 sem consultar banco", async () => {
+    const { runSpy, runner } = runnerWithAuditRows([]);
+    const { app } = setup({ tenantActionRunner: runner });
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/tenants/not-a-uuid/audit-events",
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ code: "TENANT_RESOURCE_NOT_FOUND" });
+    expect(runSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("usuários e perfis do tenant", () => {
+  const OTHER_ESTABLISHMENT_ID = "33333333-3333-4333-8333-333333333333";
+
+  function runnerWithMemberRows(
+    rows: readonly Record<string, unknown>[],
+    options: { deny?: boolean } = {},
+  ) {
+    const query = vi.fn(async () => ({ rows }));
+    const runSpy = vi.fn();
+    const runner: TenantActionRunner = {
+      async run(input, work) {
+        runSpy(input, work);
+        if (options.deny) return { allowed: false, reason: "ACCESS_DENIED" };
+        const value = await work({
+          authorization: {
+            allowed: true,
+            matchedRole: "tenant_admin",
+            subject: input.session.subject,
+            tenantId: input.tenantId,
+          },
+          client: { query } as never,
+          session: input.session,
+        });
+        return { allowed: true, value };
+      },
+    };
+    return { query, runSpy, runner };
+  }
+
+  it("retorna vínculos sanitizados agrupados por estabelecimento com Cache-Control: no-store", async () => {
+    const { runSpy, runner } = runnerWithMemberRows([
+      {
+        created_at: new Date("2026-11-20T09:00:00.000Z"),
+        establishment_id: null,
+        member_digest:
+          "1111111111111111111111111111111111111111111111111111111111111111",
+        role: "tenant_admin",
+        status: "active",
+        subject: "oidc|admin-secret-subject",
+        subject_hash: "raw-subject-hash-secret",
+      },
+      {
+        created_at: new Date("2026-11-21T09:00:00.000Z"),
+        establishment_id: OTHER_ESTABLISHMENT_ID,
+        member_digest:
+          "2222222222222222222222222222222222222222222222222222222222222222",
+        role: "renave_operator",
+        status: "active",
+      },
+      {
+        created_at: new Date("2026-11-21T09:00:00.000Z"),
+        establishment_id: ESTABLISHMENT_ID,
+        member_digest:
+          "2222222222222222222222222222222222222222222222222222222222222222",
+        role: "renave_operator",
+        status: "active",
+      },
+    ]);
+    const { app } = setup({ tenantActionRunner: runner });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/users`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    const payload = response.json() as {
+      items: {
+        active: boolean;
+        createdAt: string;
+        establishmentIds: string[];
+        memberId: string;
+        role: string;
+        status: string;
+      }[];
+    };
+    expect(payload.items).toHaveLength(2);
+    expect(payload.items[0]).toEqual({
+      active: true,
+      createdAt: "2026-11-20T09:00:00.000Z",
+      establishmentIds: [],
+      memberId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+      ),
+      role: "tenant_admin",
+      status: "active",
+    });
+    expect(payload.items[1]).toEqual({
+      active: true,
+      createdAt: "2026-11-21T09:00:00.000Z",
+      establishmentIds: [ESTABLISHMENT_ID, OTHER_ESTABLISHMENT_ID],
+      memberId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+      ),
+      role: "renave_operator",
+      status: "active",
+    });
+    expect(response.body).not.toContain("subject");
+    expect(response.body).not.toContain("subject_hash");
+    expect(response.body).not.toContain("admin-secret-subject");
+    expect(response.body).not.toContain("raw-subject-hash-secret");
+    expect(runSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "tenant.user.manage",
+        mfa: "required",
+        tenantId: TENANT_ID,
+      }),
+      expect.any(Function),
+    );
+  });
+
+  it("recusa sessão ausente com 401 e sessão sem MFA com 403", async () => {
+    const unauth = runnerWithMemberRows([]);
+    const { app: appUnauth } = setup({
+      authenticated: false,
+      tenantActionRunner: unauth.runner,
+    });
+    const resUnauth = await appUnauth.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/users`,
+    });
+    expect(resUnauth.statusCode).toBe(401);
+    expect(unauth.runSpy).not.toHaveBeenCalled();
+
+    const noMfa = runnerWithMemberRows([]);
+    const { app: appNoMfa } = setup({
+      mfaVerified: false,
+      tenantActionRunner: noMfa.runner,
+    });
+    const resNoMfa = await appNoMfa.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/users`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(resNoMfa.statusCode).toBe(403);
+    expect(noMfa.runSpy).not.toHaveBeenCalled();
+  });
+
+  it("nega acesso (deny-by-default) com 404 para operador/auditor e tenantId inválido", async () => {
+    const denied = runnerWithMemberRows([], { deny: true });
+    const { app } = setup({ tenantActionRunner: denied.runner });
+
+    const resDenied = await app.inject({
+      method: "GET",
+      url: `/api/tenants/${TENANT_ID}/users`,
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(resDenied.statusCode).toBe(404);
+    expect(resDenied.json()).toEqual({ code: "TENANT_RESOURCE_NOT_FOUND" });
+
+    const resMalformed = await app.inject({
+      method: "GET",
+      url: "/api/tenants/not-a-uuid/users",
+      headers: { cookie: "renave_session=opaque-session" },
+    });
+    expect(resMalformed.statusCode).toBe(404);
+    expect(resMalformed.json()).toEqual({ code: "TENANT_RESOURCE_NOT_FOUND" });
+  });
+});

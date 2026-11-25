@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   InvalidStockEntryReconciliationError,
+  InvalidStockExitReconciliationError,
   reconcileStockEntry,
+  reconcileStockExit,
   type RenaveStockRecord,
   type StockEntryRequest,
+  type StockExitCandidateRecord,
+  type StockExitReconciliationRequest,
 } from "./index.js";
 
 const request: StockEntryRequest = {
@@ -231,6 +235,450 @@ describe("reconcileStockEntry", () => {
     expect(() => reconcileStockEntry(request, [], invalidWindow)).toThrowError(
       expect.objectContaining({
         code: "INVALID_STOCK_ENTRY_RECONCILIATION",
+        reason: "WINDOW",
+      }),
+    );
+  });
+});
+
+const exitRequest: StockExitReconciliationRequest = {
+  comprador: {
+    numeroDocumento: "987.654.321-00",
+    tipoDocumento: "CPF",
+  },
+  cpfOperadorResponsavel: "123.456.789-01",
+  stockId: 42,
+  valorVenda: 95_500.5,
+  veiculo: {
+    chassi: "9BWZZZ377VT004251",
+    codigoSegurancaCrv: "12345678901",
+    numeroCrv: "123456789012",
+    placa: "QTP4H82",
+    renavam: "00607701676",
+    tipoCrv: "DIGITAL",
+  },
+};
+
+function finalizedExitStock(
+  id: number | undefined,
+  registeredAt: string | undefined,
+): StockExitCandidateRecord {
+  return {
+    chassi: "9BWZZZ377VT004251",
+    codigoSegurancaCrv: "12345678901",
+    estado: "FINALIZADO",
+    ...(id === undefined ? {} : { id }),
+    numeroCrv: "123456789012",
+    placa: "QTP4H82",
+    renavam: "00607701676",
+    saidaEstoque: {
+      comprador: {
+        numeroDocumento: "98765432100",
+        tipoDocumento: "CPF",
+      },
+      cpfOperadorResponsavel: "12345678901",
+      ...(registeredAt === undefined ? {} : { dataHoraRegistro: registeredAt }),
+      valorVenda: 95_500.5,
+    },
+    tipoCrv: "DIGITAL",
+  };
+}
+
+function confirmedStock(id = 42): StockExitCandidateRecord {
+  return {
+    chassi: "9BWZZZ377VT004251",
+    codigoSegurancaCrv: "12345678901",
+    estado: "CONFIRMADO",
+    id,
+    numeroCrv: "123456789012",
+    placa: "QTP4H82",
+    renavam: "00607701676",
+    tipoCrv: "DIGITAL",
+  };
+}
+
+describe("reconcileStockExit", () => {
+  it("confirma saída única íntegra a partir de registro único (GET /api/estoques/{id})", () => {
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        finalizedExitStock(42, "2026-11-23T15:02:00.000Z"),
+        window,
+      ),
+    ).toEqual({ outcome: "confirmed", stockId: 42 });
+  });
+
+  it("confirma saída usando campo saida de StockDetail e fuso explícito ±hh:mm", () => {
+    const detailRecord: StockExitCandidateRecord = {
+      chassi: "9BWZZZ377VT004251",
+      codigoSegurancaCrv: "12345678901",
+      estado: "FINALIZADO",
+      id: 42,
+      numeroCrv: "123456789012",
+      placa: "QTP4H82",
+      renavam: "00607701676",
+      saida: {
+        comprador: {
+          numeroDocumento: "98765432100",
+          tipoDocumento: "CPF",
+        },
+        cpfOperadorResponsavel: "12345678901",
+        dataHoraRegistro: "2026-11-23T12:05:00-03:00",
+        valorVenda: 95_500.5,
+      },
+      tipoCrv: "DIGITAL",
+    };
+    expect(reconcileStockExit(exitRequest, [detailRecord], window)).toEqual({
+      outcome: "confirmed",
+      stockId: 42,
+    });
+  });
+
+  it("ignora outros stockIds na lista e confirma apenas o stockId esperado", () => {
+    const otherStock = finalizedExitStock(99, "2026-11-23T15:03:00.000Z");
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        [otherStock, finalizedExitStock(42, "2026-11-23T15:02:00.000Z")],
+        window,
+      ),
+    ).toEqual({ outcome: "confirmed", stockId: 42 });
+  });
+
+  it("aceita bordas exatas da janela [sentAt - clockSkewMs, sentAt + windowMs]", () => {
+    const sentAt = new Date("2026-11-23T15:00:00.000Z");
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        finalizedExitStock(42, "2026-11-23T14:59:00.000Z"),
+        { clockSkewMs: 60_000, sentAt },
+      ),
+    ).toEqual({ outcome: "confirmed", stockId: 42 });
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        finalizedExitStock(42, "2026-11-23T16:00:00.000Z"),
+        { clockSkewMs: 60_000, sentAt },
+      ),
+    ).toEqual({ outcome: "confirmed", stockId: 42 });
+  });
+
+  it("retorna not_observed quando o estoque continua CONFIRMADO sem saída nem cancelamento", () => {
+    expect(reconcileStockExit(exitRequest, confirmedStock(42), window)).toEqual(
+      { outcome: "not_observed" },
+    );
+  });
+
+  it("retorna not_observed quando o stockId esperado não está na lista", () => {
+    expect(
+      reconcileStockExit(exitRequest, [confirmedStock(99)], window),
+    ).toEqual({ outcome: "not_observed" });
+  });
+
+  it("envia para manual_review quando dataHoraRegistro está fora da borda inferior ou superior", () => {
+    const sentAt = new Date("2026-11-23T15:00:00.000Z");
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        finalizedExitStock(42, "2026-11-23T14:58:59.999Z"),
+        { clockSkewMs: 60_000, sentAt },
+      ),
+    ).toEqual({ candidateStockIds: [42], outcome: "manual_review" });
+
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        finalizedExitStock(42, "2026-11-23T16:00:00.001Z"),
+        { clockSkewMs: 60_000, sentAt },
+      ),
+    ).toEqual({ candidateStockIds: [42], outcome: "manual_review" });
+  });
+
+  it("trata dataHoraRegistro ausente, sem offset ou apenas dataHora como manual_review", () => {
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        finalizedExitStock(42, undefined),
+        window,
+      ),
+    ).toEqual({ candidateStockIds: [42], outcome: "manual_review" });
+
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        finalizedExitStock(42, "2026-11-23T12:02:00"),
+        window,
+      ),
+    ).toEqual({ candidateStockIds: [42], outcome: "manual_review" });
+
+    const onlyBusinessDate = finalizedExitStock(42, undefined);
+    onlyBusinessDate.saidaEstoque = {
+      ...onlyBusinessDate.saidaEstoque,
+      dataHora: "2026-11-23T15:02:00.000Z",
+    };
+    expect(reconcileStockExit(exitRequest, onlyBusinessDate, window)).toEqual({
+      candidateStockIds: [42],
+      outcome: "manual_review",
+    });
+  });
+
+  it.each<[string, (record: StockExitCandidateRecord) => void]>([
+    [
+      "cancelamentoEstoque",
+      (record) => {
+        record.cancelamentoEstoque = { motivoCancelamentoEstoque: "CANCELADO" };
+      },
+    ],
+    [
+      "cancelamento",
+      (record) => {
+        record.cancelamento = { motivo: "CANCELADO" };
+      },
+    ],
+    [
+      "estado SOLICITADO",
+      (record) => {
+        record.estado = "SOLICITADO";
+      },
+    ],
+    [
+      "estado TRANSFERIDO",
+      (record) => {
+        record.estado = "TRANSFERIDO";
+      },
+    ],
+    [
+      "estado ausente",
+      (record) => {
+        delete record.estado;
+      },
+    ],
+    [
+      "CONFIRMADO com saidaEstoque",
+      (record) => {
+        record.estado = "CONFIRMADO";
+      },
+    ],
+    [
+      "FINALIZADO sem saidaEstoque",
+      (record) => {
+        delete record.saidaEstoque;
+      },
+    ],
+    [
+      "placa divergente",
+      (record) => {
+        record.placa = "ABC1D23";
+      },
+    ],
+    [
+      "chassi divergente",
+      (record) => {
+        record.chassi = "9BWZZZ377VT999999";
+      },
+    ],
+    [
+      "RENAVAM divergente",
+      (record) => {
+        record.renavam = "99999999999";
+      },
+    ],
+    [
+      "CRV divergente",
+      (record) => {
+        record.codigoSegurancaCrv = "00000000000";
+      },
+    ],
+    [
+      "número CRV divergente",
+      (record) => {
+        record.numeroCrv = "000000000000";
+      },
+    ],
+    [
+      "tipo CRV divergente",
+      (record) => {
+        record.tipoCrv = "AZUL";
+      },
+    ],
+  ])(
+    "envia %s para manual_review (nunca not_observed)",
+    (_label, mutateRecord) => {
+      const candidate = finalizedExitStock(42, "2026-11-23T15:02:00.000Z");
+      mutateRecord(candidate);
+      expect(reconcileStockExit(exitRequest, candidate, window)).toEqual({
+        candidateStockIds: [42],
+        outcome: "manual_review",
+      });
+    },
+  );
+
+  it.each<
+    [
+      string,
+      (exit: NonNullable<StockExitCandidateRecord["saidaEstoque"]>) => void,
+    ]
+  >([
+    [
+      "CPF operador divergente",
+      (exit) => {
+        exit.cpfOperadorResponsavel = "00000000000";
+      },
+    ],
+    [
+      "CPF operador ausente",
+      (exit) => {
+        delete exit.cpfOperadorResponsavel;
+      },
+    ],
+    [
+      "comprador documento divergente",
+      (exit) => {
+        exit.comprador = {
+          numeroDocumento: "11111111111",
+          tipoDocumento: "CPF",
+        };
+      },
+    ],
+    [
+      "comprador tipo divergente",
+      (exit) => {
+        exit.comprador = {
+          numeroDocumento: "98765432100",
+          tipoDocumento: "CNPJ",
+        };
+      },
+    ],
+    [
+      "comprador ausente",
+      (exit) => {
+        delete exit.comprador;
+      },
+    ],
+    [
+      "valorVenda divergente",
+      (exit) => {
+        exit.valorVenda = 95_500.51;
+      },
+    ],
+    [
+      "valorVenda ausente",
+      (exit) => {
+        delete exit.valorVenda;
+      },
+    ],
+  ])("envia %s na saída para manual_review", (_label, mutateExit) => {
+    const candidate = finalizedExitStock(42, "2026-11-23T15:02:00.000Z");
+    mutateExit(candidate.saidaEstoque!);
+    expect(reconcileStockExit(exitRequest, candidate, window)).toEqual({
+      candidateStockIds: [42],
+      outcome: "manual_review",
+    });
+  });
+
+  it("envia para manual_review quando há múltiplos candidatos com o mesmo stockId", () => {
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        [
+          finalizedExitStock(42, "2026-11-23T15:02:00.000Z"),
+          finalizedExitStock(42, "2026-11-23T15:03:00.000Z"),
+        ],
+        window,
+      ),
+    ).toEqual({ candidateStockIds: [42], outcome: "manual_review" });
+  });
+
+  it("envia para manual_review quando há registro sem ID válido para a mesma placa", () => {
+    expect(
+      reconcileStockExit(
+        exitRequest,
+        [
+          finalizedExitStock(42, "2026-11-23T15:02:00.000Z"),
+          finalizedExitStock(undefined, "2026-11-23T15:02:00.000Z"),
+        ],
+        window,
+      ),
+    ).toEqual({ candidateStockIds: [42], outcome: "manual_review" });
+  });
+
+  it("envia para manual_review quando saidaEstoque e saida coexistem no mesmo registro", () => {
+    const candidate = finalizedExitStock(42, "2026-11-23T15:02:00.000Z");
+    candidate.saida = { ...candidate.saidaEstoque };
+    expect(reconcileStockExit(exitRequest, candidate, window)).toEqual({
+      candidateStockIds: [42],
+      outcome: "manual_review",
+    });
+  });
+
+  it.each([
+    ["stockId zero", { stockId: 0 }],
+    ["stockId negativo", { stockId: -5 }],
+    ["stockId não inteiro", { stockId: 42.5 }],
+    ["CPF operador inválido", { cpfOperadorResponsavel: "123" }],
+    ["valorVenda zero", { valorVenda: 0 }],
+    ["valorVenda negativo", { valorVenda: -10 }],
+    ["comprador sem documento", { comprador: { numeroDocumento: "" } }],
+    [
+      "placa inválida",
+      { veiculo: { ...exitRequest.veiculo, placa: "INVALIDA" } },
+    ],
+    [
+      "tipoCrv desconhecido",
+      {
+        veiculo: {
+          ...exitRequest.veiculo,
+          tipoCrv: "PAPEL",
+        },
+      },
+    ],
+  ])("recusa request inválido (%s) fail-closed", (_label, override) => {
+    const unsafeRequest = {
+      ...exitRequest,
+      ...override,
+    } as StockExitReconciliationRequest;
+    expect(() =>
+      reconcileStockExit(
+        unsafeRequest,
+        [finalizedExitStock(42, "2026-11-23T15:02:00.000Z")],
+        window,
+      ),
+    ).toThrow(InvalidStockExitReconciliationError);
+    expect(() =>
+      reconcileStockExit(
+        unsafeRequest,
+        [finalizedExitStock(42, "2026-11-23T15:02:00.000Z")],
+        window,
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: "INVALID_STOCK_EXIT_RECONCILIATION",
+        reason: "REQUEST",
+      }),
+    );
+  });
+
+  it.each([
+    {
+      observedAt: new Date("2026-11-23T14:59:00.000Z"),
+      sentAt: window.sentAt,
+    },
+    { ...window, clockSkewMs: -1 },
+    { ...window, clockSkewMs: 300_001 },
+    { ...window, windowMs: 0 },
+    { ...window, windowMs: 3_600_001 },
+    { ...window, observedAt: new Date("inválida") },
+    { sentAt: new Date("inválida") },
+    {
+      observedAt: new Date("2026-11-23T16:00:00.001Z"),
+      sentAt: window.sentAt,
+    },
+  ])("recusa janela inválida %# fail-closed", (invalidWindow) => {
+    expect(() =>
+      reconcileStockExit(exitRequest, [], invalidWindow),
+    ).toThrowError(
+      expect.objectContaining({
+        code: "INVALID_STOCK_EXIT_RECONCILIATION",
         reason: "WINDOW",
       }),
     );

@@ -400,4 +400,93 @@ describe("fila tenant-scoped de operações pendentes", () => {
     expect(response.body).not.toContain("private-db");
     expect(response.headers["cache-control"]).toBe("no-store");
   });
+
+  it("projeta tanto USED_STOCK_ENTRY quanto USED_STOCK_EXIT na fila e no detalhe", async () => {
+    const exitOperationId = "55555555-5555-4555-8555-555555555555";
+    const exitSummary: PendingOperationSummaryProjection = {
+      ...summary,
+      kind: "USED_STOCK_EXIT",
+      operationId: exitOperationId,
+      status: "MANUAL_REVIEW",
+      reasonCode: "RENAVE_RECONCILIATION_AMBIGUOUS",
+    };
+    const exitDetail: PendingOperationDetailProjection = {
+      ...detail,
+      operation: {
+        ...detail.operation,
+        kind: "USED_STOCK_EXIT",
+        operationId: exitOperationId,
+        status: "MANUAL_REVIEW",
+        reasonCode: "RENAVE_RECONCILIATION_AMBIGUOUS",
+      },
+    };
+    const reader = readerWith({
+      get: vi.fn(async () => exitDetail),
+      list: vi.fn(async () => ({
+        items: [summary, exitSummary],
+        truncated: false,
+      })),
+    });
+    const { app } = setup({ reader });
+
+    const [listRes, detailRes] = await Promise.all([
+      app.inject({ headers: cookie, method: "GET", url: listUrl() }),
+      app.inject({
+        headers: cookie,
+        method: "GET",
+        url: detailUrl(exitOperationId),
+      }),
+    ]);
+
+    expect(listRes.statusCode).toBe(200);
+    expect(listRes.json()).toMatchObject({
+      items: [
+        { kind: "USED_STOCK_ENTRY", operationId: OPERATION_ID },
+        { kind: "USED_STOCK_EXIT", operationId: exitOperationId },
+      ],
+      truncated: false,
+    });
+    expect(detailRes.statusCode).toBe(200);
+    expect(detailRes.json()).toMatchObject({
+      operation: {
+        kind: "USED_STOCK_EXIT",
+        operationId: exitOperationId,
+        reasonCode: "RENAVE_RECONCILIATION_AMBIGUOUS",
+        status: "MANUAL_REVIEW",
+      },
+    });
+  });
+
+  it("falha fechado (503) quando o reader devolve kind desconhecido", async () => {
+    const unknownKind =
+      "UNKNOWN_MUTATION" as PendingOperationSummaryProjection["kind"];
+    const reader = readerWith({
+      get: vi.fn(async () => ({
+        ...detail,
+        operation: { ...detail.operation, kind: unknownKind },
+      })),
+      list: vi.fn(async () => ({
+        items: [{ ...summary, kind: unknownKind }],
+        truncated: false,
+      })),
+    });
+    const { app } = setup({ reader });
+
+    const [listRes, detailRes] = await Promise.all([
+      app.inject({ headers: cookie, method: "GET", url: listUrl() }),
+      app.inject({ headers: cookie, method: "GET", url: detailUrl() }),
+    ]);
+
+    expect(listRes.statusCode).toBe(503);
+    expect(listRes.json()).toMatchObject({
+      code: "OPERATION_READER_UNAVAILABLE",
+    });
+    expect(listRes.body).not.toContain("UNKNOWN_MUTATION");
+
+    expect(detailRes.statusCode).toBe(503);
+    expect(detailRes.json()).toMatchObject({
+      code: "OPERATION_READER_UNAVAILABLE",
+    });
+    expect(detailRes.body).not.toContain("UNKNOWN_MUTATION");
+  });
 });

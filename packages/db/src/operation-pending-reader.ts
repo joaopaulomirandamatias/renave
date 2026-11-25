@@ -33,10 +33,17 @@ export const readableRemoteStates = [
 
 export type ReadableRemoteState = (typeof readableRemoteStates)[number];
 
+export const readableOperationKinds = [
+  "USED_STOCK_ENTRY",
+  "USED_STOCK_EXIT",
+] as const;
+
+export type ReadableOperationKind = (typeof readableOperationKinds)[number];
+
 export interface PendingOperationSummary {
   correlationId: string;
   createdAt: Date;
-  kind: "USED_STOCK_ENTRY";
+  kind: ReadableOperationKind;
   operationId: string;
   reasonCode: string | null;
   sentAt: Date | null;
@@ -48,7 +55,7 @@ export interface PendingOperationDetailSummary {
   correlationId: string;
   createdAt: Date;
   finalizedAt: Date | null;
-  kind: "USED_STOCK_ENTRY";
+  kind: ReadableOperationKind;
   operationId: string;
   reasonCode: string | null;
   remoteRecordId: number | null;
@@ -146,6 +153,12 @@ function isRemoteState(value: string): value is ReadableRemoteState {
   return readableRemoteStates.some((candidate) => candidate === value);
 }
 
+function isReadableOperationKind(
+  value: string,
+): value is ReadableOperationKind {
+  return readableOperationKinds.some((candidate) => candidate === value);
+}
+
 function nullableDate(value: unknown): value is Date | null {
   return value === null || isDate(value);
 }
@@ -153,7 +166,7 @@ function nullableDate(value: unknown): value is Date | null {
 function toSummary(row: PendingOperationRow): PendingOperationSummary {
   if (
     !isUuid(row.operation_id) ||
-    row.kind !== "USED_STOCK_ENTRY" ||
+    !isReadableOperationKind(row.kind) ||
     !isPendingStatus(row.status) ||
     !isReasonCode(row.reason_code) ||
     !isUuid(row.correlation_id) ||
@@ -167,7 +180,7 @@ function toSummary(row: PendingOperationRow): PendingOperationSummary {
   return {
     correlationId: row.correlation_id.toLowerCase(),
     createdAt: new Date(row.created_at),
-    kind: "USED_STOCK_ENTRY",
+    kind: row.kind,
     operationId: row.operation_id.toLowerCase(),
     reasonCode: row.reason_code,
     sentAt: row.sent_at === null ? null : new Date(row.sent_at),
@@ -181,7 +194,7 @@ function toDetailSummary(
 ): PendingOperationDetailSummary {
   if (
     !isUuid(row.operation_id) ||
-    row.kind !== "USED_STOCK_ENTRY" ||
+    !isReadableOperationKind(row.kind) ||
     !isReadableStatus(row.status) ||
     !isReasonCode(row.reason_code) ||
     !isUuid(row.correlation_id) ||
@@ -207,7 +220,7 @@ function toDetailSummary(
     correlationId: row.correlation_id.toLowerCase(),
     createdAt: new Date(row.created_at),
     finalizedAt: row.finalized_at === null ? null : new Date(row.finalized_at),
-    kind: "USED_STOCK_ENTRY",
+    kind: row.kind,
     operationId: row.operation_id.toLowerCase(),
     reasonCode: row.reason_code,
     remoteRecordId:

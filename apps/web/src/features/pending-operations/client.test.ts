@@ -106,6 +106,28 @@ describe("browserPendingOperationsClient", () => {
     });
   });
 
+  it("aceita operações pendentes de saída de veículo usado (USED_STOCK_EXIT)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        Response.json({
+          items: [summary({ kind: "USED_STOCK_EXIT" })],
+          truncated: false,
+        }),
+      ),
+    );
+
+    await expect(
+      browserPendingOperationsClient.loadPage({
+        establishmentId,
+        tenantId,
+      }),
+    ).resolves.toMatchObject({
+      items: [{ kind: "USED_STOCK_EXIT", operationId }],
+      truncated: false,
+    });
+  });
+
   it.each([
     [
       "campo protegido na lista",
@@ -117,7 +139,7 @@ describe("browserPendingOperationsClient", () => {
     [
       "tipo ainda não publicado",
       {
-        items: [summary({ kind: "USED_STOCK_EXIT" })],
+        items: [summary({ kind: "USED_STOCK_TRANSFER" })],
         truncated: false,
       },
     ],
@@ -190,5 +212,39 @@ describe("browserPendingOperationsClient", () => {
       status: 404,
     });
     expect(String(failure)).not.toContain("12345678909");
+  });
+
+  it("carrega detalhe sanitizado de operação USED_STOCK_EXIT", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async () =>
+        Response.json({
+          operation: {
+            correlationId: "44444444-4444-4444-8444-444444444444",
+            createdAt: "2026-11-24T12:00:00Z",
+            finalizedAt: null,
+            kind: "USED_STOCK_EXIT",
+            operationId,
+            reasonCode: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
+            remoteRecordId: null,
+            remoteState: null,
+            sentAt: "2026-11-24T12:01:00Z",
+            status: "PENDING_RECONCILIATION",
+            updatedAt: "2026-11-24T12:02:00Z",
+            version: "2",
+          },
+          timeline: [],
+        }),
+      ),
+    );
+
+    const detail = await browserPendingOperationsClient.loadDetail({
+      establishmentId,
+      operationId,
+      tenantId,
+    });
+
+    expect(detail.operation.kind).toBe("USED_STOCK_EXIT");
+    expect(detail.operation.status).toBe("PENDING_RECONCILIATION");
   });
 });

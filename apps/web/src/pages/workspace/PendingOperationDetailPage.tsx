@@ -88,6 +88,7 @@ const STATUS_PRESENTATION: Readonly<
 
 const KIND_LABELS = Object.freeze({
   USED_STOCK_ENTRY: "Entrada de veículo usado",
+  USED_STOCK_EXIT: "Saída de veículo usado",
 });
 
 const REASON_LABELS: Readonly<Record<string, string>> = Object.freeze({

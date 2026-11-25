@@ -178,6 +178,57 @@ Falha não autoriza repetição em loop. Classifique a causa entre configuraçã
 certificado, vínculo, limite, rede ou contrato e preserve a evidência da
 tentativa.
 
+## Cerimônia do canário somente leitura (GET)
+
+Antes de autorizar qualquer mutação (`POST`) em homologação, execute e registre
+esta cerimônia estritamente somente leitura nesta ordem:
+
+1. **Pré-validação offline negativa (H-04 a H-07):** execute
+   `pnpm prehomologation:serpro` (com `--json` e `--junit` em caminhos novos
+   quando gerar artefatos de CI) e confirme código de saída `0`. Este passo não
+   abre rede nem exige credenciais.
+2. **Smoke read-only de identidade:** em janela aprovada, com egress de
+   homologação liberado e produção negada, execute uma única vez
+   `pnpm smoke:serpro:hml` (que chama apenas `GET /api/cliente-autenticado` com
+   `RENAVE_MTLS_CA_FILE`, `RENAVE_MTLS_CERT_FILE`, `RENAVE_MTLS_KEY_FILE`,
+   `RENAVE_INTEGRATOR_CNPJ`, `RENAVE_ESTABLISHMENT_CNPJ` e opcionalmente
+   `RENAVE_MTLS_KEY_PASSPHRASE`). Confirme a mensagem sanitizada de sucesso sem
+   CNPJ ou payload bruto.
+3. **Ensaio serial no painel `HomologationCanaryPanel`:** no frontend
+   autenticado, execute uma única sequência serial sem mutação (6 etapas, sem
+   repetição automática nem espera):
+   - `initial_readiness` (Prontidão local: `environment: "homologation"`,
+     `integration: "configured"`, `certificate` em `ready` ou `warning`,
+     `mutations: "blocked"`);
+   - `preflight` (Identidade e vínculo — registra evidência/auditoria e atualiza
+     o vínculo local);
+   - `confirmed_readiness` (Prontidão após o vínculo: `link` em `confirmed` ou
+     `enabled`, `queries: "ready"`, `operatorIdentity: "verified"`,
+     `establishmentContact: "verified"`);
+   - `eligibility` (Consulta de aptidão);
+   - `stocks` (Consulta de estoque — exige exatamente 1 registro `CONFIRMADO`
+     para a placa);
+   - `vehicle` (Consulta do veículo — valida correspondência da placa).
+
+   Em qualquer resultado inconclusivo (`INITIAL_READINESS_BLOCKED`,
+   `LINK_NOT_READY`, `STOCK_NOT_UNIQUE_CONFIRMED`) ou falha (`CANARY_ABORTED`,
+   `CANARY_STAGE_FAILED`), a sequência é interrompida imediatamente sem retry;
+   corrija a causa raiz antes de nova cerimônia.
+4. **Pré-requisitos operacionais obrigatórios antes de habilitar qualquer `POST`:**
+   confirme a adoção e verificação de todos os controles descritos nos três
+   runbooks complementares:
+   - [`certificate-lifecycle.md`](./certificate-lifecycle.md) — ciclo de vida,
+     monitoramento 90/60/30/15/7/1 dia, deduplicação multi-réplica, fechamento
+     do readiness, rotação, revogação emergencial, TLS/CA e NTP;
+   - [`reconciliation-worker.md`](./reconciliation-worker.md) — agenda fixa em
+     1/5/15/60 min (ADR 0002), tolerância máxima de 5 min sem ampliar
+     candidatos, proibição de 5ª leitura ou retry cego, triagem de
+     `MANUAL_REVIEW` e checagem de leases/locks;
+   - [`observability-and-incidents.md`](./observability-and-incidents.md) —
+     sinais/alertas sanitizados (zero PII), matriz SEV-1..SEV-4, registro de
+     prova de causa externa SERPRO/DETRAN, resposta ao monitor de evidências e
+     resposta à adulteração da cadeia de hash de auditoria (ADR 0003).
+
 ## Observabilidade
 
 Monitore separadamente:

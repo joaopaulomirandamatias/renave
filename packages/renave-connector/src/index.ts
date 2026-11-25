@@ -115,9 +115,17 @@ export {
 export { InvalidStockPlateQueryError, normalizeStockPlate } from "./plate.js";
 export {
   InvalidStockEntryReconciliationError,
+  InvalidStockExitReconciliationError,
   reconcileStockEntry,
+  reconcileStockExit,
+  type RenaveStockExitBuyerRecord,
+  type RenaveStockExitMovementRecord,
   type RenaveStockRecord,
   type StockEntryReconciliation,
   type StockEntryReconciliationRequest,
   type StockEntryReconciliationWindow,
+  type StockExitCandidateRecord,
+  type StockExitReconciliation,
+  type StockExitReconciliationRequest,
+  type StockExitReconciliationWindow,
 } from "./reconciliation.js";

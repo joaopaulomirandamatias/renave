@@ -70,8 +70,30 @@ describe("StockDetailPage", () => {
     expect(screen.getByText("24/11/2026 10:25:30 -03:00")).toBeVisible();
     expect(screen.getByText("24/11/2026 10:30")).toBeVisible();
     expect(screen.getByText("24/11/2026 10:31:45 Z")).toBeVisible();
+
+    const overviewTab = screen.getByRole("tab", { name: "Visão geral" });
+    const restrictionsTab = screen.getByRole("tab", {
+      name: "Restrições (1)",
+    });
+    const movementsTab = screen.getByRole("tab", { name: "Movimentações" });
+    expect(overviewTab).toHaveAttribute("aria-selected", "true");
+    expect(restrictionsTab).toHaveAttribute("aria-selected", "false");
+    expect(movementsTab).toHaveAttribute("aria-selected", "false");
+
+    fireEvent.keyDown(overviewTab, { key: "ArrowRight" });
+    expect(restrictionsTab).toHaveAttribute("aria-selected", "true");
+    expect(restrictionsTab).toHaveFocus();
     expect(screen.getByText("Administrativa")).toBeVisible();
     expect(screen.getByText("Código 01")).toBeVisible();
+
+    fireEvent.keyDown(restrictionsTab, { key: "ArrowRight" });
+    expect(movementsTab).toHaveAttribute("aria-selected", "true");
+    expect(movementsTab).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "Movimentação" })).toBeVisible();
+
+    fireEvent.keyDown(movementsTab, { key: "ArrowLeft" });
+    expect(restrictionsTab).toHaveAttribute("aria-selected", "true");
+
     expect(dateParse).not.toHaveBeenCalled();
     expect(
       screen.queryByRole("button", { name: /saída|transferir|documento/i }),
@@ -239,10 +261,63 @@ describe("StockDetailPage", () => {
       />,
     );
 
+    const restrictionsTab = await screen.findByRole("tab", {
+      name: "Restrições (0)",
+    });
+    fireEvent.click(restrictionsTab);
     expect(
-      await screen.findByText("Nenhuma restrição informada pelo RENAVE."),
+      screen.getByText("Nenhuma restrição informada pelo RENAVE."),
     ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Atualizar ficha" }));
     await waitFor(() => expect(onLoad).toHaveBeenCalledTimes(2));
   });
+
+  it("exibe o botão Registrar saída para veículo CONFIRMADO sem cancelamento quando habilitado", async () => {
+    const onStartStockExit = vi.fn();
+    render(
+      <StockDetailPage
+        onBack={vi.fn()}
+        onLoad={vi.fn(async () => detail({ estado: "CONFIRMADO" }))}
+        onStartStockExit={onStartStockExit}
+        selectionKey="tenant-a:store-a"
+        stockId={71}
+      />,
+    );
+
+    const exitButton = await screen.findByRole("button", {
+      name: "Registrar saída",
+    });
+    expect(exitButton).toBeVisible();
+    fireEvent.click(exitButton);
+    expect(onStartStockExit).toHaveBeenCalledWith({ id: 71, placa: "ABC1D23" });
+  });
+
+  it.each([
+    { estado: "FINALIZADO" as const },
+    {
+      cancelamento: {
+        dataHora: "2026-11-24T12:40",
+        motivo: "Solicitação do estabelecimento",
+      },
+      estado: "CONFIRMADO" as const,
+    },
+  ])(
+    "oculta o botão Registrar saída quando o registro não está elegível",
+    async (overrides) => {
+      render(
+        <StockDetailPage
+          onBack={vi.fn()}
+          onLoad={vi.fn(async () => detail(overrides))}
+          onStartStockExit={vi.fn()}
+          selectionKey="tenant-a:store-a"
+          stockId={71}
+        />,
+      );
+
+      expect(await screen.findByText("ABC1D23")).toBeVisible();
+      expect(
+        screen.queryByRole("button", { name: "Registrar saída" }),
+      ).toBeNull();
+    },
+  );
 });

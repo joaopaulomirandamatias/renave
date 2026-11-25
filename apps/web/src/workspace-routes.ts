@@ -3,10 +3,13 @@ export type WorkspaceRoute =
   | "stock"
   | "stock-detail"
   | "stock-entry"
+  | "stock-exit"
   | "pending"
   | "pending-detail"
   | "compliance"
-  | "establishments";
+  | "audit"
+  | "establishments"
+  | "users";
 
 export interface WorkspaceNavigationDefinition {
   href: string;
@@ -18,12 +21,19 @@ export const workspaceNavigation = [
   { href: "/painel", id: "dashboard", label: "Painel" },
   { href: "/estoque", id: "stock", label: "Estoque" },
   { href: "/estoque/entrada", id: "stock-entry", label: "Entradas" },
+  { href: "/estoque/saida", id: "stock-exit", label: "Saídas" },
   { href: "/pendencias", id: "pending", label: "Pendências" },
   { href: "/compliance", id: "compliance", label: "Compliance" },
+  { href: "/auditoria", id: "audit", label: "Auditoria" },
   {
     href: "/configuracoes/estabelecimentos",
     id: "establishments",
     label: "Estabelecimentos & Certificados",
+  },
+  {
+    href: "/configuracoes/usuarios",
+    id: "users",
+    label: "Usuários & Perfis",
   },
 ] as const satisfies readonly WorkspaceNavigationDefinition[];
 
