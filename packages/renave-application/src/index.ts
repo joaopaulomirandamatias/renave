@@ -21,6 +21,13 @@ export {
   type VehicleEligibilitySummary,
 } from "./vehicle-eligibility.js";
 export {
+  StockExitPreflightRejectedError,
+  verifyStockExitPreflight,
+  type StockExitPreflightConfirmation,
+  type StockExitPreflightVerificationInput,
+  type StockExitVehicleIdentity,
+} from "./stock-exit-preflight.js";
+export {
   InvalidStockQueryApplicationInputError,
   StockQueryEvidenceError,
   StockQueryResultInvalidError,
@@ -38,6 +45,7 @@ export {
   type StockQueryInput,
   type StockInventoryQueryInput,
   type StockDetailQueryInput,
+  type StockExitPreflightQueryInput,
   type StockQueryPorts,
   type StockQueryServiceConfig,
 } from "./stock-query.js";

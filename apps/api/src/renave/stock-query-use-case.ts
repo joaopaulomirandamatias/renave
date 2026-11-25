@@ -16,6 +16,8 @@ import {
 } from "@seu-renave/protected-evidence";
 import {
   StockQueryService,
+  type StockExitPreflightConfirmation,
+  type StockExitPreflightQueryInput,
   type StockDetailQueryInput,
   type StockQueryAuditRecord,
   type StockInventoryQueryInput,
@@ -138,6 +140,13 @@ export class PostgresStockQueryUseCase {
   async executeById(input: StockDetailQueryInput): Promise<StockDetail> {
     await this.authorize(input);
     return this.service(input).executeById(input);
+  }
+
+  async executeStockExitPreflight(
+    input: StockExitPreflightQueryInput,
+  ): Promise<StockExitPreflightConfirmation> {
+    await this.authorize(input);
+    return this.service(input).executeStockExitPreflight(input);
   }
 
   private service(

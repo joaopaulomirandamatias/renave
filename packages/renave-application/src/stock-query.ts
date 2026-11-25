@@ -24,6 +24,12 @@ import {
   EstablishmentUnavailableError,
   type ApplicationEstablishment,
 } from "./vehicle-eligibility.js";
+import {
+  StockExitPreflightRejectedError,
+  verifyStockExitPreflight,
+  type StockExitPreflightConfirmation,
+  type StockExitVehicleIdentity,
+} from "./stock-exit-preflight.js";
 
 const ACTION = "renave.stock.read" as const;
 const STOCK_STATES = new Set<RenaveStockState>([
@@ -46,6 +52,9 @@ export interface StockQueryInput {
 export type StockInventoryQueryInput = Omit<StockQueryInput, "plate">;
 export type StockDetailQueryInput = StockInventoryQueryInput & {
   stockId: number;
+};
+export type StockExitPreflightQueryInput = StockDetailQueryInput & {
+  vehicle: StockExitVehicleIdentity;
 };
 
 export interface StockQueryAuthorizationContextPort {
@@ -80,7 +89,11 @@ export interface StockQueryEvidenceContext {
   action: typeof ACTION;
   actorSubject: string;
   establishmentId: string;
-  request: { placa?: string; stockId?: number };
+  request: {
+    placa?: string;
+    stockId?: number;
+    vehicle?: StockExitVehicleIdentity;
+  };
   tenantId: string;
   traceId?: string;
 }
@@ -603,6 +616,35 @@ function rebuildStockDetail(
   return { evidence: result.evidence, publicResult: expected };
 }
 
+type StockExitPreflightDecision =
+  | {
+      accepted: true;
+      confirmation: StockExitPreflightConfirmation;
+    }
+  | { accepted: false };
+
+function rebuildStockExitPreflight(
+  result: StockDetailQueryResult,
+  input: Pick<StockExitPreflightQueryInput, "stockId" | "vehicle">,
+): { evidence: RenaveStockRecord; publicResult: StockExitPreflightDecision } {
+  const detail = rebuildStockDetail(result, input.stockId);
+  try {
+    return {
+      evidence: detail.evidence,
+      publicResult: Object.freeze({
+        accepted: true,
+        confirmation: verifyStockExitPreflight(input, detail.evidence),
+      }),
+    };
+  } catch (error) {
+    if (!(error instanceof StockExitPreflightRejectedError)) throw error;
+    return {
+      evidence: detail.evidence,
+      publicResult: Object.freeze({ accepted: false }),
+    };
+  }
+}
+
 export class StockQueryService {
   private readonly certificateThumbprintSha256: string;
   private readonly integratorCnpj: string;
@@ -654,9 +696,27 @@ export class StockQueryService {
     );
   }
 
+  async executeStockExitPreflight(
+    input: StockExitPreflightQueryInput,
+  ): Promise<StockExitPreflightConfirmation> {
+    if (!Number.isSafeInteger(input.stockId) || input.stockId <= 0) {
+      throw new InvalidStockQueryApplicationInputError("stockId");
+    }
+    const stockId = input.stockId;
+    const vehicle = Object.freeze({ ...input.vehicle });
+    const decision = await this.executeQuery(
+      input,
+      { stockId, vehicle },
+      (context) => this.ports.connector.getStockById(context, stockId),
+      (result) => rebuildStockExitPreflight(result, { stockId, vehicle }),
+    );
+    if (!decision.accepted) throw new StockExitPreflightRejectedError();
+    return decision.confirmation;
+  }
+
   private async executeQuery<TResult, TOutput>(
     input: StockInventoryQueryInput,
-    request: { placa?: string; stockId?: number },
+    request: StockQueryEvidenceContext["request"],
     query: (context: RenaveServerContext) => Promise<MutationResult<TResult>>,
     rebuild: (result: TResult) => {
       evidence: unknown;

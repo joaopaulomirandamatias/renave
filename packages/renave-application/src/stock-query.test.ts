@@ -146,6 +146,32 @@ const detailResult = {
   verifiedIdentity: successfulResult.verifiedIdentity,
 };
 
+const preflightVehicle = {
+  codigoSegurancaCrv: "01234567890",
+  numeroCrv: "001234567890",
+  placa: "ABC1D23",
+  renavam: "00987654321",
+};
+
+const preflightDetailResult = {
+  result: {
+    evidence: {
+      ...preflightVehicle,
+      estado: "CONFIRMADO" as const,
+      id: 71,
+      restricoesVeiculo: [],
+    },
+    publicResult: {
+      estado: "CONFIRMADO" as const,
+      id: 71,
+      placa: "ABC1D23",
+      renavam: "00987654321",
+      restricoes: [],
+    },
+  },
+  verifiedIdentity: successfulResult.verifiedIdentity,
+};
+
 function createHarness(options?: {
   authorizationContext?: AuthorizationContext | null;
   connectorError?: Error;
@@ -218,6 +244,75 @@ const input = {
 };
 
 describe("StockQueryService", () => {
+  it("cifra o registro bruto e retorna somente a confirmação do preflight de saída", async () => {
+    const harness = createHarness({ connectorResult: preflightDetailResult });
+
+    await expect(
+      harness.service.executeStockExitPreflight({
+        actorIp: input.actorIp,
+        establishmentId: input.establishmentId,
+        stockId: 71,
+        subject: input.subject,
+        tenantId: input.tenantId,
+        traceId: "trace-exit-preflight",
+        vehicle: preflightVehicle,
+      }),
+    ).resolves.toEqual({ remoteStockId: 71 });
+    expect(harness.connector).toHaveBeenCalledWith(
+      {
+        environment: "homologation",
+        establishmentCnpj: ESTABLISHMENT_CNPJ,
+        establishmentId: ESTABLISHMENT_ID,
+        integratorCnpj: INTEGRATOR_CNPJ,
+        tenantId: TENANT_ID,
+      },
+      71,
+    );
+    expect(harness.begin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: { stockId: 71, vehicle: preflightVehicle },
+      }),
+    );
+    expect(harness.succeed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidenceResponse: preflightDetailResult.result.evidence,
+      }),
+    );
+    expect(harness.fail).not.toHaveBeenCalled();
+  });
+
+  it("preserva a resposta cifrada antes de rejeitar o preflight de saída", async () => {
+    const restricted = {
+      ...preflightDetailResult,
+      result: {
+        evidence: {
+          ...preflightDetailResult.result.evidence,
+          restricoesVeiculo: [{ codigoTipoRestricao: "01" }],
+        },
+        publicResult: {
+          ...preflightDetailResult.result.publicResult,
+          restricoes: [{ codigoTipo: "01" }],
+        },
+      },
+    };
+    const harness = createHarness({ connectorResult: restricted });
+
+    await expect(
+      harness.service.executeStockExitPreflight({
+        actorIp: input.actorIp,
+        establishmentId: input.establishmentId,
+        stockId: 71,
+        subject: input.subject,
+        tenantId: input.tenantId,
+        vehicle: preflightVehicle,
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
+    expect(harness.succeed).toHaveBeenCalledWith(
+      expect.objectContaining({ evidenceResponse: restricted.result.evidence }),
+    );
+    expect(harness.fail).not.toHaveBeenCalled();
+  });
+
   it("consulta detalhe por id e reconstrói a projeção sem campos protegidos", async () => {
     const harness = createHarness({ connectorResult: detailResult });
 

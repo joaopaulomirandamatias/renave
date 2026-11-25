@@ -254,6 +254,7 @@ describe("registerStockExitOperationRoute", () => {
     );
     expect(first.execute).toHaveBeenCalledWith(
       expect.objectContaining({
+        actorIp: "127.0.0.1",
         business: validBody,
         establishmentId: ESTABLISHMENT_ID,
         idempotencyKey: IDEMPOTENCY_KEY,
@@ -339,6 +340,43 @@ describe("registerStockExitOperationRoute", () => {
     expect(response.body).toBe('{"code":"INTERNAL_ERROR"}');
     expect(response.body).not.toContain("52998224725");
     expect(response.body).not.toContain("123456789012");
+  });
+
+  it("distingue rejeição, limite e indisponibilidade do preflight", async () => {
+    const rejected = setup({
+      executeError: new StockExitOperationError(
+        "STOCK_EXIT_PREFLIGHT_REJECTED",
+      ),
+    });
+    const rejectedResponse = await request(rejected.app);
+    expect(rejectedResponse.statusCode).toBe(409);
+    expect(rejectedResponse.json()).toEqual({
+      code: "STOCK_EXIT_PREFLIGHT_REJECTED",
+    });
+
+    const limited = setup({
+      executeError: new StockExitOperationError(
+        "STOCK_EXIT_PREFLIGHT_LIMITED",
+        13,
+      ),
+    });
+    const limitedResponse = await request(limited.app);
+    expect(limitedResponse.statusCode).toBe(429);
+    expect(limitedResponse.headers["retry-after"]).toBe("13");
+    expect(limitedResponse.json()).toEqual({
+      code: "STOCK_EXIT_PREFLIGHT_LIMITED",
+    });
+
+    const unavailable = setup({
+      executeError: new StockExitOperationError(
+        "STOCK_EXIT_PREFLIGHT_UNAVAILABLE",
+      ),
+    });
+    const unavailableResponse = await request(unavailable.app);
+    expect(unavailableResponse.statusCode).toBe(503);
+    expect(unavailableResponse.json()).toEqual({
+      code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE",
+    });
   });
 });
 
@@ -506,6 +544,7 @@ describe("PostgresHeldStockExitOperation", () => {
     });
 
     const result = await useCase.execute({
+      actorIp: "198.51.100.10",
       business: validBody,
       establishmentId: ESTABLISHMENT_ID,
       idempotencyKey: IDEMPOTENCY_KEY,
@@ -522,8 +561,14 @@ describe("PostgresHeldStockExitOperation", () => {
     });
     expect(protectedRequest).not.toHaveProperty("subject");
     expect(protectedRequest).not.toHaveProperty("stockId");
-    expect(executionOrder).toEqual(["preflight", "runner", "persist"]);
+    expect(executionOrder).toEqual([
+      "runner",
+      "preflight",
+      "runner",
+      "persist",
+    ]);
     expect(preflight.verify).toHaveBeenCalledWith({
+      actorIp: "198.51.100.10",
       establishmentId: ESTABLISHMENT_ID,
       stockId: validBody.stockId,
       subject: SUBJECT,
@@ -537,6 +582,12 @@ describe("PostgresHeldStockExitOperation", () => {
     });
     expect(buildOperation).toHaveBeenCalledOnce();
     expect(runnerInputs).toEqual([
+      expect.objectContaining({
+        action: "renave.stock-exit.request",
+        establishmentId: ESTABLISHMENT_ID,
+        mfa: "required",
+        tenantId: TENANT_ID,
+      }),
       expect.objectContaining({
         action: "renave.stock-exit.request",
         establishmentId: ESTABLISHMENT_ID,
@@ -562,6 +613,7 @@ describe("PostgresHeldStockExitOperation", () => {
     });
     await expect(
       useCase.execute({
+        actorIp: "198.51.100.10",
         business: validBody,
         establishmentId: ESTABLISHMENT_ID,
         idempotencyKey: IDEMPOTENCY_KEY,
@@ -571,12 +623,55 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-divergent",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
-    expect(runnerInputs).toHaveLength(runnerCount);
+    expect(runnerInputs).toHaveLength(runnerCount + 1);
     expect(createOperation).toHaveBeenCalledOnce();
+
+    preflight.verify.mockRejectedValueOnce(
+      Object.assign(new Error("resposta incompatível"), {
+        code: "STOCK_EXIT_PREFLIGHT_REJECTED",
+      }),
+    );
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-rejected",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
+    expect(runnerInputs).toHaveLength(runnerCount + 2);
+
+    preflight.verify.mockRejectedValueOnce(
+      Object.assign(new Error("limitado"), {
+        code: "STOCK_EXIT_PREFLIGHT_LIMITED",
+        retryAfterSeconds: 11,
+      }),
+    );
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-limited",
+      }),
+    ).rejects.toMatchObject({
+      code: "STOCK_EXIT_PREFLIGHT_LIMITED",
+      retryAfterSeconds: 11,
+    });
+    expect(runnerInputs).toHaveLength(runnerCount + 3);
 
     preflight.verify.mockRejectedValueOnce(new Error("remote payload"));
     await expect(
       useCase.execute({
+        actorIp: "198.51.100.10",
         business: validBody,
         establishmentId: ESTABLISHMENT_ID,
         idempotencyKey: IDEMPOTENCY_KEY,
@@ -586,12 +681,13 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-unavailable",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE" });
-    expect(runnerInputs).toHaveLength(runnerCount);
+    expect(runnerInputs).toHaveLength(runnerCount + 4);
     expect(createOperation).toHaveBeenCalledOnce();
 
     municipalityCatalog.contains.mockResolvedValueOnce(false);
     await expect(
       useCase.execute({
+        actorIp: "198.51.100.10",
         business: validBody,
         establishmentId: ESTABLISHMENT_ID,
         idempotencyKey: IDEMPOTENCY_KEY,

@@ -91,6 +91,7 @@ export interface StockExitMunicipalityCatalog {
 
 export interface StockExitPreflightPort {
   verify(input: {
+    actorIp: string;
     establishmentId: string;
     stockId: number;
     subject: string;
@@ -115,6 +116,7 @@ export interface StockExitOperationUseCase {
     tenantId: string;
   }): Promise<void>;
   execute(input: {
+    actorIp: string;
     business: StockExitBusinessInput;
     establishmentId: string;
     idempotencyKey: string;
@@ -137,7 +139,10 @@ export interface StockExitMutationRateLimiter {
 export class StockExitOperationError extends Error {
   readonly code: string;
 
-  constructor(code: string) {
+  constructor(
+    code: string,
+    readonly retryAfterSeconds?: number,
+  ) {
     super("A operação local de saída de estoque não pôde ser criada.");
     this.name = "StockExitOperationError";
     this.code = code;
@@ -530,6 +535,7 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
   }
 
   async execute(input: {
+    actorIp: string;
     business: StockExitBusinessInput;
     establishmentId: string;
     idempotencyKey: string;
@@ -541,9 +547,15 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
     if (this.destroyed) {
       throw new StockExitOperationError("STOCK_EXIT_OPERATION_UNAVAILABLE");
     }
+    await this.authorize({
+      establishmentId: input.establishmentId,
+      session: input.session,
+      tenantId: input.tenantId,
+    });
     let confirmation: { remoteStockId: number };
     try {
       confirmation = await this.options.preflight.verify({
+        actorIp: input.actorIp,
         establishmentId: input.establishmentId,
         stockId: input.business.stockId,
         subject: input.session.subject,
@@ -551,7 +563,17 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
         traceId: input.traceId,
         vehicle: { ...input.business.veiculo },
       });
-    } catch {
+    } catch (error) {
+      const code = safeCode(error);
+      if (code === "STOCK_EXIT_PREFLIGHT_REJECTED") {
+        throw new StockExitOperationError(code);
+      }
+      if (code === "STOCK_EXIT_PREFLIGHT_LIMITED") {
+        const retryAfterSeconds = safeRetryAfterSeconds(error);
+        if (retryAfterSeconds !== undefined) {
+          throw new StockExitOperationError(code, retryAfterSeconds);
+        }
+      }
       throw new StockExitOperationError("STOCK_EXIT_PREFLIGHT_UNAVAILABLE");
     }
     if (
@@ -769,9 +791,23 @@ function safeCode(error: unknown): string | undefined {
   return undefined;
 }
 
+function safeRetryAfterSeconds(error: unknown): number | undefined {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("retryAfterSeconds" in error) ||
+    !Number.isSafeInteger(error.retryAfterSeconds) ||
+    (error.retryAfterSeconds as number) < 1
+  ) {
+    return undefined;
+  }
+  return error.retryAfterSeconds as number;
+}
+
 function mapError(error: unknown): {
   code: string;
-  status: 400 | 403 | 404 | 409 | 500 | 503;
+  retryAfterSeconds?: number;
+  status: 400 | 403 | 404 | 409 | 429 | 500 | 503;
 } {
   const code = safeCode(error);
   if (code === "INVALID_STOCK_EXIT_MUNICIPALITY") {
@@ -802,6 +838,12 @@ function mapError(error: unknown): {
     code === "STOCK_EXIT_PREFLIGHT_UNAVAILABLE"
   ) {
     return { code, status: 503 };
+  }
+  if (code === "STOCK_EXIT_PREFLIGHT_LIMITED") {
+    const retryAfterSeconds = safeRetryAfterSeconds(error);
+    return retryAfterSeconds === undefined
+      ? { code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE", status: 503 }
+      : { code, retryAfterSeconds, status: 429 };
   }
   return { code: "INTERNAL_ERROR", status: 500 };
 }
@@ -894,6 +936,7 @@ export function registerStockExitOperationRoute(
       }
       try {
         const result = await options.operation.execute({
+          actorIp: request.ip,
           business,
           establishmentId,
           idempotencyKey: idempotencyKey.toLowerCase(),
@@ -911,6 +954,9 @@ export function registerStockExitOperationRoute(
         });
       } catch (error) {
         const mapped = mapError(error);
+        if (mapped.retryAfterSeconds !== undefined) {
+          reply.header("retry-after", String(mapped.retryAfterSeconds));
+        }
         request.log.error({
           errorCode: mapped.code,
           event: "renave.stock_exit_operation.failed",
