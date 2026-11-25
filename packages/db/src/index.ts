@@ -261,3 +261,7 @@ export {
   type IdentityPurgeResult,
 } from "./session-store.js";
 export { getCurrentTenant, provisionTenant, type Tenant } from "./tenants.js";
+export {
+  PostgresStockExitMunicipalityCatalog,
+  StockExitMunicipalityCatalogUnavailableError,
+} from "./stock-exit-municipality-catalog.js";

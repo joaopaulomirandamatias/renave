@@ -98,3 +98,7 @@ export { PostgresTenantAdministration } from "./tenant-administration.js";
 export { createPool } from "./tenant-context.js";
 export { withTenant, type TenantClient } from "./tenant-runtime.js";
 export { discoverTenants } from "./tenant-directory.js";
+export {
+  PostgresStockExitMunicipalityCatalog,
+  StockExitMunicipalityCatalogUnavailableError,
+} from "./stock-exit-municipality-catalog.js";

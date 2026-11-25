@@ -440,6 +440,18 @@ describe("loadMigrations", () => {
     );
   });
 
+  it("vincula o contrato do catálogo à migration que criou as tabelas", async () => {
+    const migrations = await loadMigrations();
+    const catalog = migrations.find(
+      ({ version }) => version === "0080_municipality_catalog",
+    );
+    const contract = migrations.find(
+      ({ version }) => version === "0081_runtime_contract_municipality_catalog",
+    );
+    expect(catalog).toBeDefined();
+    expect(contract?.sql).toContain(catalog?.checksum);
+  });
+
   it("recusa lacuna na sequência e nome fora do padrão", async () => {
     const gap = await mkdtemp(join(tmpdir(), "renave-mig-"));
     await writeFile(join(gap, "0002_x.sql"), "select 1;");

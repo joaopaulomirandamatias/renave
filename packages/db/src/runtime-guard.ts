@@ -132,7 +132,7 @@ export async function assertRuntimeDatabase(
               array[
                 'renave', 'renave_identity', 'renave_directory',
                 'renave_admin', 'renave_operations', 'renave_platform',
-                'renave_platform_rate', 'renave_runtime'
+                'renave_platform_rate', 'renave_reference', 'renave_runtime'
               ]::text[]
             )
               and namespace.nspowner = roles.oid
@@ -145,7 +145,7 @@ export async function assertRuntimeDatabase(
               array[
                 'renave', 'renave_identity', 'renave_directory',
                 'renave_admin', 'renave_operations', 'renave_platform',
-                'renave_platform_rate', 'renave_runtime'
+                'renave_platform_rate', 'renave_reference', 'renave_runtime'
               ]::text[]
             )
               and object.relowner = roles.oid
