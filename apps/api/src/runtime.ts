@@ -62,6 +62,14 @@ import type {
   StockEntryMutationRateLimiter,
   StockEntryOperationUseCase,
 } from "./renave/stock-entry-operations.js";
+import {
+  composeStockExitRuntime,
+  type StockExitRuntimeComposition,
+} from "./renave/stock-exit-runtime.js";
+import type {
+  StockExitMutationRateLimiter,
+  StockExitOperationUseCase,
+} from "./renave/stock-exit-operations.js";
 import { createPostgresTenantDirectory } from "./tenant/directory.js";
 import type {
   TenantEstablishmentAdministration,
@@ -86,6 +94,8 @@ export interface AppRuntime {
   vehicleLookup?: PostgresVehicleLookupUseCase;
   stockEntryMutationRateLimiter?: StockEntryMutationRateLimiter;
   stockEntryOperation?: StockEntryOperationUseCase;
+  stockExitMutationRateLimiter?: StockExitMutationRateLimiter;
+  stockExitOperation?: StockExitOperationUseCase;
   tenantDirectory?: TenantDirectory;
   tenantEstablishmentAdministration?: TenantEstablishmentAdministration;
   tenantMutationRateLimiter?: TenantMutationRateLimiter;
@@ -185,6 +195,7 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
   let tenantAdministration:
     PostgresTenantEstablishmentAdministration | undefined;
   let stockEntryComposition: StockEntryRuntimeComposition | undefined;
+  let stockExitComposition: StockExitRuntimeComposition | undefined;
   function registerPool(pool: Pool): Pool {
     cleanup.registerPool(() => pool.end());
     pool.on("error", () => {
@@ -443,6 +454,42 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
         vehicleConnector,
       });
     }
+    if (config.stockExitLocalEnabled) {
+      if (
+        !businessPool ||
+        !tenantActionRunner ||
+        !stockQuery ||
+        !serproQueryLimiter ||
+        !mtls
+      ) {
+        throw new Error("A saída de estoque local está indisponível");
+      }
+      const bundle = await readStockEntrySecretBundle();
+      try {
+        await assertStockEntryRuntimeKeyGeneration(businessPool, {
+          fingerprint: bundle.digests.fingerprint,
+          generationId: bundle.digests.generationId,
+        });
+        stockExitComposition = composeStockExitRuntime({
+          bundle,
+          certificate: mtls,
+          mfaMaxAgeSeconds: config.stockExitMfaMaxAgeSeconds,
+          pool: businessPool,
+          queryLimiter: serproQueryLimiter,
+          runner: tenantActionRunner,
+          stockQuery,
+        });
+        cleanup.registerResource(() => stockExitComposition!.destroy());
+        if (!(await stockExitComposition.ready())) {
+          throw new Error(
+            "A saída de estoque local exige catálogo municipal vigente",
+          );
+        }
+      } catch (error) {
+        destroyStockEntrySecretBundle(bundle);
+        throw error;
+      }
+    }
     const renaveReadiness = businessPool
       ? new PostgresRenaveReadinessUseCase({
           ...(mtls
@@ -481,6 +528,13 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
             stockEntryOperation: stockEntryComposition.operation,
           }
         : {}),
+      ...(stockExitComposition
+        ? {
+            stockExitMutationRateLimiter:
+              stockExitComposition.mutationRateLimiter,
+            stockExitOperation: stockExitComposition.operation,
+          }
+        : {}),
       ...(tenantDirectory ? { tenantDirectory } : {}),
       ...(tenantActionRunner ? { tenantActionRunner } : {}),
       ...(tenantAdministration
@@ -496,6 +550,9 @@ export async function createRuntime(config: AppConfig): Promise<AppRuntime> {
               assertRuntimeDatabase(pool, { expectedRole }),
             ),
           );
+          if (stockExitComposition && !(await stockExitComposition.ready())) {
+            databasesReady = false;
+          }
         } catch {
           databasesReady = false;
         }

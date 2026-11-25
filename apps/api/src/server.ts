@@ -37,6 +37,14 @@ const app = buildApp({
   ...(runtime.stockEntryOperation
     ? { stockEntryOperation: runtime.stockEntryOperation }
     : {}),
+  ...(runtime.stockExitMutationRateLimiter
+    ? {
+        stockExitMutationRateLimiter: runtime.stockExitMutationRateLimiter,
+      }
+    : {}),
+  ...(runtime.stockExitOperation
+    ? { stockExitOperation: runtime.stockExitOperation }
+    : {}),
   ...(runtime.tenantDirectory
     ? { tenantDirectory: runtime.tenantDirectory }
     : {}),

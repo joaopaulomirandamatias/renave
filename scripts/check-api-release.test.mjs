@@ -29,7 +29,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY apps/api apps/api
 RUN pnpm install --frozen-lockfile --ignore-scripts
 FROM gcr.io/distroless/nodejs26-debian13@sha256:${digest} AS runtime
-ENV NODE_ENV=production APP_ENVIRONMENT=homologation AUTH_MODE=disabled RENAVE_INTEGRATION_ENABLED=false RENAVE_STOCK_ENTRY_LOCAL_ENABLED=false HOST=127.0.0.1
+ENV NODE_ENV=production APP_ENVIRONMENT=homologation AUTH_MODE=disabled RENAVE_INTEGRATION_ENABLED=false RENAVE_STOCK_ENTRY_LOCAL_ENABLED=false RENAVE_STOCK_EXIT_LOCAL_ENABLED=false HOST=127.0.0.1
 COPY --from=build /opt/runtime/ ./
 USER 10001:10001
 STOPSIGNAL SIGTERM
@@ -102,6 +102,12 @@ spec:
                 - /nodejs/bin/node
                 - dist/health-probe.js
                 - readiness
+          env:
+            - name: RENAVE_STOCK_EXIT_LOCAL_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: RENAVE_STOCK_EXIT_LOCAL_ENABLED
 `,
   ],
   [
@@ -112,6 +118,7 @@ spec:
   HOST: 127.0.0.1
   RENAVE_INTEGRATION_ENABLED: "false"
   RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "false"
+  RENAVE_STOCK_EXIT_LOCAL_ENABLED: "false"
 `,
   ],
   [
@@ -181,6 +188,7 @@ jobs:
         with:
           persist-credentials: false
       - run: node scripts/check-api-release.mjs
+      - run: inspect RENAVE_STOCK_EXIT_LOCAL_ENABLED false
       - run: docker build --tag seu-renave/api:ci --file apps/api/Dockerfile .
       - run: docker image inspect seu-renave/api:ci
       - run: docker history --no-trunc seu-renave/api:ci
@@ -233,6 +241,10 @@ describe("guard da imagem da API", () => {
         "RENAVE_INTEGRATION_ENABLED=false",
         "RENAVE_INTEGRATION_ENABLED=true",
       )
+      .replace(
+        "RENAVE_STOCK_EXIT_LOCAL_ENABLED=false",
+        "RENAVE_STOCK_EXIT_LOCAL_ENABLED=true",
+      )
       .replace("HOST=127.0.0.1", "HOST=0.0.0.0");
     const found = ids(checkApiDockerfile(unsafe));
     assert.ok(found.includes("API_DOCKER_BASE_DIGEST_REQUIRED"));
@@ -241,6 +253,11 @@ describe("guard da imagem da API", () => {
     assert.ok(found.includes("API_DOCKER_DEFAULT_AUTH_MODE_REQUIRED"));
     assert.ok(
       found.includes("API_DOCKER_DEFAULT_RENAVE_INTEGRATION_ENABLED_REQUIRED"),
+    );
+    assert.ok(
+      found.includes(
+        "API_DOCKER_DEFAULT_RENAVE_STOCK_EXIT_LOCAL_ENABLED_REQUIRED",
+      ),
     );
     assert.ok(found.includes("API_DOCKER_DEFAULT_HOST_REQUIRED"));
   });
@@ -350,6 +367,32 @@ describe("guard do contexto e manifests da API", () => {
       ids(checkApiManifestSet(unsafe)).includes("API_CONFIG_HOST_REQUIRED"),
     );
   });
+
+  it("recusa publicação sem a saída local explicitamente dormente", () => {
+    const unsafe = new Map(safeManifestSet);
+    unsafe.set(
+      "configmap.yaml",
+      unsafe
+        .get("configmap.yaml")
+        .replace('  RENAVE_STOCK_EXIT_LOCAL_ENABLED: "false"\n', ""),
+    );
+    unsafe.set(
+      "deployment.yaml",
+      unsafe
+        .get("deployment.yaml")
+        .replace(
+          /\s+- name: RENAVE_STOCK_EXIT_LOCAL_ENABLED[\s\S]*?key: RENAVE_STOCK_EXIT_LOCAL_ENABLED\n/u,
+          "",
+        ),
+    );
+    const found = ids(checkApiManifestSet(unsafe));
+    assert.ok(
+      found.includes("API_CONFIG_RENAVE_STOCK_EXIT_LOCAL_ENABLED_REQUIRED"),
+    );
+    assert.ok(
+      found.includes("API_MANIFEST_STOCK_EXIT_FLAG_REFERENCE_REQUIRED"),
+    );
+  });
 });
 
 describe("guard do job CI da API", () => {
@@ -371,6 +414,18 @@ describe("guard do job CI da API", () => {
     assert.ok(found.includes("API_WORKFLOW_READ_ONLY_REQUIRED"));
     assert.ok(found.includes("API_WORKFLOW_CAP_DROP_REQUIRED"));
     assert.ok(found.includes("API_WORKFLOW_NO_NEW_PRIVILEGES_REQUIRED"));
+  });
+
+  it("exige inspeção da flag dormente de saída na imagem", () => {
+    const unsafe = safeWorkflow.replace(
+      "      - run: inspect RENAVE_STOCK_EXIT_LOCAL_ENABLED false\n",
+      "",
+    );
+    assert.ok(
+      ids(checkApiWorkflow(unsafe)).includes(
+        "API_WORKFLOW_STOCK_EXIT_DORMANT_REQUIRED",
+      ),
+    );
   });
 
   it("recusa smoke que não verifica saída prematura do processo", () => {

@@ -200,6 +200,7 @@ export function checkApiDockerfile(source, file = "apps/api/Dockerfile") {
     ["AUTH_MODE", "disabled"],
     ["RENAVE_INTEGRATION_ENABLED", "false"],
     ["RENAVE_STOCK_ENTRY_LOCAL_ENABLED", "false"],
+    ["RENAVE_STOCK_EXIT_LOCAL_ENABLED", "false"],
     ["HOST", "127.0.0.1"],
   ]) {
     if (defaults.get(name) !== expected) {
@@ -430,6 +431,7 @@ export function checkApiManifestSet(manifests) {
     ["HOST", "127.0.0.1"],
     ["RENAVE_INTEGRATION_ENABLED", '"false"'],
     ["RENAVE_STOCK_ENTRY_LOCAL_ENABLED", '"false"'],
+    ["RENAVE_STOCK_EXIT_LOCAL_ENABLED", '"false"'],
   ]) {
     required(
       config,
@@ -439,6 +441,13 @@ export function checkApiManifestSet(manifests) {
       issues,
     );
   }
+  required(
+    deployment,
+    deploymentFile,
+    "API_MANIFEST_STOCK_EXIT_FLAG_REFERENCE_REQUIRED",
+    /name:\s*RENAVE_STOCK_EXIT_LOCAL_ENABLED\s*[\s\S]*?configMapKeyRef:\s*[\s\S]*?name:\s*renave-api\s*[\s\S]*?key:\s*RENAVE_STOCK_EXIT_LOCAL_ENABLED\b/u,
+    issues,
+  );
   required(
     service,
     "deploy/api/base/service.yaml",
@@ -679,6 +688,10 @@ export function checkApiWorkflow(source, file = ".github/workflows/ci.yml") {
       /permissions:\s*\n\s*contents:\s*read\b/u,
     ],
     ["API_WORKFLOW_GUARD_REQUIRED", /check-api-release\.mjs/u],
+    [
+      "API_WORKFLOW_STOCK_EXIT_DORMANT_REQUIRED",
+      /RENAVE_STOCK_EXIT_LOCAL_ENABLED[\s\S]{0,160}["']?false["']?/u,
+    ],
     [
       "API_WORKFLOW_BUILD_REQUIRED",
       /docker\s+build[\s\S]*?apps\/api\/Dockerfile/u,

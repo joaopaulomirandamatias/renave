@@ -77,6 +77,10 @@ jobs:
             environment.get("RENAVE_STOCK_ENTRY_LOCAL_ENABLED"),
             "false",
           );
+          assert.equal(
+            environment.get("RENAVE_STOCK_EXIT_LOCAL_ENABLED"),
+            "false",
+          );
           for (const forbidden of [
             "DATABASE_URL",
             "DATABASE_PLATFORM_READER_URL",

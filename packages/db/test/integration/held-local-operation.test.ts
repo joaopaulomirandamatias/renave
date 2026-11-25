@@ -16,6 +16,8 @@ import {
 import {
   createOrReplayHeldLocalOperation,
   createOrReplayHeldLocalStockExitOperation,
+  probeHeldLocalStockExitReplay,
+  recordHeldLocalStockExitReplay,
   getOperation,
   OperationActiveConflictError,
   OperationCredentialLinkNotEnabledError,
@@ -356,6 +358,38 @@ describe("held local operation integration", () => {
       replayed: true,
       operation: { id: created.operation.id },
     });
+    const replayDigest = Buffer.alloc(32, 0x7a);
+    await withTenant(appPool, tenantA.id, async (client) => {
+      await recordHeldLocalStockExitReplay(client, {
+        idempotencyKeyDigest: input.idempotencyKeyDigest,
+        operationId: created.operation.id,
+        replayDigest,
+      });
+      await expect(
+        probeHeldLocalStockExitReplay(client, {
+          idempotencyKeyDigest: input.idempotencyKeyDigest,
+          replayDigest,
+        }),
+      ).resolves.toMatchObject({
+        operationId: created.operation.id,
+        state: "match",
+      });
+      await expect(
+        probeHeldLocalStockExitReplay(client, {
+          idempotencyKeyDigest: input.idempotencyKeyDigest,
+          replayDigest: Buffer.alloc(32, 0x7b),
+        }),
+      ).resolves.toEqual({ state: "conflict" });
+    });
+    await expect(
+      withTenant(appPool, tenantB.id, (client) =>
+        probeHeldLocalStockExitReplay(client, {
+          idempotencyKeyDigest: input.idempotencyKeyDigest,
+          replayDigest,
+        }),
+      ),
+    ).resolves.toEqual({ state: "missing" });
+    replayDigest.fill(0);
     expect(retry.operationId).not.toBe(input.operationId);
     expect(retry.correlationId).not.toBe(input.correlationId);
 
@@ -950,6 +984,53 @@ describe("held local operation integration", () => {
     } finally {
       await adminPool.query(
         "drop function if exists renave_stock_exit.unexpected_contract_drift()",
+      );
+    }
+    await expect(
+      appPool.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      ),
+    ).resolves.toMatchObject({ rows: [{ ready: true }] });
+
+    try {
+      await adminPool.query(
+        `grant execute on function
+           renave_stock_exit_barriers.probe_replay(bytea,bytea)
+         to renave_identity_app`,
+      );
+      await expect(
+        appPool.query<{ ready: boolean }>(
+          "select renave_runtime.api_contract_ready() as ready",
+        ),
+      ).resolves.toMatchObject({ rows: [{ ready: false }] });
+    } finally {
+      await adminPool.query(
+        `revoke execute on function
+           renave_stock_exit_barriers.probe_replay(bytea,bytea)
+         from renave_identity_app`,
+      );
+    }
+    await expect(
+      appPool.query<{ ready: boolean }>(
+        "select renave_runtime.api_contract_ready() as ready",
+      ),
+    ).resolves.toMatchObject({ rows: [{ ready: true }] });
+
+    try {
+      await adminPool.query(
+        `create trigger unexpected_replay_trigger
+         before truncate on renave_stock_exit_barriers.replay_registry
+         for each statement execute function renave_stock_exit.reject_change()`,
+      );
+      await expect(
+        appPool.query<{ ready: boolean }>(
+          "select renave_runtime.api_contract_ready() as ready",
+        ),
+      ).resolves.toMatchObject({ rows: [{ ready: false }] });
+    } finally {
+      await adminPool.query(
+        `drop trigger if exists unexpected_replay_trigger
+         on renave_stock_exit_barriers.replay_registry`,
       );
     }
     await expect(

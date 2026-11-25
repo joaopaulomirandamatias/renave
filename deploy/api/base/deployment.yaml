@@ -76,6 +76,11 @@ spec:
                 configMapKeyRef:
                   name: renave-api
                   key: RENAVE_STOCK_ENTRY_LOCAL_ENABLED
+            - name: RENAVE_STOCK_EXIT_LOCAL_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: renave-api
+                  key: RENAVE_STOCK_EXIT_LOCAL_ENABLED
           ports:
             - containerPort: 3000
               name: http

@@ -8,6 +8,8 @@ import {
 import {
   appendAuditEvent,
   createOrReplayHeldLocalStockExitOperation,
+  probeHeldLocalStockExitReplay,
+  recordHeldLocalStockExitReplay,
   type AppendAuditEventInput,
   type CreateHeldLocalOperationInput,
   type CreateHeldLocalStockExitOperationInput,
@@ -142,6 +144,10 @@ export interface StockExitMutationRateLimiter {
   }): Promise<
     { allowed: true } | { allowed: false; retryAfterSeconds: number }
   >;
+}
+
+export interface StockExitTemporalGuard {
+  assert(session: AuthenticatedSession): void;
 }
 
 export class StockExitOperationError extends Error {
@@ -545,6 +551,8 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       buildOperation?: BuildOperation;
       appendAudit?: AppendAudit;
       createOperation?: typeof createOrReplayHeldLocalStockExitOperation;
+      probeReplay?: typeof probeHeldLocalStockExitReplay;
+      recordReplay?: typeof recordHeldLocalStockExitReplay;
       digestKeys: DigestKeys;
       environment: "homologation";
       keyGeneration: RuntimeKeyGeneration;
@@ -556,6 +564,7 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       requestCipher: OperationRequestCipher;
       resolver: VerifiedRenavePrincipalResolver;
       runner: TenantActionRunner;
+      temporalGuard: StockExitTemporalGuard;
     },
   ) {
     this.digestKeys = copyDigestKeys(options.digestKeys);
@@ -620,8 +629,11 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       session: input.session,
       tenantId: input.tenantId,
     });
+    const replay = await this.tryLocalReplay(input);
+    if (replay) return replay;
     let confirmation: { remoteStockId: number };
     try {
+      this.options.temporalGuard.assert(input.session);
       confirmation = await this.options.preflight.verify({
         actorIp: input.actorIp,
         establishmentId: input.establishmentId,
@@ -633,6 +645,12 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       });
     } catch (error) {
       const code = safeCode(error);
+      if (
+        code === "MFA_RECENT_REQUIRED" ||
+        code === "STOCK_EXIT_CERTIFICATE_UNAVAILABLE"
+      ) {
+        throw new StockExitOperationError(code);
+      }
       if (code === "STOCK_EXIT_PREFLIGHT_REJECTED") {
         const auditContext = preflightAuditContext(error);
         if (!auditContext) {
@@ -656,6 +674,7 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
     ) {
       throw new StockExitOperationError("STOCK_EXIT_PREFLIGHT_UNAVAILABLE");
     }
+    this.options.temporalGuard.assert(input.session);
     const result = await this.options.runner.run(
       {
         action: "renave.stock-exit.request",
@@ -679,6 +698,94 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       );
     }
     return result.value;
+  }
+
+  private async tryLocalReplay(
+    input: Parameters<StockExitOperationUseCase["execute"]>[0],
+  ): Promise<StockExitOperationResult | undefined> {
+    const idempotencyDigest = hmac(
+      this.digestKeys.idempotency,
+      "stock-exit-idempotency",
+      [input.tenantId, input.idempotencyKey],
+    );
+    const replayDigest = hmac(
+      this.digestKeys.idempotency,
+      "stock-exit-replay",
+      [
+        input.tenantId,
+        input.establishmentId,
+        input.session.issuer,
+        input.session.subject,
+        JSON.stringify(input.business),
+      ],
+    );
+    try {
+      const result = await this.options.runner.run(
+        {
+          action: "renave.stock-exit.request",
+          establishmentId: input.establishmentId,
+          mfa: "required",
+          session: input.session,
+          tenantId: input.tenantId,
+        },
+        async ({ client }) => {
+          await this.assertKeyGeneration(client);
+          const probe = await (
+            this.options.probeReplay ?? probeHeldLocalStockExitReplay
+          )(client, {
+            idempotencyKeyDigest: idempotencyDigest,
+            replayDigest,
+          });
+          if (probe.state === "missing") return undefined;
+          if (probe.state === "conflict") {
+            throw new StockExitOperationError(
+              "STOCK_EXIT_IDEMPOTENCY_CONFLICT",
+            );
+          }
+          try {
+            const responseBody = {
+              createdAt: probe.createdAt.toISOString(),
+              operationId: probe.operationId,
+              replayed: true,
+              status: "HELD_LOCAL" as const,
+            };
+            await (this.options.appendAudit ?? appendAuditEvent)(client, {
+              action: "stock-exit.held-local.replayed",
+              actorIp: input.actorIp,
+              actorSubject: input.session.subject,
+              establishmentId: input.establishmentId,
+              outcome: "succeeded",
+              payloadReference: probe.operationId,
+              requestSha256: probe.requestSha256.toString("hex"),
+              responseSha256: sha256(responseBody),
+              traceId: input.traceId,
+            });
+            return {
+              createdAt: probe.createdAt,
+              operationId: probe.operationId,
+              replayed: true,
+              status: "HELD_LOCAL" as const,
+            };
+          } finally {
+            probe.requestSha256.fill(0);
+          }
+        },
+      );
+      if (!result.allowed) {
+        throw new StockExitOperationError(
+          result.reason === "MFA_REQUIRED"
+            ? "MFA_REQUIRED"
+            : "STOCK_EXIT_RESOURCE_NOT_FOUND",
+        );
+      }
+      return result.value;
+    } catch (error) {
+      if (error instanceof StockExitOperationError) throw error;
+      throw new StockExitOperationError("STOCK_EXIT_OPERATION_UNAVAILABLE");
+    } finally {
+      idempotencyDigest.fill(0);
+      replayDigest.fill(0);
+    }
   }
 
   private async appendPreflightBusinessError(
@@ -725,6 +832,18 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
     }
   }
 
+  private async assertKeyGeneration(client: TenantClient): Promise<void> {
+    const fingerprint = Buffer.from(this.keyGeneration.fingerprint);
+    try {
+      await this.options.keyGenerationChecker.assert(client, {
+        fingerprint,
+        generationId: this.keyGeneration.generationId,
+      });
+    } finally {
+      fingerprint.fill(0);
+    }
+  }
+
   private async createWithinTransaction(
     client: TenantClient,
     input: Parameters<StockExitOperationUseCase["execute"]>[0],
@@ -740,15 +859,9 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
     let idempotencyDigest: Buffer | undefined;
     let vehicleDigest: Buffer | undefined;
     let operationInput: CreateHeldLocalOperationInput | undefined;
-    let fingerprint: Buffer | undefined;
+    let replayDigest: Buffer | undefined;
     try {
-      fingerprint = Buffer.from(this.keyGeneration.fingerprint);
-      await this.options.keyGenerationChecker.assert(client, {
-        fingerprint,
-        generationId: this.keyGeneration.generationId,
-      });
-      fingerprint.fill(0);
-      fingerprint = undefined;
+      await this.assertKeyGeneration(client);
       if (
         !(await this.options.municipalityCatalog.contains(
           client,
@@ -762,6 +875,13 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
         "stock-exit-idempotency",
         [input.tenantId, input.idempotencyKey],
       );
+      replayDigest = hmac(this.digestKeys.idempotency, "stock-exit-replay", [
+        input.tenantId,
+        input.establishmentId,
+        input.session.issuer,
+        input.session.subject,
+        JSON.stringify(input.business),
+      ]);
       principals = await this.options.resolver.resolve(client, {
         establishmentId: input.establishmentId,
         idempotencyKeyDigest: idempotencyDigest,
@@ -832,6 +952,14 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
         this.options.createOperation ??
         createOrReplayHeldLocalStockExitOperation
       )(client, stockExitOperationInput);
+      await (this.options.recordReplay ?? recordHeldLocalStockExitReplay)(
+        client,
+        {
+          idempotencyKeyDigest: idempotencyDigest,
+          operationId: result.operation.id,
+          replayDigest,
+        },
+      );
       if (
         result.operation.status !== "HELD_LOCAL" ||
         result.operation.kind !== "USED_STOCK_EXIT" ||
@@ -894,8 +1022,8 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       zeroPrincipals(principals);
       actorDigest?.fill(0);
       idempotencyDigest?.fill(0);
+      replayDigest?.fill(0);
       vehicleDigest?.fill(0);
-      fingerprint?.fill(0);
       if (operationInput) {
         operationInput.actorSubjectHash.fill(0);
         operationInput.idempotencyKeyDigest.fill(0);
@@ -947,7 +1075,9 @@ function mapError(error: unknown): {
   if (code === "INVALID_STOCK_EXIT_MUNICIPALITY") {
     return { code, status: 400 };
   }
-  if (code === "MFA_REQUIRED") return { code, status: 403 };
+  if (code === "MFA_REQUIRED" || code === "MFA_RECENT_REQUIRED") {
+    return { code, status: 403 };
+  }
   if (code === "STOCK_EXIT_RESOURCE_NOT_FOUND") {
     return { code, status: 404 };
   }
@@ -973,6 +1103,7 @@ function mapError(error: unknown): {
   }
   if (
     code === "STOCK_EXIT_PRINCIPALS_UNAVAILABLE" ||
+    code === "STOCK_EXIT_CERTIFICATE_UNAVAILABLE" ||
     code === "STOCK_EXIT_OPERATION_UNAVAILABLE" ||
     code === "STOCK_EXIT_PREFLIGHT_UNAVAILABLE"
   ) {
@@ -994,6 +1125,7 @@ export function registerStockExitOperationRoute(
     businessTimeZone?: string;
     clock?: Clock;
     mutationRateLimiter?: StockExitMutationRateLimiter;
+    mfaMaxAgeSeconds?: number;
     operation?: StockExitOperationUseCase;
     publicOrigin: string;
   },
@@ -1010,6 +1142,9 @@ export function registerStockExitOperationRoute(
       }
       const session = await options.accessGuard.authenticate(request, reply, {
         mfa: "required",
+        ...(options.mfaMaxAgeSeconds === undefined
+          ? {}
+          : { mfaMaxAgeSeconds: options.mfaMaxAgeSeconds }),
       });
       if (!session.ok) return;
       const params = request.params as Record<string, unknown>;

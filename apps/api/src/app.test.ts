@@ -67,6 +67,18 @@ describe("fundação da API", () => {
     expect(response.body).not.toMatch(/serpro|certificate|cnpj|cpf|renavam/iu);
   });
 
+  it("recusa startup da saída ligada sem composição completa", () => {
+    expect(() =>
+      buildApp({
+        config: {
+          ...loadConfig(),
+          stockExitLocalEnabled: true,
+        },
+        logger: false,
+      }),
+    ).toThrow("composição completa");
+  });
+
   it("readiness reflete dependências sem revelar qual falhou", async () => {
     const app = buildApp({
       config: loadConfig(),

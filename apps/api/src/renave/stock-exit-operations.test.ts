@@ -91,7 +91,7 @@ function setup(
       reply.code(401).send({ code: "AUTHENTICATION_REQUIRED" });
       return { ok: false as const };
     }
-    expect(requirements).toEqual({ mfa: "required" });
+    expect(requirements).toEqual({ mfa: "required", mfaMaxAgeSeconds: 300 });
     return { ok: true as const, session: session() };
   });
   const authorize = vi.fn<StockExitOperationUseCase["authorize"]>(async () => {
@@ -113,6 +113,7 @@ function setup(
   registerStockExitOperationRoute(app, {
     accessGuard: { authenticate } as unknown as RequestAccessGuard,
     clock,
+    mfaMaxAgeSeconds: 300,
     ...(options.operationConfigured === false
       ? {}
       : {
@@ -253,6 +254,9 @@ describe("registerStockExitOperationRoute", () => {
     });
     expect(first.authorize.mock.invocationCallOrder[0]).toBeLessThan(
       first.acquire.mock.invocationCallOrder[0]!,
+    );
+    expect(first.acquire.mock.invocationCallOrder[0]).toBeLessThan(
+      first.execute.mock.invocationCallOrder[0]!,
     );
     expect(first.execute).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -550,6 +554,24 @@ describe("PostgresHeldStockExitOperation", () => {
         return { remoteStockId: validBody.stockId };
       }),
     };
+    const probeReplay = vi.fn(
+      async (): Promise<
+        | { state: "missing" }
+        | {
+            createdAt: Date;
+            operationId: string;
+            requestSha256: Buffer;
+            state: "match";
+          }
+      > => ({ state: "missing" }),
+    );
+    const recordReplay = vi.fn(async () => undefined);
+    const temporalGuard = {
+      assert: vi.fn(() => executionOrder.push("temporal")),
+    };
+    const keyGenerationChecker = {
+      assert: vi.fn(async () => undefined),
+    };
     const useCase = new PostgresHeldStockExitOperation({
       appendAudit,
       buildOperation,
@@ -564,14 +586,17 @@ describe("PostgresHeldStockExitOperation", () => {
         fingerprint: Buffer.alloc(32, 71),
         generationId: "held-local-v1",
       },
-      keyGenerationChecker: { assert: vi.fn(async () => undefined) },
+      keyGenerationChecker,
       municipalityCatalog,
       preflight,
+      probeReplay,
       principalCrypto,
       projectionCipher: {} as never,
       requestCipher: {} as never,
       resolver,
+      recordReplay,
       runner,
+      temporalGuard,
     });
 
     const result = await useCase.execute({
@@ -594,7 +619,10 @@ describe("PostgresHeldStockExitOperation", () => {
     expect(protectedRequest).not.toHaveProperty("stockId");
     expect(executionOrder).toEqual([
       "runner",
+      "runner",
+      "temporal",
       "preflight",
+      "temporal",
       "runner",
       "persist",
       "audit",
@@ -660,6 +688,12 @@ describe("PostgresHeldStockExitOperation", () => {
         mfa: "required",
         tenantId: TENANT_ID,
       }),
+      expect.objectContaining({
+        action: "renave.stock-exit.request",
+        establishmentId: ESTABLISHMENT_ID,
+        mfa: "required",
+        tenantId: TENANT_ID,
+      }),
     ]);
     expect(municipalityCatalog.contains).toHaveBeenCalledWith(
       expect.anything(),
@@ -672,6 +706,79 @@ describe("PostgresHeldStockExitOperation", () => {
     expect(establishmentEnvelope.ciphertext.every((byte) => byte === 0)).toBe(
       true,
     );
+
+    const preflightCalls = preflight.verify.mock.calls.length;
+    probeReplay.mockResolvedValueOnce({
+      createdAt: new Date("2026-11-24T18:01:02.003Z"),
+      operationId: OPERATION_ID,
+      requestSha256: Buffer.alloc(32, 1),
+      state: "match" as const,
+    });
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-replay",
+      }),
+    ).resolves.toMatchObject({ replayed: true, operationId: OPERATION_ID });
+    expect(preflight.verify).toHaveBeenCalledTimes(preflightCalls);
+    expect(keyGenerationChecker.assert).toHaveBeenCalledTimes(3);
+
+    keyGenerationChecker.assert.mockRejectedValueOnce(
+      new Error("pin divergente"),
+    );
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-replay-pin-drift",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_OPERATION_UNAVAILABLE" });
+    expect(preflight.verify).toHaveBeenCalledTimes(preflightCalls);
+
+    temporalGuard.assert.mockImplementationOnce(() => {
+      throw new StockExitOperationError("STOCK_EXIT_CERTIFICATE_UNAVAILABLE");
+    });
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-certificate-invalid-before-get",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_CERTIFICATE_UNAVAILABLE" });
+    expect(preflight.verify).toHaveBeenCalledTimes(preflightCalls);
+
+    temporalGuard.assert.mockImplementationOnce(() => {
+      throw new StockExitOperationError("MFA_RECENT_REQUIRED");
+    });
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-mfa-expired-before-get",
+      }),
+    ).rejects.toMatchObject({ code: "MFA_RECENT_REQUIRED" });
+    expect(preflight.verify).toHaveBeenCalledTimes(preflightCalls);
 
     const runnerCount = runnerInputs.length;
     preflight.verify.mockResolvedValueOnce({
@@ -689,7 +796,51 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-divergent",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE" });
-    expect(runnerInputs).toHaveLength(runnerCount + 1);
+    expect(runnerInputs).toHaveLength(runnerCount + 2);
+    expect(createOperation).toHaveBeenCalledOnce();
+
+    preflight.verify.mockResolvedValueOnce({
+      remoteStockId: validBody.stockId,
+    });
+    temporalGuard.assert
+      .mockImplementationOnce(() => executionOrder.push("temporal"))
+      .mockImplementationOnce(() => {
+        throw new StockExitOperationError("STOCK_EXIT_CERTIFICATE_UNAVAILABLE");
+      });
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-expired-certificate",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_CERTIFICATE_UNAVAILABLE" });
+    expect(createOperation).toHaveBeenCalledOnce();
+
+    preflight.verify.mockResolvedValueOnce({
+      remoteStockId: validBody.stockId,
+    });
+    temporalGuard.assert
+      .mockImplementationOnce(() => executionOrder.push("temporal"))
+      .mockImplementationOnce(() => {
+        throw new StockExitOperationError("MFA_RECENT_REQUIRED");
+      });
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-expired-mfa",
+      }),
+    ).rejects.toMatchObject({ code: "MFA_RECENT_REQUIRED" });
     expect(createOperation).toHaveBeenCalledOnce();
 
     preflight.verify.mockRejectedValueOnce(
@@ -715,7 +866,7 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-rejected",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
-    expect(runnerInputs).toHaveLength(runnerCount + 3);
+    expect(runnerInputs).toHaveLength(runnerCount + 9);
     expect(appendAudit).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -749,7 +900,7 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-rejected-without-evidence",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE" });
-    expect(runnerInputs).toHaveLength(runnerCount + 4);
+    expect(runnerInputs).toHaveLength(runnerCount + 11);
 
     appendAudit.mockRejectedValueOnce(new Error("auditoria indisponível"));
     preflight.verify.mockRejectedValueOnce(
@@ -775,7 +926,7 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-rejected-audit-failure",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_OPERATION_UNAVAILABLE" });
-    expect(runnerInputs).toHaveLength(runnerCount + 6);
+    expect(runnerInputs).toHaveLength(runnerCount + 14);
     expect(createOperation).toHaveBeenCalledOnce();
 
     preflight.verify.mockRejectedValueOnce(
@@ -799,7 +950,7 @@ describe("PostgresHeldStockExitOperation", () => {
       code: "STOCK_EXIT_PREFLIGHT_LIMITED",
       retryAfterSeconds: 11,
     });
-    expect(runnerInputs).toHaveLength(runnerCount + 7);
+    expect(runnerInputs).toHaveLength(runnerCount + 16);
 
     preflight.verify.mockRejectedValueOnce(new Error("remote payload"));
     await expect(
@@ -814,7 +965,7 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-unavailable",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE" });
-    expect(runnerInputs).toHaveLength(runnerCount + 8);
+    expect(runnerInputs).toHaveLength(runnerCount + 18);
     expect(createOperation).toHaveBeenCalledOnce();
 
     municipalityCatalog.contains.mockResolvedValueOnce(false);

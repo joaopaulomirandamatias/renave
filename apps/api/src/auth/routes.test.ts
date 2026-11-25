@@ -35,6 +35,8 @@ const config: AppConfig = {
   sessionLookupMaxConcurrency: 4,
   serproQueryLimitHmacKeyBase64: undefined,
   stockEntryLocalEnabled: false,
+  stockExitLocalEnabled: false,
+  stockExitMfaMaxAgeSeconds: 300,
   databaseUrl: undefined,
   databaseTlsCaFile: undefined,
   platformConsole: undefined,

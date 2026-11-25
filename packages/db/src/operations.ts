@@ -583,6 +583,86 @@ export async function createOrReplayHeldLocalStockExitOperation(
   );
 }
 
+export type HeldLocalStockExitReplayProbe =
+  | { state: "missing" }
+  | { state: "conflict" }
+  | {
+      state: "match";
+      operationId: string;
+      createdAt: Date;
+      requestSha256: Buffer;
+    };
+
+interface StockExitReplayProbeRow {
+  state: string;
+  operation_id: string | null;
+  created_at: Date | null;
+  request_sha256: Buffer | null;
+}
+
+export async function probeHeldLocalStockExitReplay(
+  client: TenantClient,
+  input: { idempotencyKeyDigest: Buffer; replayDigest: Buffer },
+): Promise<HeldLocalStockExitReplayProbe> {
+  if (
+    !Buffer.isBuffer(input.idempotencyKeyDigest) ||
+    input.idempotencyKeyDigest.length !== 32 ||
+    !Buffer.isBuffer(input.replayDigest) ||
+    input.replayDigest.length !== 32
+  ) {
+    throw new OperationInputError();
+  }
+  const { rows } = await client.query<StockExitReplayProbeRow>(
+    `select state,operation_id,created_at,request_sha256
+       from renave_stock_exit_barriers.probe_replay($1,$2)`,
+    [input.idempotencyKeyDigest, input.replayDigest],
+  );
+  const row = rows[0];
+  if (rows.length !== 1 || !row) throw new OperationStorageError();
+  if (row.state === "MISSING") return { state: "missing" };
+  if (row.state === "CONFLICT") return { state: "conflict" };
+  if (
+    row.state !== "MATCH" ||
+    !row.operation_id ||
+    !isUuid(row.operation_id) ||
+    !(row.created_at instanceof Date) ||
+    !Number.isFinite(row.created_at.getTime()) ||
+    !Buffer.isBuffer(row.request_sha256) ||
+    row.request_sha256.length !== 32
+  ) {
+    throw new OperationStorageError();
+  }
+  return {
+    createdAt: row.created_at,
+    operationId: row.operation_id,
+    requestSha256: Buffer.from(row.request_sha256),
+    state: "match",
+  };
+}
+
+export async function recordHeldLocalStockExitReplay(
+  client: TenantClient,
+  input: {
+    idempotencyKeyDigest: Buffer;
+    operationId: string;
+    replayDigest: Buffer;
+  },
+): Promise<void> {
+  if (
+    !isUuid(input.operationId) ||
+    !Buffer.isBuffer(input.idempotencyKeyDigest) ||
+    input.idempotencyKeyDigest.length !== 32 ||
+    !Buffer.isBuffer(input.replayDigest) ||
+    input.replayDigest.length !== 32
+  ) {
+    throw new OperationInputError();
+  }
+  await client.query(
+    "select renave_stock_exit_barriers.record_replay($1,$2,$3)",
+    [input.idempotencyKeyDigest, input.replayDigest, input.operationId],
+  );
+}
+
 export class OperationPromotionDeniedError extends Error {
   override name = "OperationPromotionDeniedError";
   constructor() {

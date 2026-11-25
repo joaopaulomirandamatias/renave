@@ -69,6 +69,10 @@ export interface AppConfig {
   serproQueryLimitHmacKeyBase64: string | undefined;
   /** Habilita apenas a criação cifrada em HELD_LOCAL; nunca envia ao SERPRO. */
   stockEntryLocalEnabled: boolean;
+  /** Habilita somente a saída local HELD_LOCAL em homologação. */
+  stockExitLocalEnabled: boolean;
+  /** Idade máxima explícita da prova MFA usada pela saída local. */
+  stockExitMfaMaxAgeSeconds: number;
   /** Banco de negócio SaaS; independe de a integração SERPRO estar ligada. */
   databaseUrl: string | undefined;
   databaseTlsCa?: string | undefined;
@@ -206,6 +210,13 @@ function stockEntryLocalEnabled(value: string | undefined): boolean {
   if (!normalized || normalized === "false") return false;
   if (normalized === "true") return true;
   throw new Error("RENAVE_STOCK_ENTRY_LOCAL_ENABLED deve ser true ou false");
+}
+
+function stockExitLocalEnabled(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === "false") return false;
+  if (normalized === "true") return true;
+  throw new Error("RENAVE_STOCK_EXIT_LOCAL_ENABLED deve ser true ou false");
 }
 
 function platformConsoleEnabled(value: string | undefined): boolean {
@@ -428,6 +439,16 @@ function parsePlatformMfaMaxAgeSeconds(value: string | undefined): number {
   return seconds;
 }
 
+function parseStockExitMfaMaxAgeSeconds(value: string | undefined): number {
+  const parsed = Number(value ?? "300");
+  if (!Number.isSafeInteger(parsed) || parsed < 60 || parsed > 900) {
+    throw new Error(
+      "RENAVE_STOCK_EXIT_MFA_MAX_AGE_SECONDS deve ser um inteiro entre 60 e 900",
+    );
+  }
+  return parsed;
+}
+
 function withSecretValues(
   environment: NodeJS.ProcessEnv,
   secretFiles: ApiSecretFiles | undefined,
@@ -502,6 +523,9 @@ function parseConfig(
   const enableStockEntryLocal = stockEntryLocalEnabled(
     environment.RENAVE_STOCK_ENTRY_LOCAL_ENABLED,
   );
+  const enableStockExitLocal = stockExitLocalEnabled(
+    environment.RENAVE_STOCK_EXIT_LOCAL_ENABLED,
+  );
   const renave = loadRenaveIntegration(
     environment,
     appEnvironment,
@@ -514,6 +538,9 @@ function parseConfig(
       : undefined;
   const platformMfaMaxAgeSeconds = parsePlatformMfaMaxAgeSeconds(
     environment.PLATFORM_OPERATOR_MFA_MAX_AGE_SECONDS,
+  );
+  const stockExitMfaMaxAgeSeconds = parseStockExitMfaMaxAgeSeconds(
+    environment.RENAVE_STOCK_EXIT_MFA_MAX_AGE_SECONDS,
   );
 
   validateDatabaseUrl(
@@ -592,6 +619,36 @@ function parseConfig(
       throw new Error("A entrada de estoque local exige DATABASE_URL");
     }
   }
+  if (enableStockExitLocal) {
+    if (appEnvironment !== "homologation") {
+      throw new Error(
+        "RENAVE_STOCK_EXIT_LOCAL_ENABLED está restrito à homologação",
+      );
+    }
+    if (authMode !== "oidc") {
+      throw new Error("A saída de estoque local exige AUTH_MODE=oidc");
+    }
+    if (sessionStore !== "postgres" || !identityDatabaseUrl) {
+      throw new Error(
+        "A saída de estoque local exige SESSION_STORE=postgres e IDENTITY_DATABASE_URL",
+      );
+    }
+    if (!databaseUrl || !renave || !serproQueryLimitHmacKeyBase64) {
+      throw new Error(
+        "A saída de estoque local exige DATABASE_URL e integração RENAVE read-only limitada",
+      );
+    }
+    if (
+      !oidc ||
+      oidc.mfaAcceptedAcrValues.length === 0 ||
+      oidc.maxAuthenticationAgeSeconds === undefined ||
+      oidc.maxAuthenticationAgeSeconds > stockExitMfaMaxAgeSeconds
+    ) {
+      throw new Error(
+        "A saída de estoque local exige MFA recente configurada no OIDC",
+      );
+    }
+  }
   if (enablePlatformConsole) {
     if (authMode !== "oidc") {
       throw new Error("O console global exige AUTH_MODE=oidc");
@@ -634,6 +691,8 @@ function parseConfig(
     ),
     serproQueryLimitHmacKeyBase64,
     stockEntryLocalEnabled: enableStockEntryLocal,
+    stockExitLocalEnabled: enableStockExitLocal,
+    stockExitMfaMaxAgeSeconds,
     databaseUrl,
     databaseTlsCa,
     databaseTlsCaFile,
@@ -685,7 +744,8 @@ function hasOperationalCapability(environment: NodeJS.ProcessEnv): boolean {
     parseAuthMode(environment.AUTH_MODE) === "oidc" ||
     platformConsoleEnabled(environment.PLATFORM_CONSOLE_ENABLED) ||
     integrationEnabled(environment.RENAVE_INTEGRATION_ENABLED) ||
-    stockEntryLocalEnabled(environment.RENAVE_STOCK_ENTRY_LOCAL_ENABLED)
+    stockEntryLocalEnabled(environment.RENAVE_STOCK_ENTRY_LOCAL_ENABLED) ||
+    stockExitLocalEnabled(environment.RENAVE_STOCK_EXIT_LOCAL_ENABLED)
   );
 }
 

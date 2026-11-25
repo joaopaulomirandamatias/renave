@@ -898,6 +898,7 @@ async function stockExitCompositionHarness(
     }),
     resolver,
     runner: createTenantActionRunner(appPool),
+    temporalGuard: { assert: vi.fn() },
   });
   return {
     acquire,
@@ -2518,7 +2519,7 @@ describe("composição PostgreSQL real da API", () => {
           traceId: "stock-exit-replay-payload-conflict",
         }),
       ).rejects.toMatchObject({ code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT" });
-      expect(harness.getStockById).toHaveBeenCalledTimes(3);
+      expect(harness.getStockById).toHaveBeenCalledOnce();
       expect(harness.mutate).not.toHaveBeenCalled();
 
       const cnpjBase = "223334440001";
@@ -2555,6 +2556,7 @@ describe("composição PostgreSQL real da API", () => {
             traceId: "stock-exit-replay-establishment-conflict",
           }),
         ).rejects.toMatchObject({ code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT" });
+        expect(otherEstablishment.getStockById).not.toHaveBeenCalled();
       } finally {
         otherEstablishment.operation.destroy();
       }
@@ -2586,6 +2588,7 @@ describe("composição PostgreSQL real da API", () => {
             traceId: "stock-exit-replay-actor-conflict",
           }),
         ).rejects.toMatchObject({ code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT" });
+        expect(otherActor.getStockById).not.toHaveBeenCalled();
       } finally {
         otherActor.operation.destroy();
       }

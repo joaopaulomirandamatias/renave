@@ -124,3 +124,26 @@ it("recusa acesso a tabelas e digests inválidos", async () => {
     ),
   ).rejects.toMatchObject({ code: "22023" });
 });
+
+it("não devolve quota quando a transação de negócio posterior faz rollback", async () => {
+  await migrator.query(
+    `update renave_stock_exit_barriers.rate_policy set
+       global_capacity=100,tenant_capacity=1,subject_capacity=100`,
+  );
+  const limiter = new PostgresStockExitRateLimiter(appA, KEY);
+  await expect(
+    limiter.acquire({ subject: "oidc|rollback", tenantId: TENANT_A }),
+  ).resolves.toEqual({ allowed: true });
+  const client = await appA.connect();
+  try {
+    await client.query("begin");
+    await client.query("select 1");
+    await client.query("rollback");
+  } finally {
+    client.release();
+  }
+  await expect(
+    limiter.acquire({ subject: "oidc|rollback-2", tenantId: TENANT_A }),
+  ).resolves.toMatchObject({ allowed: false, scope: "tenant" });
+  limiter.destroy();
+});

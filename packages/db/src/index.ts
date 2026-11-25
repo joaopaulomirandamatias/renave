@@ -136,6 +136,8 @@ export {
 export {
   createOrReplayHeldLocalOperation,
   createOrReplayHeldLocalStockExitOperation,
+  probeHeldLocalStockExitReplay,
+  recordHeldLocalStockExitReplay,
   promoteHeldLocalOperation,
   getOperation,
   operationKinds,
@@ -151,6 +153,7 @@ export {
   type CreateOperationInput,
   type CreateHeldLocalOperationInput,
   type CreateHeldLocalStockExitOperationInput,
+  type HeldLocalStockExitReplayProbe,
   type CreateOperationResult,
   type PromoteHeldLocalOperationInput,
   type PromoteHeldLocalOperationResult,

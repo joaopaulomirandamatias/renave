@@ -55,6 +55,46 @@ describe("configuração da API", () => {
     ).toThrow("RENAVE_STOCK_ENTRY_LOCAL_ENABLED");
   });
 
+  it("mantém a saída local desligada e valida sua flag", async () => {
+    expect(loadConfig().stockExitLocalEnabled).toBe(false);
+    expect(loadConfig().stockExitMfaMaxAgeSeconds).toBe(300);
+    expect(() =>
+      loadConfig({ RENAVE_STOCK_EXIT_LOCAL_ENABLED: "yes" }),
+    ).toThrow("RENAVE_STOCK_EXIT_LOCAL_ENABLED");
+    let secretReads = 0;
+    await loadAppConfig(
+      {
+        APP_ENVIRONMENT: "homologation",
+        RENAVE_STOCK_EXIT_LOCAL_ENABLED: "false",
+      },
+      async () => {
+        secretReads += 1;
+        return secureSecrets();
+      },
+    );
+    expect(secretReads).toBe(0);
+  });
+
+  it("recusa saída local com composição de segurança incompleta", () => {
+    expect(() =>
+      loadConfig({
+        ...stockEntryLocal,
+        RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "false",
+        RENAVE_STOCK_EXIT_LOCAL_ENABLED: "true",
+      }),
+    ).toThrow("integração RENAVE read-only limitada");
+    expect(() =>
+      loadConfig({
+        ...stockEntryLocal,
+        APP_ENVIRONMENT: "production",
+        DATABASE_TLS_CA_FILE: "/run/secrets/database-ca.pem",
+        IDENTITY_DATABASE_TLS_CA_FILE: "/run/secrets/identity-ca.pem",
+        RENAVE_STOCK_ENTRY_LOCAL_ENABLED: "false",
+        RENAVE_STOCK_EXIT_LOCAL_ENABLED: "true",
+      }),
+    ).toThrow("restrito à homologação");
+  });
+
   it("habilita HELD_LOCAL somente com homologação, OIDC e bancos persistentes", () => {
     const config = loadConfig(stockEntryLocal);
     expect(config.stockEntryLocalEnabled).toBe(true);
@@ -395,6 +435,22 @@ function cipher(config: Awaited<ReturnType<typeof loadAppConfig>>) {
 }
 
 describe("configuração operacional da API por arquivos", () => {
+  it("habilita a saída local somente com o bundle operacional e MFA recente", async () => {
+    const config = await loadAppConfig(
+      {
+        ...secureOidc,
+        OIDC_MAX_AUTHENTICATION_AGE_SECONDS: "300",
+        OIDC_MFA_ACCEPTED_ACR_VALUES: "urn:example:assurance:mfa",
+        RENAVE_STOCK_EXIT_LOCAL_ENABLED: "true",
+      },
+      async () => secureSecrets(),
+    );
+    expect(config.stockExitLocalEnabled).toBe(true);
+    expect(config.stockExitMfaMaxAgeSeconds).toBe(300);
+    expect(config.renave).toBeDefined();
+    expect(config.serproQueryLimitHmacKeyBase64).toBeDefined();
+  });
+
   it("rejeita segredo concorrente no ambiente antes de ler o mount", async () => {
     let reads = 0;
     await expect(

@@ -67,8 +67,11 @@ export {
 export {
   createOrReplayHeldLocalOperation,
   createOrReplayHeldLocalStockExitOperation,
+  probeHeldLocalStockExitReplay,
+  recordHeldLocalStockExitReplay,
   type CreateHeldLocalOperationInput,
   type CreateHeldLocalStockExitOperationInput,
+  type HeldLocalStockExitReplayProbe,
   type CreateOperationInput,
   type CreateOperationResult,
   type OperationKind,

@@ -80,6 +80,7 @@ describe("runtime cleanup", () => {
       "cleanup.registerResource(() => tenantAdminLimiter!.destroy())",
       "cleanup.registerResource(() => tenantAdministration!.destroy())",
       "cleanup.registerResource(() => stockEntryComposition!.destroy())",
+      "cleanup.registerResource(() => stockExitComposition!.destroy())",
       "cleanup.registerResource(() => platformConsole!.destroy())",
       "cleanup.registerResource(() => mtls!.close())",
       "cleanup.registerResource(() => cipher.destroy())",

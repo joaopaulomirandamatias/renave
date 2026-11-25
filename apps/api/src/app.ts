@@ -33,6 +33,11 @@ import {
   type StockEntryMutationRateLimiter,
   type StockEntryOperationUseCase,
 } from "./renave/stock-entry-operations.js";
+import {
+  registerStockExitOperationRoute,
+  type StockExitMutationRateLimiter,
+  type StockExitOperationUseCase,
+} from "./renave/stock-exit-operations.js";
 import type {
   TenantEstablishmentAdministration,
   TenantMutationRateLimiter,
@@ -77,6 +82,10 @@ export interface BuildAppOptions {
   stockEntryBusinessTimeZone?: string;
   /** Limite distribuído obrigatório da criação local retida. */
   stockEntryMutationRateLimiter?: StockEntryMutationRateLimiter;
+  /** Saída usada retida localmente; ausente mantém a rota inexistente. */
+  stockExitOperation?: StockExitOperationUseCase;
+  /** Limitador distribuído exclusivo da mutação de saída. */
+  stockExitMutationRateLimiter?: StockExitMutationRateLimiter;
   /** Diretório global mínimo; ausente mantém descoberta de tenants bloqueada. */
   tenantDirectory?: TenantDirectory;
   /** Mutação administrativa atômica; ausente mantém o POST bloqueado. */
@@ -137,6 +146,12 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   if (options.stockEntryOperation && !options.stockEntryMutationRateLimiter) {
     throw new Error("Entrada de estoque exige rate limit distribuído");
   }
+  if (
+    options.config.stockExitLocalEnabled &&
+    (!options.stockExitOperation || !options.stockExitMutationRateLimiter)
+  ) {
+    throw new Error("Saída de estoque exige composição completa");
+  }
   if (options.config.platformConsole && !options.platformConsole) {
     throw new Error("Console global exige leitor de plataforma configurado");
   }
@@ -166,6 +181,11 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   if (options.stockEntryOperation?.destroy) {
     app.addHook("onClose", async () => {
       options.stockEntryOperation?.destroy?.();
+    });
+  }
+  if (options.stockExitOperation?.destroy) {
+    app.addHook("onClose", async () => {
+      options.stockExitOperation?.destroy?.();
     });
   }
 
@@ -257,6 +277,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         ? { operation: options.stockEntryOperation }
         : {}),
     });
+    if (options.config.stockExitLocalEnabled) {
+      registerStockExitOperationRoute(app, {
+        accessGuard,
+        mfaMaxAgeSeconds: options.config.stockExitMfaMaxAgeSeconds,
+        mutationRateLimiter: options.stockExitMutationRateLimiter!,
+        operation: options.stockExitOperation!,
+        publicOrigin: options.identity.config.publicOrigin,
+      });
+    }
     if (options.config.platformConsole && options.platformConsole) {
       registerPlatformRoutes(app, {
         accessGuard,
