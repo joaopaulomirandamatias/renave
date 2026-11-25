@@ -56,6 +56,45 @@ function compatibleDocument() {
           placa: {},
         },
       },
+      Municipio: {
+        properties: {
+          id: { type: "string" },
+          nome: { type: "string" },
+          uf: {
+            enum: [
+              "AC",
+              "AL",
+              "AP",
+              "AM",
+              "BA",
+              "CE",
+              "DF",
+              "ES",
+              "GO",
+              "MA",
+              "MT",
+              "MS",
+              "MG",
+              "PA",
+              "PB",
+              "PR",
+              "PE",
+              "PI",
+              "RJ",
+              "RN",
+              "RS",
+              "RO",
+              "RR",
+              "SP",
+              "SC",
+              "SE",
+              "TO",
+            ],
+            type: "string",
+          },
+        },
+        type: "object",
+      },
       Restricao: { properties: properties(["codigoTipo", "tipo"]) },
       SolicitacaoEntradaEstoque: {
         required: [
@@ -124,6 +163,20 @@ function compatibleDocument() {
               },
             },
           },
+        }),
+      },
+      "/api/municipios/{id}": {
+        get: secured({
+          parameters: [
+            {
+              format: "int64",
+              in: "path",
+              name: "id",
+              required: true,
+              type: "integer",
+            },
+          ],
+          responses: { 200: { schema: { $ref: "#/definitions/Municipio" } } },
         }),
       },
       "/api/solicitacoes-entrada-estoque": {
@@ -224,6 +277,38 @@ describe("contrato semântico da primeira fatia", () => {
       (document) => {
         document.definitions.SolicitacaoEntradaEstoque.required = [];
       },
+    ];
+
+    for (const mutate of mutations) {
+      const document = compatibleDocument();
+      mutate(document);
+      assert.throws(
+        () => validateFirstSlice(document),
+        /Contrato incompatível/,
+      );
+    }
+  });
+
+  it("recusa mudanças no contrato do detalhe de município", () => {
+    const municipalitiesPath = "/api/municipios/{id}";
+    const mutations = [
+      (document) => delete document.paths[municipalitiesPath],
+      (document) => document.paths[municipalitiesPath].get.security.push({}),
+      (document) => {
+        document.paths[municipalitiesPath].get.parameters[0].format = "int32";
+      },
+      (document) => {
+        document.paths[municipalitiesPath].get.responses[200].schema.$ref =
+          "#/definitions/Outro";
+      },
+      (document) => {
+        document.definitions.Municipio.properties.id.type = "integer";
+      },
+      (document) => {
+        document.definitions.Municipio.properties.extra = { type: "string" };
+      },
+      (document) =>
+        document.definitions.Municipio.properties.uf.enum.push("XX"),
     ];
 
     for (const mutate of mutations) {

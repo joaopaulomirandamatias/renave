@@ -9,6 +9,7 @@ const HOMOLOGATION_ORIGIN = "https://hom.renave.estaleiro.serpro.gov.br";
 const HOMOLOGATION_IDENTITY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/cliente-autenticado`;
 const HOMOLOGATION_ELIGIBILITY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/aptidao-veiculo-estoque`;
 const HOMOLOGATION_STOCKS_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/estoques`;
+const HOMOLOGATION_MUNICIPALITIES_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/municipios`;
 const HOMOLOGATION_VEHICLES_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/veiculos`;
 const HOMOLOGATION_STOCK_ENTRY_URL = `${HOMOLOGATION_ORIGIN}/renave-ws/api/solicitacoes-entrada-estoque`;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -165,20 +166,8 @@ function isAllowedReadUrl(input: string): boolean {
   }
   if (input === HOMOLOGATION_IDENTITY_URL) return true;
   if (input === HOMOLOGATION_STOCKS_URL) return true;
-  if (
-    url.search === "" &&
-    url.pathname.startsWith("/renave-ws/api/estoques/")
-  ) {
-    const rawStockId = url.pathname.slice("/renave-ws/api/estoques/".length);
-    const stockId = Number(rawStockId);
-    return (
-      /^[1-9]\d*$/u.test(rawStockId) &&
-      Number.isSafeInteger(stockId) &&
-      stockId > 0 &&
-      String(stockId) === rawStockId &&
-      input === `${HOMOLOGATION_STOCKS_URL}/${rawStockId}`
-    );
-  }
+  if (isCanonicalDetailUrl(input, HOMOLOGATION_STOCKS_URL)) return true;
+  if (isCanonicalDetailUrl(input, HOMOLOGATION_MUNICIPALITIES_URL)) return true;
   if (url.pathname === "/renave-ws/api/aptidao-veiculo-estoque") {
     const entries = [...url.searchParams.entries()];
     if (entries.length !== 2 || entries[0]?.[0] !== "tipoCrv") return false;
@@ -219,6 +208,14 @@ function isAllowedReadUrl(input: string): boolean {
       ? HOMOLOGATION_VEHICLES_URL
       : HOMOLOGATION_STOCKS_URL;
   return input === `${base}?placa=${entries[0][1]}`;
+}
+
+function isCanonicalDetailUrl(input: string, baseUrl: string): boolean {
+  const prefix = `${baseUrl}/`;
+  if (!input.startsWith(prefix)) return false;
+  const rawId = input.slice(prefix.length);
+  const id = Number(rawId);
+  return Number.isSafeInteger(id) && id > 0 && String(id) === rawId;
 }
 
 function isAllowedMtlsRequest(input: string, init: RequestInit): boolean {

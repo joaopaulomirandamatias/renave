@@ -2,6 +2,7 @@ import type {
   AuthenticatedClientIdentity,
   EstablishmentHeaders,
   RenaveEnvironment,
+  RenaveMunicipalityLookupTransport,
   RenaveQueryTransport,
   RenaveReadOptions,
   RenaveTransport,
@@ -13,7 +14,10 @@ import {
   type HomologationRenaveReadOnlyRequest,
 } from "./mtls-request.js";
 import {
+  renaveMunicipalityUfs,
   renaveMutationRoutes,
+  type RenaveMunicipality,
+  type RenaveMunicipalityUf,
   type RenaveMutationOperation,
   type RenaveVehicle,
   type RenaveVehicleRestriction,
@@ -77,6 +81,7 @@ const httpReadOnlyTransportStates = new WeakMap<
 
 type RenaveHttpOperation =
   | "get-authenticated-client"
+  | "get-municipality-by-id"
   | "get-vehicle-eligibility"
   | "get-vehicle-by-plate"
   | "find-recent-stocks"
@@ -96,6 +101,9 @@ const MAX_INTERNAL_ERROR_BODY_BYTES = 16 * 1_024;
 const MAX_RESTRICTIONS = 256;
 const MAX_RESTRICTION_CODE_LENGTH = 64;
 const MAX_RESTRICTION_TYPE_LENGTH = 256;
+const MAX_MUNICIPALITY_RESPONSE_BYTES = 4 * 1024;
+const MAX_MUNICIPALITY_NAME_LENGTH = 256;
+const MUNICIPALITY_UFS = new Set<string>(renaveMunicipalityUfs);
 const ABSOLUTE_DATE_TIME_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|([+-])(\d{2}):(\d{2}))$/u;
 
@@ -686,6 +694,80 @@ async function vehicleResponseFrom(
   }
 }
 
+async function getMunicipalityById(
+  state: HttpRenaveReadOnlyTransportState,
+  headers: EstablishmentHeaders,
+  municipalityId: number,
+  options?: RenaveReadOptions,
+): Promise<RenaveMunicipality> {
+  const operation = "get-municipality-by-id";
+  if (!Number.isSafeInteger(municipalityId) || municipalityId <= 0) {
+    throw new RenaveProtocolError(operation);
+  }
+  const id = String(municipalityId);
+  let signal: AbortSignal;
+  let response: Response;
+  try {
+    const timeout = AbortSignal.timeout(state.readTimeoutMs);
+    signal = options?.signal
+      ? AbortSignal.any([options.signal, timeout])
+      : timeout;
+    signal.throwIfAborted();
+    response = await state.request(
+      `${baseUrls.homologation}/api/municipios/${id}`,
+      {
+        headers: { accept: "application/json", ...headers },
+        method: "GET",
+        redirect: "error",
+        signal,
+      },
+    );
+    signal.throwIfAborted();
+  } catch {
+    throw new RenaveHttpError(0, operation);
+  }
+  if (!response.ok) throw new RenaveHttpError(response.status, operation);
+  if (response.status !== 200 || response.redirected) {
+    throw new RenaveProtocolError(operation);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await parseJson(
+      response,
+      operation,
+      MAX_MUNICIPALITY_RESPONSE_BYTES,
+    );
+    signal.throwIfAborted();
+  } catch {
+    if (signal.aborted) throw new RenaveHttpError(0, operation);
+    throw new RenaveProtocolError(operation);
+  }
+  const candidate = requireObject(payload, operation);
+  if (
+    Object.keys(candidate).length !== 3 ||
+    !Object.hasOwn(candidate, "id") ||
+    !Object.hasOwn(candidate, "nome") ||
+    !Object.hasOwn(candidate, "uf") ||
+    candidate.id !== id ||
+    typeof candidate.nome !== "string" ||
+    candidate.nome.length === 0 ||
+    candidate.nome.length > MAX_MUNICIPALITY_NAME_LENGTH ||
+    candidate.nome !== candidate.nome.trim() ||
+    /\p{C}/u.test(candidate.nome) ||
+    typeof candidate.uf !== "string" ||
+    !MUNICIPALITY_UFS.has(candidate.uf)
+  ) {
+    throw new RenaveProtocolError(operation);
+  }
+
+  return Object.freeze({
+    id,
+    nome: candidate.nome,
+    uf: candidate.uf as RenaveMunicipalityUf,
+  });
+}
+
 function stockRecordFrom(
   value: unknown,
   operation: "find-recent-stocks" | "find-stocks-by-plate" | "find-stock-by-id",
@@ -875,7 +957,10 @@ function mutationResultFrom(
 }
 
 export class HttpRenaveTransport
-  implements RenaveTransport, RenaveVehicleLookupTransport
+  implements
+    RenaveTransport,
+    RenaveVehicleLookupTransport,
+    RenaveMunicipalityLookupTransport
 {
   constructor(options: HttpRenaveTransportOptions) {
     if (new.target !== HttpRenaveTransport) {
@@ -1058,6 +1143,18 @@ export class HttpRenaveTransport
     );
   }
 
+  async getMunicipalityById(
+    headers: EstablishmentHeaders,
+    municipalityId: number,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveMunicipality> {
+    const state = httpTransportState(this, "get-municipality-by-id");
+    if (state.environment === "production") {
+      throw new RenaveProductionBlockedError();
+    }
+    return getMunicipalityById(state, headers, municipalityId, options);
+  }
+
   async findRecentStocks(
     headers: EstablishmentHeaders,
     options?: RenaveReadOptions,
@@ -1228,7 +1325,10 @@ export class HttpRenaveTransport
 
 /** Transporte nominal de consultas que não possui superfície de mutação. */
 export class HttpRenaveReadOnlyTransport
-  implements RenaveQueryTransport, RenaveVehicleLookupTransport
+  implements
+    RenaveQueryTransport,
+    RenaveVehicleLookupTransport,
+    RenaveMunicipalityLookupTransport
 {
   constructor(options: HttpRenaveReadOnlyTransportOptions) {
     if (new.target !== HttpRenaveReadOnlyTransport) {
@@ -1353,6 +1453,15 @@ export class HttpRenaveReadOnlyTransport
       throw new RenaveHttpError(response.status, "get-vehicle-by-plate");
     }
     return vehicleResponseFrom(response, normalizedPlate);
+  }
+
+  async getMunicipalityById(
+    headers: EstablishmentHeaders,
+    municipalityId: number,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveMunicipality> {
+    const state = httpReadOnlyTransportState(this, "get-municipality-by-id");
+    return getMunicipalityById(state, headers, municipalityId, options);
   }
 
   async findStocksByPlate(

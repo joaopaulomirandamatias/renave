@@ -1,6 +1,7 @@
 import { normalizeCnpj } from "./cnpj.js";
 import type {
   CrvType,
+  RenaveMunicipality,
   RenaveMutationOperation,
   RenaveStockState,
   RenaveVehicle,
@@ -152,6 +153,19 @@ export interface RenaveVehicleLookupTransport {
   ): Promise<RenaveVehicle>;
 }
 
+export interface RenaveMunicipalityLookupTransport extends Pick<
+  RenaveVehicleLookupTransport,
+  "environment" | "getAuthenticatedClient"
+> {
+  getMunicipalityById(
+    headers: EstablishmentHeaders,
+    municipalityId: number,
+    options?: RenaveReadOptions,
+  ): Promise<RenaveMunicipality>;
+}
+
+export type MunicipalityLookupResult = MutationResult<RenaveMunicipality>;
+
 export interface RenaveQueryTransport extends RenaveReadOnlyTransport {
   getVehicleEligibility(
     headers: EstablishmentHeaders,
@@ -176,6 +190,20 @@ const vehicleLookupConnectorStates = new WeakMap<
   RenaveVehicleLookupConnector,
   RenaveVehicleLookupConnectorState
 >();
+
+const municipalityLookupConnectorStates = new WeakMap<
+  RenaveMunicipalityLookupConnector,
+  RenaveMunicipalityLookupTransport
+>();
+
+export class InvalidMunicipalityIdQueryError extends Error {
+  readonly code = "INVALID_MUNICIPALITY_ID_QUERY";
+
+  constructor() {
+    super("Informe um identificador RENAVE válido para consultar o município");
+    this.name = "InvalidMunicipalityIdQueryError";
+  }
+}
 
 export class InvalidVehiclePlateQueryError extends Error {
   readonly code = "INVALID_VEHICLE_PLATE_QUERY";
@@ -261,6 +289,56 @@ export class RenaveVehicleLookupConnector {
       options,
     );
     return { result, verifiedIdentity: authorization.verifiedIdentity };
+  }
+}
+
+/** Capacidade nominal dedicada à consulta de município por ID RENAVE. */
+export class RenaveMunicipalityLookupConnector {
+  constructor(transport: RenaveMunicipalityLookupTransport) {
+    if (new.target !== RenaveMunicipalityLookupConnector) {
+      throw new RenaveProtocolCapabilityError();
+    }
+    try {
+      const { environment, getAuthenticatedClient, getMunicipalityById } =
+        transport;
+      if (
+        typeof getAuthenticatedClient !== "function" ||
+        typeof getMunicipalityById !== "function"
+      ) {
+        throw new RenaveProtocolCapabilityError();
+      }
+      municipalityLookupConnectorStates.set(this, {
+        environment,
+        getAuthenticatedClient: getAuthenticatedClient.bind(transport),
+        getMunicipalityById: getMunicipalityById.bind(transport),
+      });
+      Object.freeze(this);
+    } catch {
+      throw new RenaveProtocolCapabilityError();
+    }
+  }
+
+  async getMunicipalityById(
+    context: RenaveServerContext,
+    municipalityId: number,
+    options?: RenaveReadOptions,
+  ): Promise<MunicipalityLookupResult> {
+    if (!Number.isSafeInteger(municipalityId) || municipalityId <= 0) {
+      throw new InvalidMunicipalityIdQueryError();
+    }
+    const state = municipalityLookupConnectorStates.get(this);
+    if (!state) throw new RenaveProtocolCapabilityError();
+    const { headers, verifiedIdentity } = await authorizeRead(
+      state,
+      context,
+      options,
+    );
+    const result = await state.getMunicipalityById(
+      headers,
+      municipalityId,
+      options,
+    );
+    return { result, verifiedIdentity };
   }
 }
 
@@ -931,6 +1009,8 @@ Object.freeze(RenaveReconciliationReader.prototype);
 Object.freeze(RenaveReconciliationReader);
 Object.freeze(RenaveVehicleLookupConnector.prototype);
 Object.freeze(RenaveVehicleLookupConnector);
+Object.freeze(RenaveMunicipalityLookupConnector.prototype);
+Object.freeze(RenaveMunicipalityLookupConnector);
 
 function validateVehicleEligibilityQuery(
   query: VehicleEligibilityQuery,

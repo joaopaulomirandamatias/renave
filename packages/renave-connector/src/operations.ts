@@ -4,6 +4,44 @@ export type RenaveMutationOperation =
 export type CrvType = "AZUL" | "VERDE" | "BRANCO" | "DIGITAL";
 export type OwnerDocumentType = "CPF" | "CNPJ";
 
+export const renaveMunicipalityUfs = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SP",
+  "SC",
+  "SE",
+  "TO",
+] as const;
+
+export type RenaveMunicipalityUf = (typeof renaveMunicipalityUfs)[number];
+
+export interface RenaveMunicipality {
+  readonly id: string;
+  readonly nome: string;
+  readonly uf: RenaveMunicipalityUf;
+}
+
 export interface StockEntryVehicle {
   codigoSegurancaCrv: string;
   dataHoraMedicaoHodometro: string;

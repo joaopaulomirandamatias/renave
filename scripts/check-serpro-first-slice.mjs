@@ -13,6 +13,35 @@ const baselineUrl = new URL(
   "../contracts/serpro/estabelecimento-baseline.json",
   import.meta.url,
 );
+const MUNICIPALITY_UFS = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SP",
+  "SC",
+  "SE",
+  "TO",
+];
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(`Contrato incompatível: ${message}`);
@@ -165,6 +194,45 @@ export function validateFirstSlice(document) {
     definition(document, "Restricao"),
     ["codigoTipo", "tipo"],
     "Restricao",
+  );
+
+  const municipality = operation(document, "/api/municipios/{id}", "get");
+  requireValue(
+    municipality.security.every((item) =>
+      Object.hasOwn(item, "cnpjEstabelecimento"),
+    ),
+    "municipios/{id} deixou de exigir cnpjEstabelecimento em todos os modos",
+  );
+  const [municipalityId] = municipality.parameters ?? [];
+  requireValue(
+    municipality.parameters?.length === 1 &&
+      municipalityId?.name === "id" &&
+      municipalityId.in === "path" &&
+      municipalityId.required === true &&
+      municipalityId.type === "integer" &&
+      municipalityId.format === "int64",
+    "municipios/{id} não exige id int64 na rota",
+  );
+  requireValue(
+    municipality.responses?.["200"]?.schema?.$ref === "#/definitions/Municipio",
+    "municipios/{id} não retorna Municipio no HTTP 200",
+  );
+  const municipalityDefinition = definition(document, "Municipio");
+  const municipalityProperties = municipalityDefinition.properties ?? {};
+  requireValue(
+    municipalityDefinition.type === "object" &&
+      Object.keys(municipalityProperties).length === 3 &&
+      ["id", "nome", "uf"].every(
+        (key) => municipalityProperties[key]?.type === "string",
+      ),
+    "Municipio divergiu do objeto com id, nome e uf do tipo string",
+  );
+  const ufs = municipalityProperties.uf.enum;
+  requireValue(
+    Array.isArray(ufs) &&
+      ufs.length === MUNICIPALITY_UFS.length &&
+      MUNICIPALITY_UFS.every((uf) => ufs.includes(uf)),
+    "Municipio.uf divergiu do enum de unidades federativas",
   );
 
   const stocks = operation(document, "/api/estoques", "get");
