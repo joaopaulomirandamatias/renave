@@ -1,7 +1,14 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 import {
+  appendAuditEvent,
   createOrReplayHeldLocalStockExitOperation,
+  type AppendAuditEventInput,
   type CreateHeldLocalOperationInput,
   type CreateHeldLocalStockExitOperationInput,
   type CreateOperationResult,
@@ -45,6 +52,7 @@ const SECURITY_CODE = /^\d{11}$/u;
 const CRV_NUMBER = /^\d{12}$/u;
 const RENAVAM = /^\d{11}$/u;
 const KEY_GENERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
+const SHA256 = /^[0-9a-f]{64}$/u;
 const DOCUMENT_TYPES = new Set<OwnerDocumentType>(["CPF", "CNPJ"]);
 const MAX_SALE_VALUE = 99_999_999.99;
 const MAX_MUNICIPALITY_CODE = 2_147_483_647;
@@ -467,6 +475,65 @@ function zeroPrincipals(
 }
 
 type BuildOperation = typeof buildCreateOperationInput;
+type AppendAudit = typeof appendAuditEvent;
+
+function sha256(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+interface StockExitPreflightAuditContext {
+  certificateThumbprintSha256: string;
+  cnpjSent: string;
+  payloadReference: string;
+  requestSha256: string;
+}
+
+function preflightAuditContext(
+  error: unknown,
+): StockExitPreflightAuditContext | undefined {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("auditContext" in error) ||
+    typeof error.auditContext !== "object" ||
+    error.auditContext === null ||
+    Array.isArray(error.auditContext)
+  ) {
+    return undefined;
+  }
+  const value = error.auditContext as Record<string, unknown>;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== 4 ||
+    !keys.every((key) =>
+      [
+        "certificateThumbprintSha256",
+        "cnpjSent",
+        "payloadReference",
+        "requestSha256",
+      ].includes(key),
+    ) ||
+    typeof value.certificateThumbprintSha256 !== "string" ||
+    !SHA256.test(value.certificateThumbprintSha256) ||
+    typeof value.cnpjSent !== "string" ||
+    !validCnpj(value.cnpjSent) ||
+    typeof value.payloadReference !== "string" ||
+    value.payloadReference.length < 1 ||
+    value.payloadReference.length > 512 ||
+    value.payloadReference.trim() !== value.payloadReference ||
+    /\p{C}/u.test(value.payloadReference) ||
+    typeof value.requestSha256 !== "string" ||
+    !SHA256.test(value.requestSha256)
+  ) {
+    return undefined;
+  }
+  return {
+    certificateThumbprintSha256: value.certificateThumbprintSha256,
+    cnpjSent: value.cnpjSent,
+    payloadReference: value.payloadReference,
+    requestSha256: value.requestSha256,
+  };
+}
 
 export class PostgresHeldStockExitOperation implements StockExitOperationUseCase {
   private readonly digestKeys: ReturnType<typeof copyDigestKeys>;
@@ -476,6 +543,7 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
   constructor(
     private readonly options: {
       buildOperation?: BuildOperation;
+      appendAudit?: AppendAudit;
       createOperation?: typeof createOrReplayHeldLocalStockExitOperation;
       digestKeys: DigestKeys;
       environment: "homologation";
@@ -566,6 +634,11 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
     } catch (error) {
       const code = safeCode(error);
       if (code === "STOCK_EXIT_PREFLIGHT_REJECTED") {
+        const auditContext = preflightAuditContext(error);
+        if (!auditContext) {
+          throw new StockExitOperationError("STOCK_EXIT_PREFLIGHT_UNAVAILABLE");
+        }
+        await this.appendPreflightBusinessError(input, code, auditContext);
         throw new StockExitOperationError(code);
       }
       if (code === "STOCK_EXIT_PREFLIGHT_LIMITED") {
@@ -581,7 +654,7 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       !Number.isSafeInteger(confirmation.remoteStockId) ||
       confirmation.remoteStockId !== input.business.stockId
     ) {
-      throw new StockExitOperationError("STOCK_EXIT_PREFLIGHT_REJECTED");
+      throw new StockExitOperationError("STOCK_EXIT_PREFLIGHT_UNAVAILABLE");
     }
     const result = await this.options.runner.run(
       {
@@ -606,6 +679,50 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       );
     }
     return result.value;
+  }
+
+  private async appendPreflightBusinessError(
+    input: Parameters<StockExitOperationUseCase["execute"]>[0],
+    code: "STOCK_EXIT_PREFLIGHT_REJECTED",
+    auditContext: StockExitPreflightAuditContext,
+  ): Promise<void> {
+    try {
+      const result = await this.options.runner.run(
+        {
+          action: "renave.stock-exit.request",
+          establishmentId: input.establishmentId,
+          mfa: "required",
+          session: input.session,
+          tenantId: input.tenantId,
+        },
+        async ({ client }) => {
+          await (this.options.appendAudit ?? appendAuditEvent)(client, {
+            action: "renave.stock-exit.request",
+            actorIp: input.actorIp,
+            actorSubject: input.session.subject,
+            certificateThumbprintSha256:
+              auditContext.certificateThumbprintSha256,
+            cnpjSent: auditContext.cnpjSent,
+            establishmentId: input.establishmentId,
+            outcome: "rejected",
+            payloadReference: auditContext.payloadReference,
+            requestSha256: auditContext.requestSha256,
+            responseSha256: sha256({ code }),
+            traceId: input.traceId,
+          });
+        },
+      );
+      if (!result.allowed) {
+        throw new StockExitOperationError(
+          result.reason === "MFA_REQUIRED"
+            ? "MFA_REQUIRED"
+            : "STOCK_EXIT_RESOURCE_NOT_FOUND",
+        );
+      }
+    } catch (error) {
+      if (error instanceof StockExitOperationError) throw error;
+      throw new StockExitOperationError("STOCK_EXIT_OPERATION_UNAVAILABLE");
+    }
   }
 
   private async createWithinTransaction(
@@ -643,12 +760,7 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       idempotencyDigest = hmac(
         this.digestKeys.idempotency,
         "stock-exit-idempotency",
-        [
-          input.tenantId,
-          input.establishmentId,
-          input.session.subject,
-          input.idempotencyKey,
-        ],
+        [input.tenantId, input.idempotencyKey],
       );
       principals = await this.options.resolver.resolve(client, {
         establishmentId: input.establishmentId,
@@ -727,6 +839,26 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
       ) {
         throw new StockExitOperationError("STOCK_EXIT_OPERATION_UNAVAILABLE");
       }
+      const responseBody = {
+        createdAt: result.operation.createdAt.toISOString(),
+        operationId: result.operation.id,
+        replayed: result.replayed,
+        status: "HELD_LOCAL" as const,
+      };
+      const auditInput: AppendAuditEventInput = {
+        action: result.replayed
+          ? "stock-exit.held-local.replayed"
+          : "stock-exit.held-local.created",
+        actorIp: input.actorIp,
+        actorSubject: input.session.subject,
+        establishmentId: input.establishmentId,
+        outcome: "succeeded",
+        payloadReference: result.operation.id,
+        requestSha256: operationInput.requestSha256.toString("hex"),
+        responseSha256: sha256(responseBody),
+        traceId: input.traceId,
+      };
+      await (this.options.appendAudit ?? appendAuditEvent)(client, auditInput);
       return {
         createdAt: result.operation.createdAt,
         operationId: result.operation.id,
@@ -736,9 +868,11 @@ export class PostgresHeldStockExitOperation implements StockExitOperationUseCase
     } catch (error) {
       if (error instanceof StockExitOperationError) throw error;
       const code = safeCode(error);
+      if (code === "OperationIdempotencyConflictError") {
+        throw new StockExitOperationError("STOCK_EXIT_IDEMPOTENCY_CONFLICT");
+      }
       if (
         code === "OperationActiveConflictError" ||
-        code === "OperationIdempotencyConflictError" ||
         code === "OperationCredentialLinkNotEnabledError"
       ) {
         throw new StockExitOperationError("STOCK_EXIT_OPERATION_CONFLICT");
@@ -807,7 +941,7 @@ function safeRetryAfterSeconds(error: unknown): number | undefined {
 function mapError(error: unknown): {
   code: string;
   retryAfterSeconds?: number;
-  status: 400 | 403 | 404 | 409 | 429 | 500 | 503;
+  status: 400 | 403 | 404 | 409 | 422 | 429 | 500 | 503;
 } {
   const code = safeCode(error);
   if (code === "INVALID_STOCK_EXIT_MUNICIPALITY") {
@@ -818,8 +952,13 @@ function mapError(error: unknown): {
     return { code, status: 404 };
   }
   if (
-    code === "OperationActiveConflictError" ||
     code === "OperationIdempotencyConflictError" ||
+    code === "STOCK_EXIT_IDEMPOTENCY_CONFLICT"
+  ) {
+    return { code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT", status: 422 };
+  }
+  if (
+    code === "OperationActiveConflictError" ||
     code === "OperationCredentialLinkNotEnabledError" ||
     code === "STOCK_EXIT_OPERATION_CONFLICT" ||
     code === "STOCK_EXIT_PREFLIGHT_REJECTED"

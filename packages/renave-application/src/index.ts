@@ -23,6 +23,7 @@ export {
 export {
   StockExitPreflightRejectedError,
   verifyStockExitPreflight,
+  type StockExitPreflightAuditContext,
   type StockExitPreflightConfirmation,
   type StockExitPreflightVerificationInput,
   type StockExitVehicleIdentity,

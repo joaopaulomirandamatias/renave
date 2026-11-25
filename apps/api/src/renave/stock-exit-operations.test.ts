@@ -1,3 +1,5 @@
+import { createHash, createHmac } from "node:crypto";
+
 import type { TenantClient } from "@seu-renave/db";
 import type {
   DecryptedRenavePrincipal,
@@ -343,6 +345,28 @@ describe("registerStockExitOperationRoute", () => {
   });
 
   it("distingue rejeição, limite e indisponibilidade do preflight", async () => {
+    const idempotencyConflict = setup({
+      executeError: new StockExitOperationError(
+        "STOCK_EXIT_IDEMPOTENCY_CONFLICT",
+      ),
+    });
+    const idempotencyResponse = await request(idempotencyConflict.app);
+    expect(idempotencyResponse.statusCode).toBe(422);
+    expect(idempotencyResponse.json()).toEqual({
+      code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT",
+    });
+
+    const activeConflict = setup({
+      executeError: new StockExitOperationError(
+        "STOCK_EXIT_OPERATION_CONFLICT",
+      ),
+    });
+    const activeResponse = await request(activeConflict.app);
+    expect(activeResponse.statusCode).toBe(409);
+    expect(activeResponse.json()).toEqual({
+      code: "STOCK_EXIT_OPERATION_CONFLICT",
+    });
+
     const rejected = setup({
       executeError: new StockExitOperationError(
         "STOCK_EXIT_PREFLIGHT_REJECTED",
@@ -454,6 +478,7 @@ describe("PostgresHeldStockExitOperation", () => {
       },
     };
     let protectedRequest: Record<string, unknown> | undefined;
+    let persistedIdempotencyDigest: Buffer | undefined;
     const buildOperation = vi.fn((_requestCipher, _projectionCipher, input) => {
       const trusted = readPreparedRenaveMutation(input.prepared);
       protectedRequest = JSON.parse(
@@ -493,6 +518,7 @@ describe("PostgresHeldStockExitOperation", () => {
     });
     const createOperation = vi.fn(async (_client, input) => {
       executionOrder.push("persist");
+      persistedIdempotencyDigest = Buffer.from(input.idempotencyKeyDigest);
       return {
         operation: {
           correlationId: input.correlationId,
@@ -514,6 +540,10 @@ describe("PostgresHeldStockExitOperation", () => {
     const municipalityCatalog = {
       contains: vi.fn(async () => true),
     };
+    const appendAudit = vi.fn(async (_client, _input) => {
+      executionOrder.push("audit");
+      return {} as never;
+    });
     const preflight = {
       verify: vi.fn(async () => {
         executionOrder.push("preflight");
@@ -521,6 +551,7 @@ describe("PostgresHeldStockExitOperation", () => {
       }),
     };
     const useCase = new PostgresHeldStockExitOperation({
+      appendAudit,
       buildOperation,
       createOperation,
       digestKeys: {
@@ -566,6 +597,7 @@ describe("PostgresHeldStockExitOperation", () => {
       "preflight",
       "runner",
       "persist",
+      "audit",
     ]);
     expect(preflight.verify).toHaveBeenCalledWith({
       actorIp: "198.51.100.10",
@@ -580,6 +612,40 @@ describe("PostgresHeldStockExitOperation", () => {
     expect(createOperation.mock.calls[0]?.[1]).toMatchObject({
       remoteStockId: validBody.stockId,
     });
+    expect(persistedIdempotencyDigest).toEqual(
+      createHmac("sha256", Buffer.alloc(32, 22))
+        .update(
+          JSON.stringify([
+            "seu-renave-stock-exit-idempotency-v1",
+            TENANT_ID,
+            IDEMPOTENCY_KEY,
+          ]),
+        )
+        .digest(),
+    );
+    expect(appendAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "stock-exit.held-local.created",
+        actorIp: "198.51.100.10",
+        actorSubject: SUBJECT,
+        establishmentId: ESTABLISHMENT_ID,
+        outcome: "succeeded",
+        payloadReference: OPERATION_ID,
+        requestSha256: "01".repeat(32),
+        responseSha256: createHash("sha256")
+          .update(
+            JSON.stringify({
+              createdAt: "2026-11-24T18:01:02.003Z",
+              operationId: OPERATION_ID,
+              replayed: false,
+              status: "HELD_LOCAL",
+            }),
+          )
+          .digest("hex"),
+        traceId: "trace-1",
+      }),
+    );
     expect(buildOperation).toHaveBeenCalledOnce();
     expect(runnerInputs).toEqual([
       expect.objectContaining({
@@ -622,12 +688,18 @@ describe("PostgresHeldStockExitOperation", () => {
         tenantId: TENANT_ID,
         traceId: "trace-divergent",
       }),
-    ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE" });
     expect(runnerInputs).toHaveLength(runnerCount + 1);
     expect(createOperation).toHaveBeenCalledOnce();
 
     preflight.verify.mockRejectedValueOnce(
       Object.assign(new Error("resposta incompatível"), {
+        auditContext: {
+          certificateThumbprintSha256: "a".repeat(64),
+          cnpjSent: "11222333000181",
+          payloadReference: "evidence-preflight-1",
+          requestSha256: "b".repeat(64),
+        },
         code: "STOCK_EXIT_PREFLIGHT_REJECTED",
       }),
     );
@@ -643,7 +715,68 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-rejected",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
-    expect(runnerInputs).toHaveLength(runnerCount + 2);
+    expect(runnerInputs).toHaveLength(runnerCount + 3);
+    expect(appendAudit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "renave.stock-exit.request",
+        certificateThumbprintSha256: "a".repeat(64),
+        cnpjSent: "11222333000181",
+        outcome: "rejected",
+        payloadReference: "evidence-preflight-1",
+        requestSha256: "b".repeat(64),
+        responseSha256: createHash("sha256")
+          .update(JSON.stringify({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" }))
+          .digest("hex"),
+        traceId: "trace-rejected",
+      }),
+    );
+
+    preflight.verify.mockRejectedValueOnce(
+      Object.assign(new Error("rejeição sem evidência"), {
+        code: "STOCK_EXIT_PREFLIGHT_REJECTED",
+      }),
+    );
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-rejected-without-evidence",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE" });
+    expect(runnerInputs).toHaveLength(runnerCount + 4);
+
+    appendAudit.mockRejectedValueOnce(new Error("auditoria indisponível"));
+    preflight.verify.mockRejectedValueOnce(
+      Object.assign(new Error("rejeição auditável"), {
+        auditContext: {
+          certificateThumbprintSha256: "a".repeat(64),
+          cnpjSent: "11222333000181",
+          payloadReference: "evidence-preflight-2",
+          requestSha256: "c".repeat(64),
+        },
+        code: "STOCK_EXIT_PREFLIGHT_REJECTED",
+      }),
+    );
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-rejected-audit-failure",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_OPERATION_UNAVAILABLE" });
+    expect(runnerInputs).toHaveLength(runnerCount + 6);
+    expect(createOperation).toHaveBeenCalledOnce();
 
     preflight.verify.mockRejectedValueOnce(
       Object.assign(new Error("limitado"), {
@@ -666,7 +799,7 @@ describe("PostgresHeldStockExitOperation", () => {
       code: "STOCK_EXIT_PREFLIGHT_LIMITED",
       retryAfterSeconds: 11,
     });
-    expect(runnerInputs).toHaveLength(runnerCount + 3);
+    expect(runnerInputs).toHaveLength(runnerCount + 7);
 
     preflight.verify.mockRejectedValueOnce(new Error("remote payload"));
     await expect(
@@ -681,7 +814,7 @@ describe("PostgresHeldStockExitOperation", () => {
         traceId: "trace-unavailable",
       }),
     ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_UNAVAILABLE" });
-    expect(runnerInputs).toHaveLength(runnerCount + 4);
+    expect(runnerInputs).toHaveLength(runnerCount + 8);
     expect(createOperation).toHaveBeenCalledOnce();
 
     municipalityCatalog.contains.mockResolvedValueOnce(false);
@@ -699,5 +832,24 @@ describe("PostgresHeldStockExitOperation", () => {
     ).rejects.toMatchObject({ code: "INVALID_STOCK_EXIT_MUNICIPALITY" });
     expect(createOperation).toHaveBeenCalledOnce();
     expect(resolver.resolve).toHaveBeenCalledOnce();
+
+    createOperation.mockRejectedValueOnce(
+      Object.assign(new Error("conflito interno"), {
+        name: "OperationIdempotencyConflictError",
+      }),
+    );
+    await expect(
+      useCase.execute({
+        actorIp: "198.51.100.10",
+        business: validBody,
+        establishmentId: ESTABLISHMENT_ID,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        now: NOW,
+        session: session(),
+        tenantId: TENANT_ID,
+        traceId: "trace-idempotency-conflict",
+      }),
+    ).rejects.toMatchObject({ code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT" });
+    expect(createOperation).toHaveBeenCalledTimes(2);
   });
 });

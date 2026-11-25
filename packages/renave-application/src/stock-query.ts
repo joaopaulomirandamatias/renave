@@ -27,6 +27,7 @@ import {
 import {
   StockExitPreflightRejectedError,
   verifyStockExitPreflight,
+  type StockExitPreflightAuditContext,
   type StockExitPreflightConfirmation,
   type StockExitVehicleIdentity,
 } from "./stock-exit-preflight.js";
@@ -249,8 +250,9 @@ function normalizedPlate(value: unknown): string {
 function validatePayloadReference(reference: unknown): string {
   if (
     typeof reference !== "string" ||
-    reference.trim().length === 0 ||
-    reference.trim() !== reference
+    !/^pev1_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+      reference,
+    )
   ) {
     throw new StockQueryEvidenceError(
       "O armazenamento protegido não devolveu uma referência válida",
@@ -623,6 +625,11 @@ type StockExitPreflightDecision =
     }
   | { accepted: false };
 
+interface StockQueryExecution<T> {
+  auditContext: StockExitPreflightAuditContext;
+  output: T;
+}
+
 function rebuildStockExitPreflight(
   result: StockDetailQueryResult,
   input: Pick<StockExitPreflightQueryInput, "stockId" | "vehicle">,
@@ -664,23 +671,25 @@ export class StockQueryService {
 
   async execute(input: StockQueryInput): Promise<readonly StockSummary[]> {
     const plate = normalizedPlate(input.plate);
-    return this.executeQuery(
+    const result = await this.executeQuery(
       input,
       { placa: plate },
       (context) => this.ports.connector.getStocksByPlate(context, plate),
       (result) => rebuildPublicResult(result, plate),
     );
+    return result.output;
   }
 
   async executeRecent(
     input: StockInventoryQueryInput,
   ): Promise<readonly StockInventorySummary[]> {
-    return this.executeQuery(
+    const result = await this.executeQuery(
       input,
       {},
       (context) => this.ports.connector.getRecentStocks(context),
       rebuildInventoryPublicResult,
     );
+    return result.output;
   }
 
   async executeById(input: StockDetailQueryInput): Promise<StockDetail> {
@@ -688,12 +697,13 @@ export class StockQueryService {
       throw new InvalidStockQueryApplicationInputError("stockId");
     }
     const stockId = input.stockId;
-    return this.executeQuery(
+    const result = await this.executeQuery(
       input,
       { stockId },
       (context) => this.ports.connector.getStockById(context, stockId),
       (result) => rebuildStockDetail(result, stockId),
     );
+    return result.output;
   }
 
   async executeStockExitPreflight(
@@ -704,14 +714,16 @@ export class StockQueryService {
     }
     const stockId = input.stockId;
     const vehicle = Object.freeze({ ...input.vehicle });
-    const decision = await this.executeQuery(
+    const execution = await this.executeQuery(
       input,
       { stockId, vehicle },
       (context) => this.ports.connector.getStockById(context, stockId),
       (result) => rebuildStockExitPreflight(result, { stockId, vehicle }),
     );
-    if (!decision.accepted) throw new StockExitPreflightRejectedError();
-    return decision.confirmation;
+    if (!execution.output.accepted) {
+      throw new StockExitPreflightRejectedError(execution.auditContext);
+    }
+    return execution.output.confirmation;
   }
 
   private async executeQuery<TResult, TOutput>(
@@ -722,7 +734,7 @@ export class StockQueryService {
       evidence: unknown;
       publicResult: TOutput;
     },
-  ): Promise<TOutput> {
+  ): Promise<StockQueryExecution<TOutput>> {
     const subject = requireText(input.subject, "subject");
     const tenantId = requireText(input.tenantId, "tenantId");
     const establishmentId = requireText(
@@ -827,6 +839,14 @@ export class StockQueryService {
       evidenceResponse: validated.evidence,
       payloadReference,
     });
-    return validated.publicResult;
+    return Object.freeze({
+      auditContext: Object.freeze({
+        certificateThumbprintSha256: this.certificateThumbprintSha256,
+        cnpjSent: establishmentCnpj,
+        payloadReference,
+        requestSha256: commonAudit.requestSha256,
+      }),
+      output: validated.publicResult,
+    });
   }
 }

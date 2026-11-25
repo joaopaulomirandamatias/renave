@@ -297,16 +297,23 @@ describe("StockQueryService", () => {
     };
     const harness = createHarness({ connectorResult: restricted });
 
-    await expect(
-      harness.service.executeStockExitPreflight({
-        actorIp: input.actorIp,
-        establishmentId: input.establishmentId,
-        stockId: 71,
-        subject: input.subject,
-        tenantId: input.tenantId,
-        vehicle: preflightVehicle,
-      }),
-    ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
+    const rejected = harness.service.executeStockExitPreflight({
+      actorIp: input.actorIp,
+      establishmentId: input.establishmentId,
+      stockId: 71,
+      subject: input.subject,
+      tenantId: input.tenantId,
+      vehicle: preflightVehicle,
+    });
+    await expect(rejected).rejects.toMatchObject({
+      auditContext: {
+        certificateThumbprintSha256: CERTIFICATE_SHA256,
+        cnpjSent: ESTABLISHMENT_CNPJ,
+        payloadReference: PAYLOAD_REFERENCE,
+        requestSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      },
+      code: "STOCK_EXIT_PREFLIGHT_REJECTED",
+    });
     expect(harness.succeed).toHaveBeenCalledWith(
       expect.objectContaining({ evidenceResponse: restricted.result.evidence }),
     );

@@ -29,10 +29,17 @@ export interface StockExitPreflightConfirmation {
   readonly remoteStockId: number;
 }
 
+export interface StockExitPreflightAuditContext {
+  readonly certificateThumbprintSha256: string;
+  readonly cnpjSent: string;
+  readonly payloadReference: string;
+  readonly requestSha256: string;
+}
+
 export class StockExitPreflightRejectedError extends Error {
   readonly code = "STOCK_EXIT_PREFLIGHT_REJECTED";
 
-  constructor() {
+  constructor(readonly auditContext?: StockExitPreflightAuditContext) {
     super("O estoque consultado não permite confirmar a saída.");
     this.name = "StockExitPreflightRejectedError";
   }

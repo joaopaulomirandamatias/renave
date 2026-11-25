@@ -33,6 +33,8 @@ import {
   transitionCredentialServiceScope,
   transitionEstablishmentRegulatoryJurisdiction,
   withTenant,
+  type AppendAuditEventInput,
+  type AuditEvent,
   type CreateHeldLocalOperationInput,
   type CredentialLinkStatus,
   type CredentialServiceNature,
@@ -211,7 +213,7 @@ async function seedVerifiedOperationPrincipalsForComposition(
       role: "renave_operator",
     },
   ]);
-  const operator = await client.query<{ id: string; version: string }>(
+  let operator = await client.query<{ id: string; version: string }>(
     `insert into renave.operator_identity_profile (
        tenant_id,subject,hmac_key_id,identity_hmac,
        envelope_schema_version,envelope_key_id,envelope_nonce,
@@ -223,7 +225,8 @@ async function seedVerifiedOperationPrincipalsForComposition(
        1,'cpf-envelope-v1',$3,$4,$5,$6,
        'verified','regulated_provider',$7,$8,$9,
        pg_catalog.clock_timestamp()
-     ) returning id,version::text`,
+     ) on conflict (tenant_id,subject) do nothing
+       returning id,version::text`,
     [
       input.subject,
       createHash("sha256").update(`operator-hmac:${input.label}`).digest(),
@@ -236,7 +239,15 @@ async function seedVerifiedOperationPrincipalsForComposition(
       createHash("sha256").update(`operator-verifier:${input.label}`).digest(),
     ],
   );
-  const establishment = await client.query<{
+  if (operator.rowCount === 0) {
+    operator = await client.query<{ id: string; version: string }>(
+      `select id,version::text
+         from renave.operator_identity_profile
+        where tenant_id=renave.current_tenant_id() and subject=$1`,
+      [input.subject],
+    );
+  }
+  let establishment = await client.query<{
     id: string;
     version: string;
   }>(
@@ -251,7 +262,8 @@ async function seedVerifiedOperationPrincipalsForComposition(
        1,'email-envelope-v1',$3,$4,$5,$6,
        'verified','mailbox_challenge',$7,$8,$9,
        pg_catalog.clock_timestamp()
-     ) returning id,version::text`,
+     ) on conflict (tenant_id,establishment_id) do nothing
+       returning id,version::text`,
     [
       input.establishmentId,
       createHash("sha256").update(`establishment-hmac:${input.label}`).digest(),
@@ -270,6 +282,14 @@ async function seedVerifiedOperationPrincipalsForComposition(
         .digest(),
     ],
   );
+  if (establishment.rowCount === 0) {
+    establishment = await client.query<{ id: string; version: string }>(
+      `select id,version::text
+         from renave.establishment_renave_profile
+        where tenant_id=renave.current_tenant_id() and establishment_id=$1`,
+      [input.establishmentId],
+    );
+  }
   return {
     establishmentProfileId: establishment.rows[0]!.id,
     establishmentProfileVersion: establishment.rows[0]!.version,
@@ -746,8 +766,16 @@ async function stockExitCompositionHarness(
   scenario: PreflightScenario,
   label: string,
   restricted: boolean,
+  appendAudit?: (
+    client: TenantClient,
+    input: AppendAuditEventInput,
+  ) => Promise<AuditEvent>,
+  subject = STOCK_EXIT_SUBJECT,
+  prepareLink = true,
 ) {
-  await prepareCredentialLink(scenario, "enabled");
+  if (prepareLink) {
+    await prepareCredentialLink(scenario, "enabled");
+  }
   const principals = await withTenant(
     migratorPool,
     scenario.tenant.id,
@@ -755,7 +783,7 @@ async function stockExitCompositionHarness(
       seedVerifiedOperationPrincipalsForComposition(client, {
         establishmentId: scenario.store.id,
         label,
-        subject: STOCK_EXIT_SUBJECT,
+        subject,
       }),
   );
   const getStockById = vi.fn(async () =>
@@ -816,7 +844,7 @@ async function stockExitCompositionHarness(
           profileId: principals.operatorProfileId,
           profileVersion: principals.operatorProfileVersion,
           purpose: "operator-cpf" as const,
-          subject: STOCK_EXIT_SUBJECT,
+          subject,
           tenantId: scenario.tenant.id,
         },
         envelope: protectedPrincipal(1),
@@ -839,6 +867,7 @@ async function stockExitCompositionHarness(
   } as unknown as RenavePrincipalCrypto;
   const municipalityCatalog = { contains: vi.fn(async () => true) };
   const operation = new PostgresHeldStockExitOperation({
+    ...(appendAudit === undefined ? {} : { appendAudit }),
     digestKeys: {
       actor: Buffer.alloc(32, 0x51),
       idempotency: Buffer.alloc(32, 0x52),
@@ -882,6 +911,18 @@ async function stockExitCompositionHarness(
     releaseFailure,
     resolver,
   };
+}
+
+async function stockExitLocalAudits(scenario: PreflightScenario) {
+  const audits = await withTenant(appPool, scenario.tenant.id, (client) =>
+    listAuditEvents(client),
+  );
+  return audits.filter(
+    ({ action }) =>
+      action === "renave.stock-exit.request" ||
+      action === "stock-exit.held-local.created" ||
+      action === "stock-exit.held-local.replayed",
+  );
 }
 
 async function stockExitOperationCounts(scenario: PreflightScenario) {
@@ -2268,6 +2309,18 @@ describe("composição PostgreSQL real da API", () => {
         "attempted",
         "succeeded",
       ]);
+      expect(await stockExitLocalAudits(scenario)).toEqual([
+        expect.objectContaining({
+          action: "stock-exit.held-local.created",
+          actorIp: "198.51.100.15/32",
+          actorSubject: STOCK_EXIT_SUBJECT,
+          establishmentId: scenario.store.id,
+          outcome: "succeeded",
+          requestSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+          responseSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+          traceId: "stock-exit-preflight-accepted-trace",
+        }),
+      ]);
       expect(harness.acquire).toHaveBeenCalledOnce();
       expect(harness.release).toHaveBeenCalledOnce();
       expect(harness.releaseFailure).not.toHaveBeenCalled();
@@ -2340,6 +2393,21 @@ describe("composição PostgreSQL real da API", () => {
         "attempted",
         "succeeded",
       ]);
+      expect(await stockExitLocalAudits(scenario)).toEqual([
+        expect.objectContaining({
+          action: "renave.stock-exit.request",
+          actorIp: "198.51.100.16/32",
+          actorSubject: STOCK_EXIT_SUBJECT,
+          certificateThumbprintSha256: "b".repeat(64),
+          cnpjSent: scenario.store.cnpj,
+          establishmentId: scenario.store.id,
+          outcome: "rejected",
+          payloadReference: expect.any(String),
+          requestSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+          responseSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+          traceId: "stock-exit-preflight-rejected-trace",
+        }),
+      ]);
       expect(harness.acquire).toHaveBeenCalledOnce();
       expect(harness.release).toHaveBeenCalledOnce();
       expect(harness.releaseFailure).not.toHaveBeenCalled();
@@ -2359,6 +2427,219 @@ describe("composição PostgreSQL real da API", () => {
       expect(harness.mutate).not.toHaveBeenCalled();
       expect(harness.resolver.resolve).not.toHaveBeenCalled();
       expect(harness.municipalityCatalog.contains).not.toHaveBeenCalled();
+    } finally {
+      harness.operation.destroy();
+    }
+  });
+
+  it("audita o replay sem duplicar a saída HELD_LOCAL", async () => {
+    const scenario = await createPreflightScenario("stock-exit-replay-audit");
+    const harness = await stockExitCompositionHarness(
+      scenario,
+      "stock-exit-replay-audit",
+      false,
+    );
+    const idempotencyKey = randomUUID();
+    const execute = () =>
+      harness.operation.execute({
+        actorIp: "198.51.100.18",
+        business: stockExitBusiness,
+        establishmentId: scenario.store.id,
+        idempotencyKey,
+        now: STOCK_EXIT_NOW,
+        session: {
+          expiresAt: Date.now() + 60_000,
+          issuer: "https://issuer.example.test",
+          mfaVerified: true,
+          roles: [],
+          subject: STOCK_EXIT_SUBJECT,
+        },
+        tenantId: scenario.tenant.id,
+        traceId: "stock-exit-replay-audit-trace",
+      });
+    try {
+      const created = await execute();
+      const replayed = await execute();
+      expect(created.replayed).toBe(false);
+      expect(replayed).toMatchObject({
+        operationId: created.operationId,
+        replayed: true,
+        status: "HELD_LOCAL",
+      });
+      expect(await stockExitOperationCounts(scenario)).toEqual({
+        legacy_operations: 0,
+        outbox_items: 0,
+        stock_exit_operations: 1,
+        stock_exit_statuses: ["HELD_LOCAL"],
+      });
+      const audits = await stockExitLocalAudits(scenario);
+      expect(audits).toHaveLength(2);
+      expect(audits.map(({ action }) => action)).toEqual([
+        "stock-exit.held-local.created",
+        "stock-exit.held-local.replayed",
+      ]);
+      expect(audits.map(({ outcome }) => outcome)).toEqual([
+        "succeeded",
+        "succeeded",
+      ]);
+      expect(audits.map(({ payloadReference }) => payloadReference)).toEqual([
+        created.operationId,
+        created.operationId,
+      ]);
+      expect(audits.map(({ responseSha256 }) => responseSha256)).toEqual(
+        [created, replayed].map((result) =>
+          createHash("sha256")
+            .update(
+              JSON.stringify({
+                createdAt: result.createdAt.toISOString(),
+                operationId: result.operationId,
+                replayed: result.replayed,
+                status: "HELD_LOCAL",
+              }),
+            )
+            .digest("hex"),
+        ),
+      );
+      await expect(
+        harness.operation.execute({
+          actorIp: "198.51.100.18",
+          business: { ...stockExitBusiness, valorVenda: 98_501.25 },
+          establishmentId: scenario.store.id,
+          idempotencyKey,
+          now: STOCK_EXIT_NOW,
+          session: {
+            expiresAt: Date.now() + 60_000,
+            issuer: "https://issuer.example.test",
+            mfaVerified: true,
+            roles: [],
+            subject: STOCK_EXIT_SUBJECT,
+          },
+          tenantId: scenario.tenant.id,
+          traceId: "stock-exit-replay-payload-conflict",
+        }),
+      ).rejects.toMatchObject({ code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT" });
+      expect(harness.getStockById).toHaveBeenCalledTimes(3);
+      expect(harness.mutate).not.toHaveBeenCalled();
+
+      const cnpjBase = "223334440001";
+      const otherStore = await withTenant(
+        appPool,
+        scenario.tenant.id,
+        (client) =>
+          createEstablishment(client, {
+            cnpj: `${cnpjBase}${computeCnpjCheckDigits(cnpjBase)}`,
+            tradeName: "Loja Conflito Idempotente",
+          }),
+      );
+      const otherEstablishment = await stockExitCompositionHarness(
+        { store: otherStore, tenant: scenario.tenant },
+        "stock-exit-other-establishment",
+        false,
+      );
+      try {
+        await expect(
+          otherEstablishment.operation.execute({
+            actorIp: "198.51.100.19",
+            business: stockExitBusiness,
+            establishmentId: otherStore.id,
+            idempotencyKey,
+            now: STOCK_EXIT_NOW,
+            session: {
+              expiresAt: Date.now() + 60_000,
+              issuer: "https://issuer.example.test",
+              mfaVerified: true,
+              roles: [],
+              subject: STOCK_EXIT_SUBJECT,
+            },
+            tenantId: scenario.tenant.id,
+            traceId: "stock-exit-replay-establishment-conflict",
+          }),
+        ).rejects.toMatchObject({ code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT" });
+      } finally {
+        otherEstablishment.operation.destroy();
+      }
+
+      const otherActor = await stockExitCompositionHarness(
+        scenario,
+        "stock-exit-other-actor",
+        false,
+        undefined,
+        "oidc|stock-exit-other-actor",
+        false,
+      );
+      try {
+        await expect(
+          otherActor.operation.execute({
+            actorIp: "198.51.100.20",
+            business: stockExitBusiness,
+            establishmentId: scenario.store.id,
+            idempotencyKey,
+            now: STOCK_EXIT_NOW,
+            session: {
+              expiresAt: Date.now() + 60_000,
+              issuer: "https://issuer.example.test",
+              mfaVerified: true,
+              roles: [],
+              subject: "oidc|stock-exit-other-actor",
+            },
+            tenantId: scenario.tenant.id,
+            traceId: "stock-exit-replay-actor-conflict",
+          }),
+        ).rejects.toMatchObject({ code: "STOCK_EXIT_IDEMPOTENCY_CONFLICT" });
+      } finally {
+        otherActor.operation.destroy();
+      }
+      expect(await stockExitOperationCounts(scenario)).toEqual({
+        legacy_operations: 0,
+        outbox_items: 0,
+        stock_exit_operations: 1,
+        stock_exit_statuses: ["HELD_LOCAL"],
+      });
+    } finally {
+      harness.operation.destroy();
+    }
+  });
+
+  it("reverte a saída HELD_LOCAL quando a auditoria local falha", async () => {
+    const scenario = await createPreflightScenario(
+      "stock-exit-local-audit-rollback",
+    );
+    const harness = await stockExitCompositionHarness(
+      scenario,
+      "stock-exit-local-audit-rollback",
+      false,
+      async () => {
+        throw new Error("auditoria indisponível");
+      },
+    );
+    try {
+      await expect(
+        harness.operation.execute({
+          actorIp: "198.51.100.17",
+          business: stockExitBusiness,
+          establishmentId: scenario.store.id,
+          idempotencyKey: randomUUID(),
+          now: STOCK_EXIT_NOW,
+          session: {
+            expiresAt: Date.now() + 60_000,
+            issuer: "https://issuer.example.test",
+            mfaVerified: true,
+            roles: [],
+            subject: STOCK_EXIT_SUBJECT,
+          },
+          tenantId: scenario.tenant.id,
+          traceId: "stock-exit-local-audit-rollback-trace",
+        }),
+      ).rejects.toMatchObject({ code: "STOCK_EXIT_OPERATION_UNAVAILABLE" });
+      expect(await stockExitOperationCounts(scenario)).toEqual({
+        legacy_operations: 0,
+        outbox_items: 0,
+        stock_exit_operations: 0,
+        stock_exit_statuses: [],
+      });
+      expect(await stockExitLocalAudits(scenario)).toEqual([]);
+      expect(harness.getStockById).toHaveBeenCalledOnce();
+      expect(harness.mutate).not.toHaveBeenCalled();
     } finally {
       harness.operation.destroy();
     }
