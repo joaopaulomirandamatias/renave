@@ -63,7 +63,15 @@ export function AppShell({
       <aside className="sr-app-shell__sidebar" aria-label="Navegação principal">
         <div className="sr-app-shell__brand">
           <BrandLogo compact />
-          <span>{workspaceLabel}</span>
+          <span className="sr-app-shell__brand-copy">
+            <span className="sr-app-shell__brand-title" aria-hidden="true">
+              <span>Renav</span>
+              <strong>Estoque</strong>
+            </span>
+            <span className="sr-app-shell__brand-subtitle">
+              {workspaceLabel}
+            </span>
+          </span>
         </div>
 
         <nav aria-label="Seções da aplicação">
@@ -100,22 +108,40 @@ export function AppShell({
 
       <header className="sr-app-shell__topbar">
         <div className="sr-app-shell__establishment">
-          <label htmlFor={establishmentSelectId}>Estabelecimento ativo</label>
-          <select
-            id={establishmentSelectId}
-            value={activeEstablishmentId}
-            onChange={handleEstablishmentChange}
-            disabled={establishments.length === 0 || !onEstablishmentChange}
-          >
-            {establishments.length === 0 ? (
-              <option value="">Nenhum estabelecimento disponível</option>
-            ) : null}
-            {establishments.map((establishment) => (
-              <option key={establishment.id} value={establishment.id}>
-                {establishment.label}
-              </option>
-            ))}
-          </select>
+          <label className="sr-only" htmlFor={establishmentSelectId}>
+            Estabelecimento ativo
+          </label>
+          <div className="sr-app-shell__establishment-control">
+            <svg
+              className="sr-app-shell__establishment-icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
+            </svg>
+            <select
+              id={establishmentSelectId}
+              value={activeEstablishmentId}
+              onChange={handleEstablishmentChange}
+              disabled={establishments.length === 0 || !onEstablishmentChange}
+            >
+              {establishments.length === 0 ? (
+                <option value="">Nenhum estabelecimento disponível</option>
+              ) : null}
+              {establishments.map((establishment) => (
+                <option key={establishment.id} value={establishment.id}>
+                  {establishment.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="sr-app-shell__context">

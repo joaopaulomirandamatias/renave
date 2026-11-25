@@ -245,7 +245,7 @@ export function PlatformConsolePage({
       </a>
       <header className="platform-console__header">
         <div className="platform-console__brand">
-          <BrandLogo compact />
+          <BrandLogo compact showWordmark variant="inverse" />
           <span>Operação global auditada</span>
         </div>
         <div className="platform-console__session">

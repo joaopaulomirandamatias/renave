@@ -63,6 +63,12 @@ describe("@seu-renave/ui tokens e contratos", () => {
     expect(componentsCss).toMatch(
       /\.sr-app-shell__navigation-link\s*\{[^}]*min-height:\s*var\(--sr-touch-target-min\)/s,
     );
+    expect(componentsCss).toMatch(
+      /\.sr-app-shell__establishment-control\s*\{[^}]*min-height:\s*var\(--sr-touch-target-min\)/s,
+    );
+    expect(componentsCss).toMatch(
+      /\.sr-app-shell__establishment select\s*\{[^}]*min-height:\s*var\(--sr-touch-target-min\)/s,
+    );
     expect(componentsCss).toContain("@media (max-width: 52rem)");
     expect(componentsCss).toContain("@media (max-width: 36rem)");
   });

@@ -1,42 +1,66 @@
 :root {
   color-scheme: light;
-  font-family: Inter, "Segoe UI", Roboto, system-ui, sans-serif;
+  --sr-font-sans:
+    Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  --sr-font-brand: Nunito, Inter, "Segoe UI", system-ui, sans-serif;
+  --sr-font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
+  font-family: var(--sr-font-sans);
 
   --sr-color-app: #f6f7f9;
   --sr-color-surface: #ffffff;
+  --sr-color-surface-hover: #f9fafb;
   --sr-color-surface-subtle: #f2f4f7;
+  --sr-color-surface-muted: #f2f4f7;
   --sr-color-border: #e4e7ec;
   --sr-color-border-strong: #d0d5dd;
   --sr-color-text: #101828;
+  --sr-color-text-secondary: #344054;
   --sr-color-text-muted: #475467;
+  --sr-color-text-tertiary: #667085;
   --sr-color-navy: #0b2550;
   --sr-color-navy-soft: #eef4ff;
   --sr-color-navy-border: #c7d7fe;
   --sr-color-brand: #067a45;
   --sr-color-brand-hover: #05663a;
   --sr-color-brand-soft: #e7f6ee;
-  --sr-color-brand-border: #a6dfc1;
+  --sr-color-brand-border: #a7ddbf;
   --sr-color-logo-green: #0a9b55;
+  --sr-color-success: #067647;
+  --sr-color-success-soft: #ecfdf3;
+  --sr-color-success-border: #abefc6;
   /* Decorativo apenas (faixa do logo e indicador pontual; nunca texto nem grandes areas) */
   --sr-color-amber: #f2a90c;
   --sr-color-info: #175cd3;
   --sr-color-info-soft: #eff8ff;
   --sr-color-info-border: #b2ddff;
-  --sr-color-warning-text: #8a3c00;
+  --sr-color-warning: #b54708;
+  --sr-color-warning-text: #93370d;
   --sr-color-warning-soft: #fffaeb;
   --sr-color-warning-border: #fedf89;
   --sr-color-danger: #b42318;
   --sr-color-danger-hover: #912018;
   --sr-color-danger-soft: #fef3f2;
+  --sr-color-danger-border: #fecdca;
   --sr-color-disabled-bg: #eaecf0;
   --sr-color-disabled-text: #667085;
   --sr-color-focus: #1570ef;
 
+  /* Backoffice da plataforma (identidade escura diferenciada) */
+  --sr-color-sidebar-saas: #0b2550;
+  --sr-color-sidebar-saas-active: #12336e;
+  --sr-color-sidebar-saas-border: #1e3a6e;
+  --sr-color-sidebar-saas-muted: #a9b8d4;
+
   --sr-radius-control: 0.5rem;
-  --sr-radius-card: 0.75rem;
+  --sr-radius-card: 0.625rem;
+  --sr-radius-card-lg: 0.75rem;
   --sr-radius-pill: 999px;
   --sr-shadow-card: 0 1px 2px rgb(16 24 40 / 6%);
 
+  --sr-sidebar-width: 15.5rem;
+  --sr-content-max-width: 74.5rem;
   --sr-touch-target-min: 2.75rem;
   --sr-focus-ring-width: 3px;
   --sr-focus-ring-offset: 3px;
@@ -57,6 +81,10 @@ body {
   margin: 0;
   background: var(--sr-color-app);
   color: var(--sr-color-text);
+  font-family: var(--sr-font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,

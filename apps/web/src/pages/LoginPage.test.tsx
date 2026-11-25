@@ -11,13 +11,24 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LoginPage } from "./LoginPage.js";
 
+const currentDir = dirname(fileURLToPath(import.meta.url));
+const indexHtml = readFileSync(resolve(currentDir, "../../index.html"), "utf8");
+
 afterEach(cleanup);
 
 describe("LoginPage", () => {
+  it("mantém a marca RenavEstoque e não carrega fontes por CDN", () => {
+    expect(indexHtml).toContain("<title>Entrar — RenavEstoque</title>");
+    expect(indexHtml).not.toMatch(/fonts\.(googleapis|gstatic)\.com/i);
+  });
+
   it("inicia o fluxo corporativo sem coletar credenciais e expõe semântica acessível", () => {
     const { container } = render(<LoginPage />);
 
@@ -250,5 +261,17 @@ describe("@seu-renave/ui acessibilidade e semântica", () => {
       "true",
     );
     expect(container.querySelector(".sr-brand__name")).toBeNull();
+  });
+
+  it("BrandLogo inversa mantém nome acessível com wordmark", () => {
+    const { container } = render(
+      <BrandLogo compact showWordmark variant="inverse" />,
+    );
+
+    expect(screen.getByRole("img", { name: "RenavEstoque" })).toBeVisible();
+    expect(container.querySelector(".sr-brand__name")).toHaveTextContent(
+      "RenavEstoque",
+    );
+    expect(container.querySelector(".sr-brand--inverse")).toBeVisible();
   });
 });
