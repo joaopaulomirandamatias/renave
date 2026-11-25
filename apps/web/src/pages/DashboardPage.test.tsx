@@ -91,13 +91,13 @@ describe("DashboardPage", () => {
     expect(
       within(navigation).getByRole("link", { name: "Painel" }),
     ).toHaveAttribute("aria-current", "page");
-    expect(within(navigation).getAllByRole("link")).toHaveLength(5);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(6);
     expect(
       within(navigation).getByRole("link", { name: "Estoque" }),
     ).toHaveAttribute("href", "/estoque");
     expect(
-      within(navigation).queryByRole("link", { name: "Pendências" }),
-    ).toBeNull();
+      within(navigation).getByRole("link", { name: "Pendências" }),
+    ).toHaveAttribute("href", "/pendencias");
     expect(
       within(navigation).queryByRole("link", { name: "Auditoria" }),
     ).toBeNull();
@@ -160,7 +160,7 @@ describe("DashboardPage", () => {
         name: "Estabelecimentos & Certificados",
       }),
     ).toBeNull();
-    expect(within(navigation).getAllByRole("link")).toHaveLength(3);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(4);
   });
 
   it.each([
@@ -229,6 +229,70 @@ describe("DashboardPage", () => {
       }
     },
   );
+
+  it("monta a fila read-only e marca a navegação do detalhe", async () => {
+    const operationId = "33333333-3333-4333-8333-333333333333";
+    const common = {
+      environment: "homologation" as const,
+      establishments,
+      onLogout: vi.fn(),
+      selectedEstablishmentId: "store-belem",
+      selectedTenantId: "tenant-a",
+      userDisplayName: "Operador",
+    };
+    const view = render(
+      <DashboardPage
+        {...common}
+        onLoadPendingOperations={vi.fn(async () => ({
+          items: [],
+          truncated: false,
+        }))}
+        route="pending"
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Nenhuma pendência aberta" }),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Pendências" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    view.rerender(
+      <DashboardPage
+        {...common}
+        onBackPendingOperationDetail={vi.fn()}
+        onLoadPendingOperationDetail={vi.fn(async () => ({
+          operation: {
+            correlationId: "44444444-4444-4444-8444-444444444444",
+            createdAt: "2026-11-24T12:00:00.000Z",
+            finalizedAt: null,
+            kind: "USED_STOCK_ENTRY" as const,
+            operationId,
+            reasonCode: null,
+            remoteRecordId: null,
+            remoteState: null,
+            sentAt: "2026-11-24T12:01:00.000Z",
+            status: "PENDING_RECONCILIATION" as const,
+            updatedAt: "2026-11-24T12:02:00.000Z",
+            version: "2",
+          },
+          timeline: [],
+        }))}
+        pendingOperationId={operationId}
+        route="pending-detail"
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Operação 33333333" }),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Pendências" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
 
   it("cai para o primeiro estabelecimento quando o selecionado não existe", () => {
     render(

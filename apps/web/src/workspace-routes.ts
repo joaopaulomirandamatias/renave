@@ -3,6 +3,8 @@ export type WorkspaceRoute =
   | "stock"
   | "stock-detail"
   | "stock-entry"
+  | "pending"
+  | "pending-detail"
   | "compliance"
   | "establishments";
 
@@ -16,6 +18,7 @@ export const workspaceNavigation = [
   { href: "/painel", id: "dashboard", label: "Painel" },
   { href: "/estoque", id: "stock", label: "Estoque" },
   { href: "/estoque/entrada", id: "stock-entry", label: "Entradas" },
+  { href: "/pendencias", id: "pending", label: "Pendências" },
   { href: "/compliance", id: "compliance", label: "Compliance" },
   {
     href: "/configuracoes/estabelecimentos",
@@ -34,6 +37,9 @@ export function resolveWorkspaceRoute(
   pathname: string,
 ): WorkspaceRoute | undefined {
   if (resolveStockDetailId(pathname) !== undefined) return "stock-detail";
+  if (resolvePendingOperationId(pathname) !== undefined) {
+    return "pending-detail";
+  }
   return routes.get(pathname);
 }
 
@@ -45,4 +51,14 @@ export function resolveStockDetailId(pathname: string): number | undefined {
   if (!match?.[1]) return undefined;
   const stockId = Number(match[1]);
   return Number.isSafeInteger(stockId) ? stockId : undefined;
+}
+
+const pendingOperationDetailPath =
+  /^\/pendencias\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
+
+/** Extrai somente o UUID canônico publicado na rota de detalhe. */
+export function resolvePendingOperationId(
+  pathname: string,
+): string | undefined {
+  return pendingOperationDetailPath.exec(pathname)?.[1];
 }

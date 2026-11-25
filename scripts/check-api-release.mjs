@@ -830,6 +830,9 @@ export function checkApiRuntimePreparation(
   if (!source.includes('"stock-exit-municipality-catalog"')) {
     issues.push(issue(file, source, "API_STOCK_EXIT_CATALOG_RUNTIME_REQUIRED"));
   }
+  if (!source.includes('"operation-pending-reader"')) {
+    issues.push(issue(file, source, "API_OPERATION_READER_RUNTIME_REQUIRED"));
+  }
   for (const module of [
     "platform-console-rate-limiter",
     "platform-console-reader",

@@ -2044,6 +2044,253 @@ footer {
   line-height: 1.5;
 }
 
+.pending-operations,
+.pending-operation-detail,
+.pending-operation-detail__content {
+  display: grid;
+  gap: 1rem;
+}
+
+.pending-operations__heading,
+.pending-operations__meta,
+.pending-operation-detail__hero,
+.pending-operation-detail__hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pending-operations__heading > div,
+.pending-operation-detail__hero > div:first-child {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.pending-operations__heading p,
+.pending-operations__heading h2,
+.pending-operations__content > p,
+.pending-operation-detail__hero p,
+.pending-operation-detail__hero h2,
+.pending-operation-detail__notice p {
+  margin: 0;
+}
+
+.pending-operations__heading > div > p:first-child,
+.pending-operation-detail__hero > div:first-child > p:first-child {
+  color: var(--sr-color-brand);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pending-operations__heading h2,
+.pending-operation-detail__hero h2 {
+  color: var(--sr-color-navy);
+  font-size: 1.25rem;
+}
+
+.pending-operations__heading > div > p:last-child,
+.pending-operation-detail__hero > div:first-child > p:last-child {
+  max-width: 70ch;
+  color: var(--sr-color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.pending-operations__content {
+  display: grid;
+  gap: 1rem;
+}
+
+.pending-operations__notice,
+.pending-operation-detail__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: var(--sr-color-warning-text);
+  background: var(--sr-color-warning-soft);
+  border: 1px solid var(--sr-color-warning-border);
+  border-radius: var(--sr-radius-control);
+}
+
+.pending-operations__notice svg,
+.pending-operation-detail__notice svg {
+  flex: 0 0 auto;
+}
+
+.pending-operations__notice p,
+.pending-operation-detail__notice p {
+  color: var(--sr-color-text);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.pending-operations__list {
+  display: grid;
+  gap: 0.875rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.pending-operations__item {
+  border-inline-start: 0.25rem solid var(--sr-color-warning-border);
+}
+
+.pending-operations__list
+  li[data-status="MANUAL_REVIEW"]
+  .pending-operations__item {
+  border-inline-start-color: var(--sr-color-danger);
+}
+
+.pending-operations__explanation,
+.pending-operation-detail__trace dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.875rem;
+  margin: 0;
+}
+
+.pending-operations__explanation div,
+.pending-operation-detail__trace dl div {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--sr-color-surface-subtle);
+  border-radius: var(--sr-radius-control);
+}
+
+.pending-operations__explanation dt,
+.pending-operation-detail__trace dt {
+  color: var(--sr-color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pending-operations__explanation dd,
+.pending-operation-detail__trace dd {
+  margin: 0;
+  color: var(--sr-color-text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.pending-operations__meta {
+  align-items: flex-end;
+  margin-top: 1rem;
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.pending-operations__refresh-error,
+.pending-operation-detail__refresh-error {
+  padding: 0.75rem 1rem;
+  color: var(--sr-color-danger);
+  background: var(--sr-color-danger-soft);
+  border: 1px solid var(--sr-color-danger);
+  border-radius: var(--sr-radius-control);
+}
+
+.pending-operations__truncated {
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.pending-operation-detail__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.pending-operation-detail__hero {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  background: var(--sr-color-surface);
+  border: 1px solid var(--sr-color-border);
+  border-radius: var(--sr-radius-card);
+  box-shadow: var(--sr-shadow-card);
+}
+
+.pending-operation-detail__hero-actions {
+  flex: 0 0 auto;
+}
+
+.pending-operation-detail__grid {
+  display: grid;
+  grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.5fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.pending-operation-detail__trace dl {
+  grid-template-columns: 1fr;
+}
+
+.pending-operation-detail__timeline {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.pending-operation-detail__timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: 0.75rem;
+  min-height: 5rem;
+}
+
+.pending-operation-detail__timeline li:not(:last-child)::before {
+  position: absolute;
+  top: 1.25rem;
+  bottom: -0.25rem;
+  left: 0.5625rem;
+  width: 2px;
+  content: "";
+  background: var(--sr-color-border-strong);
+}
+
+.pending-operation-detail__timeline-marker {
+  z-index: 1;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0.25rem 0 0 0.1875rem;
+  background: var(--sr-color-brand);
+  border: 3px solid var(--sr-color-surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--sr-color-brand-border);
+}
+
+.pending-operation-detail__timeline li > div {
+  display: grid;
+  justify-items: start;
+  gap: 0.3rem;
+  padding-bottom: 1rem;
+}
+
+.pending-operation-detail__timeline h4,
+.pending-operation-detail__timeline time {
+  margin: 0;
+}
+
+.pending-operation-detail__timeline h4 {
+  color: var(--sr-color-text);
+  font-size: 0.9375rem;
+}
+
+.pending-operation-detail__timeline time {
+  color: var(--sr-color-text-muted);
+  font-size: 0.8125rem;
+}
+
 @media (max-width: 46rem) {
   .dashboard-page__stats {
     grid-template-columns: 1fr;
@@ -2171,6 +2418,25 @@ footer {
   }
 
   .homologation-canary li {
+    grid-template-columns: 1fr;
+  }
+
+  .pending-operations__heading,
+  .pending-operations__meta,
+  .pending-operation-detail__hero,
+  .pending-operation-detail__hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pending-operations__heading .sr-button,
+  .pending-operations__meta .sr-button,
+  .pending-operation-detail__hero-actions .sr-button {
+    width: 100%;
+  }
+
+  .pending-operations__explanation,
+  .pending-operation-detail__grid {
     grid-template-columns: 1fr;
   }
 }

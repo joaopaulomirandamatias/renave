@@ -10,6 +10,7 @@ import {
   ArrowDownToLine,
   Building2,
   CarFront,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   ShieldCheck,
@@ -30,6 +31,10 @@ import type {
   EstablishmentManagementCapability,
 } from "../App.js";
 import { type ReadonlyCanaryPort } from "../features/homologation-canary/index.js";
+import type {
+  PendingOperationDetail,
+  PendingOperationsPage as PendingOperationsPageResult,
+} from "../features/pending-operations/client.js";
 import type { StockInventoryItem } from "./StockInventoryPanel.js";
 import { StockDetailPage, type StockDetail } from "./StockDetailPage.js";
 import {
@@ -40,6 +45,8 @@ import {
   CompliancePage,
   DashboardHomePage,
   EstablishmentsPage,
+  PendingOperationDetailPage,
+  PendingOperationsPage,
   StockEntryPage,
   StockPage,
 } from "./workspace/index.js";
@@ -88,7 +95,14 @@ export interface DashboardPageProps {
     stockId: number,
     signal: AbortSignal,
   ) => Promise<StockDetail>;
+  onLoadPendingOperations?: (
+    signal: AbortSignal,
+  ) => Promise<PendingOperationsPageResult>;
+  onLoadPendingOperationDetail?: (
+    signal: AbortSignal,
+  ) => Promise<PendingOperationDetail>;
   onBackStockDetail?: () => void;
+  onBackPendingOperationDetail?: () => void;
   onReloadCredentialLinkQueue?: () => void;
   onTenantChange?: (tenantId: string) => void;
   selectedEstablishmentId?: string;
@@ -100,6 +114,7 @@ export interface DashboardPageProps {
   readinessError?: boolean;
   readinessLoading?: boolean;
   route?: WorkspaceRoute;
+  pendingOperationId?: string;
   stockDetailId?: number;
   stockEntryOperationsEnabled?: boolean;
   tenants?: readonly { id: string; label: string }[];
@@ -111,6 +126,8 @@ const navigationIcons: Record<WorkspaceRoute, ReactNode> = {
   stock: <CarFront size={19} />,
   "stock-detail": <CarFront size={19} />,
   "stock-entry": <ArrowDownToLine size={19} />,
+  pending: <ClipboardList size={19} />,
+  "pending-detail": <ClipboardList size={19} />,
   compliance: <ShieldCheck size={19} />,
   establishments: <Building2 size={19} />,
 };
@@ -134,6 +151,14 @@ const routeHeadings: Record<
   "stock-entry": {
     eyebrow: "Operação de estoque",
     title: () => "Dar entrada — veículo usado",
+  },
+  pending: {
+    eyebrow: "Operação e compliance",
+    title: () => "Pendências",
+  },
+  "pending-detail": {
+    eyebrow: "Operação e compliance",
+    title: () => "Detalhe da operação",
   },
   compliance: {
     eyebrow: "Compliance",
@@ -173,7 +198,10 @@ export function DashboardPage({
   onLookupVehicle,
   onLoadRecentStocks,
   onLoadStockDetail,
+  onLoadPendingOperations,
+  onLoadPendingOperationDetail,
   onBackStockDetail,
+  onBackPendingOperationDetail,
   onReloadCredentialLinkQueue,
   onTenantChange,
   selectedEstablishmentId,
@@ -185,6 +213,7 @@ export function DashboardPage({
   readinessError = false,
   readinessLoading = false,
   route = "dashboard",
+  pendingOperationId,
   stockDetailId,
   stockEntryOperationsEnabled = false,
   tenants = [],
@@ -199,7 +228,9 @@ export function DashboardPage({
     .map((item) => ({
       ...item,
       current:
-        item.id === route || (item.id === "stock" && route === "stock-detail"),
+        item.id === route ||
+        (item.id === "stock" && route === "stock-detail") ||
+        (item.id === "pending" && route === "pending-detail"),
       icon: navigationIcons[item.id],
     }));
   const routeHeading = routeHeadings[route];
@@ -299,6 +330,36 @@ export function DashboardPage({
           {...(selectedTenantId ? { selectedTenantId } : {})}
         />
       );
+      break;
+    case "pending":
+      routeContent =
+        onLoadPendingOperations &&
+        selectedTenantId &&
+        selectedEstablishmentId ? (
+          <PendingOperationsPage
+            onLoad={onLoadPendingOperations}
+            selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
+          />
+        ) : (
+          <p className="context-feedback" role="status">
+            Selecione um estabelecimento para consultar as pendências.
+          </p>
+        );
+      break;
+    case "pending-detail":
+      routeContent =
+        pendingOperationId &&
+        onLoadPendingOperationDetail &&
+        onBackPendingOperationDetail &&
+        selectedTenantId &&
+        selectedEstablishmentId ? (
+          <PendingOperationDetailPage
+            onBack={onBackPendingOperationDetail}
+            onLoad={onLoadPendingOperationDetail}
+            operationId={pendingOperationId}
+            selectionKey={`${selectedTenantId}:${selectedEstablishmentId}`}
+          />
+        ) : null;
       break;
     case "compliance":
       routeContent = (

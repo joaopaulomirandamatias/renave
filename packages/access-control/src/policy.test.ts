@@ -81,6 +81,67 @@ describe("authorize", () => {
     ).toEqual({ allowed: false, reason: "ROLE_DENIED" });
   });
 
+  it("limita a leitura de operações ao estabelecimento para todos os papéis", () => {
+    expect(
+      authorize(operator, {
+        action: "renave.operation.read",
+        establishmentId: "establishment-a",
+        tenantId: "tenant-a",
+      }),
+    ).toMatchObject({ allowed: true, matchedRole: "renave_operator" });
+    expect(
+      authorize(operator, {
+        action: "renave.operation.read",
+        establishmentId: "establishment-b",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ESTABLISHMENT_SCOPE_DENIED" });
+
+    const scopedAuditor: AuthorizationContext = {
+      grants: [
+        {
+          establishmentIds: ["establishment-b"],
+          role: "compliance_auditor",
+        },
+      ],
+      subject: "auditor-1",
+      tenantId: "tenant-a",
+    };
+    expect(
+      authorize(scopedAuditor, {
+        action: "renave.operation.read",
+        establishmentId: "establishment-b",
+        tenantId: "tenant-a",
+      }),
+    ).toMatchObject({ allowed: true, matchedRole: "compliance_auditor" });
+    expect(
+      authorize(scopedAuditor, {
+        action: "renave.operation.read",
+        establishmentId: "establishment-a",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ESTABLISHMENT_SCOPE_DENIED" });
+    expect(
+      authorize(scopedAuditor, {
+        action: "renave.operation.read",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual({ allowed: false, reason: "ESTABLISHMENT_REQUIRED" });
+
+    const admin: AuthorizationContext = {
+      grants: [{ establishmentIds: "*", role: "tenant_admin" }],
+      subject: "admin-1",
+      tenantId: "tenant-a",
+    };
+    expect(
+      authorize(admin, {
+        action: "renave.operation.read",
+        establishmentId: "establishment-any",
+        tenantId: "tenant-a",
+      }),
+    ).toMatchObject({ allowed: true, matchedRole: "tenant_admin" });
+  });
+
   it("nega troca de tenant mesmo com o mesmo papel", () => {
     expect(
       authorize(operator, {

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DashboardPage } from "./pages/DashboardPage.js";
 import {
+  browserPendingOperationsClient,
+  type PendingOperationsClient,
+} from "./features/pending-operations/client.js";
+import {
   browserPlatformAccessClient,
   browserPlatformConsoleClient,
   PLATFORM_CONSOLE_PATH,
@@ -17,6 +21,7 @@ import { LoginPage } from "./pages/LoginPage.js";
 import type { StockInventoryItem } from "./pages/StockInventoryPanel.js";
 import type { StockDetail } from "./pages/StockDetailPage.js";
 import {
+  resolvePendingOperationId,
   resolveStockDetailId,
   resolveWorkspaceRoute,
 } from "./workspace-routes.js";
@@ -1302,6 +1307,7 @@ export interface AppProps {
   platformAccessClient?: PlatformAccessClient;
   platformConsoleClient?: PlatformConsoleClient;
   platformConsoleEnabled?: boolean;
+  pendingOperationsClient?: PendingOperationsClient;
   redirect?: (url: string) => void;
   stockEntryOperationsEnabled?: boolean;
 }
@@ -1419,6 +1425,7 @@ export function App({
   platformAccessClient = browserPlatformAccessClient,
   platformConsoleClient = browserPlatformConsoleClient,
   platformConsoleEnabled = false,
+  pendingOperationsClient = browserPendingOperationsClient,
   redirect = (url) => window.location.assign(url),
   stockEntryOperationsEnabled = false,
 }: AppProps) {
@@ -1428,6 +1435,7 @@ export function App({
     platformConsoleEnabled && platformConsolePathRequested;
   const workspaceRoute = resolveWorkspaceRoute(locationPathname);
   const stockDetailId = resolveStockDetailId(locationPathname);
+  const pendingOperationId = resolvePendingOperationId(locationPathname);
   const unknownWorkspacePath =
     !platformConsolePathRequested && workspaceRoute === undefined;
   const disabledStockEntryPath =
@@ -2225,6 +2233,26 @@ export function App({
                 stockId,
                 signal,
               ),
+          })}
+      onLoadPendingOperations={(signal) =>
+        pendingOperationsClient.loadPage({
+          establishmentId: activeEstablishmentId ?? "",
+          signal,
+          tenantId: selectedTenantId,
+        })
+      }
+      {...(pendingOperationId === undefined
+        ? {}
+        : {
+            pendingOperationId,
+            onBackPendingOperationDetail: () => redirect("/pendencias"),
+            onLoadPendingOperationDetail: (signal: AbortSignal) =>
+              pendingOperationsClient.loadDetail({
+                establishmentId: activeEstablishmentId ?? "",
+                operationId: pendingOperationId,
+                signal,
+                tenantId: selectedTenantId,
+              }),
           })}
       onReloadLinkStatus={() => setLinkReloadVersion((current) => current + 1)}
       preflightAvailable={

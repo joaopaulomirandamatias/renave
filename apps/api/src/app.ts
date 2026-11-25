@@ -28,6 +28,10 @@ import type { RenaveLinkStatusUseCase } from "./renave/link-status-use-case.js";
 import type { RenaveLinkPreflightUseCase } from "./renave/preflight-use-case.js";
 import type { RenaveReadinessUseCase } from "./renave/readiness-use-case.js";
 import {
+  registerOperationPendingRoutes,
+  type OperationPendingReader,
+} from "./renave/operation-pending-routes.js";
+import {
   registerStockEntryOperationRoute,
   type Clock,
   type StockEntryMutationRateLimiter,
@@ -69,6 +73,8 @@ export interface BuildAppOptions {
   stockQuery?: StockQueryUseCase;
   /** Consulta sanitizada do veículo após prova de estoque confirmado. */
   vehicleLookup?: VehicleLookupUseCase;
+  /** Projeção sanitizada das operações incertas por estabelecimento. */
+  operationPendingReader?: OperationPendingReader;
   /**
    * Criação local retida de entrada usada; nunca envia ao SERPRO.
    * O app chama `destroy` do caso de uso no onClose. O compositor continua
@@ -261,6 +267,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         : {}),
       ...(options.serproQueryLimiter
         ? { queryLimiter: options.serproQueryLimiter }
+        : {}),
+    });
+    registerOperationPendingRoutes(app, {
+      accessGuard,
+      ...(options.operationPendingReader
+        ? { reader: options.operationPendingReader }
+        : {}),
+      ...(options.tenantActionRunner
+        ? { tenantActionRunner: options.tenantActionRunner }
         : {}),
     });
     registerStockEntryOperationRoute(app, {

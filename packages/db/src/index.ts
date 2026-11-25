@@ -163,6 +163,23 @@ export {
   type OperationStatus,
 } from "./operations.js";
 export {
+  getPendingOperationDetail,
+  listPendingOperations,
+  OperationPendingReaderInputError,
+  OperationPendingReaderStorageError,
+  pendingOperationStatuses,
+  readableOperationStatuses,
+  readableRemoteStates,
+  type PendingOperationDetail,
+  type PendingOperationDetailSummary,
+  type PendingOperationPage,
+  type PendingOperationStatus,
+  type PendingOperationSummary,
+  type PendingOperationTimelineEntry,
+  type ReadableOperationStatus,
+  type ReadableRemoteState,
+} from "./operation-pending-reader.js";
+export {
   getEstablishmentRenaveProfileStatus,
   getOperatorIdentityProfileStatus,
   resolveVerifiedRenavePrincipals,

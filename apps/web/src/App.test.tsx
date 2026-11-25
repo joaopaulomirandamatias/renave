@@ -1375,6 +1375,143 @@ describe("App session boundary", () => {
     expect(screen.queryByText("Consultar aptidão do veículo")).toBeNull();
   });
 
+  it("carrega pendências somente no estabelecimento ativo", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }]),
+    );
+    const pendingOperationsClient = {
+      loadDetail: vi.fn(),
+      loadPage: vi.fn(async () => ({ items: [], truncated: false })),
+    };
+
+    render(
+      <App
+        client={client}
+        locationPathname="/pendencias"
+        pendingOperationsClient={pendingOperationsClient}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Nenhuma pendência aberta" }),
+    ).toBeVisible();
+    expect(pendingOperationsClient.loadPage).toHaveBeenCalledWith({
+      establishmentId: "store-a",
+      signal: expect.any(AbortSignal),
+      tenantId: "tenant-a",
+    });
+    expect(screen.getByRole("link", { name: "Pendências" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("abre detalhe canônico e volta para a fila", async () => {
+    const client = clientFor(
+      {
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      },
+      [{ displayName: "Revenda Norte", tenantId: "tenant-a" }],
+    );
+    vi.mocked(client.loadEstablishments).mockResolvedValue(
+      collection([{ id: "store-a", tradeName: "Loja Norte" }]),
+    );
+    const operationId = "33333333-3333-4333-8333-333333333333";
+    const pendingOperationsClient = {
+      loadDetail: vi.fn(async () => ({
+        operation: {
+          correlationId: "44444444-4444-4444-8444-444444444444",
+          createdAt: "2026-11-24T12:00:00.000Z",
+          finalizedAt: null,
+          kind: "USED_STOCK_ENTRY" as const,
+          operationId,
+          reasonCode: null,
+          remoteRecordId: null,
+          remoteState: null,
+          sentAt: "2026-11-24T12:01:00.000Z",
+          status: "PENDING_RECONCILIATION" as const,
+          updatedAt: "2026-11-24T12:02:00.000Z",
+          version: "2",
+        },
+        timeline: [],
+      })),
+      loadPage: vi.fn(),
+    };
+    const redirect = vi.fn();
+
+    render(
+      <App
+        client={client}
+        locationPathname={`/pendencias/${operationId}`}
+        pendingOperationsClient={pendingOperationsClient}
+        redirect={redirect}
+      />,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Operação 33333333" }),
+    ).toBeVisible();
+    expect(pendingOperationsClient.loadDetail).toHaveBeenCalledWith({
+      establishmentId: "store-a",
+      operationId,
+      signal: expect.any(AbortSignal),
+      tenantId: "tenant-a",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Voltar às pendências" }),
+    );
+    expect(redirect).toHaveBeenCalledWith("/pendencias");
+  });
+
+  it.each([
+    "/pendencias/33333333-3333-4333-8333-33333333333X",
+    "/pendencias/33333333-3333-4333-8333-333333333333/eventos",
+    "/pendencias/33333333-3333-4333-8333-333333333333".toUpperCase(),
+  ])(
+    "recusa detalhe de pendência não canônico %s antes da sessão",
+    async (locationPathname) => {
+      const client = clientFor({
+        authenticated: true,
+        authMode: "oidc",
+        environment: "homologation",
+        expiresAt: "2026-11-24T00:00:00.000Z",
+        user: { name: "Operadora" },
+      });
+      const pendingOperationsClient = {
+        loadDetail: vi.fn(),
+        loadPage: vi.fn(),
+      };
+
+      render(
+        <App
+          client={client}
+          locationPathname={locationPathname}
+          pendingOperationsClient={pendingOperationsClient}
+        />,
+      );
+
+      expect(
+        await screen.findByRole("heading", { name: "Página não encontrada" }),
+      ).toBeVisible();
+      expect(client.load).not.toHaveBeenCalled();
+      expect(pendingOperationsClient.loadDetail).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     "/estoque/0",
     "/estoque/01",

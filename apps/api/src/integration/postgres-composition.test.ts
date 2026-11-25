@@ -1657,6 +1657,89 @@ describe("composição PostgreSQL real da API", () => {
       veiculo: { placa: "ABC1D23" },
     });
 
+    const identity = {
+      config: { publicOrigin: "https://app.test" },
+      getSession: vi.fn(async () => ({
+        expiresAt: Date.now() + 60_000,
+        mfaVerified: false,
+        roles: ["idp-role-must-not-authorize"],
+        subject,
+      })),
+    } as unknown as IdentityService;
+    const operationReaderApp = buildApp({
+      config: loadConfig(),
+      identity,
+      logger: false,
+      tenantActionRunner: createTenantActionRunner(appPool),
+    });
+    try {
+      const pending = await operationReaderApp.inject({
+        method: "GET",
+        url: `/api/tenants/${tenant.id}/establishments/${compositionStore.id}/pending-operations?limit=1`,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+      expect(pending.statusCode).toBe(200);
+      expect(pending.headers["cache-control"]).toBe("no-store");
+      expect(pending.json()).toMatchObject({
+        items: [
+          {
+            kind: "USED_STOCK_ENTRY",
+            status: "PENDING_RECONCILIATION",
+          },
+        ],
+        truncated: true,
+      });
+
+      const operationDetail = await operationReaderApp.inject({
+        method: "GET",
+        url: `/api/tenants/${tenant.id}/establishments/${compositionStore.id}/operations/${unknown.begin.operation_id}`,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+      expect(operationDetail.statusCode).toBe(200);
+      expect(operationDetail.json()).toMatchObject({
+        operation: {
+          kind: "USED_STOCK_ENTRY",
+          operationId: unknown.begin.operation_id,
+          status: "PENDING_RECONCILIATION",
+        },
+        timeline: expect.arrayContaining([
+          expect.objectContaining({
+            reasonCode: "RENAVE_MUTATION_OUTCOME_UNKNOWN",
+            status: "PENDING_RECONCILIATION",
+          }),
+        ]),
+      });
+
+      const crossEstablishment = await operationReaderApp.inject({
+        method: "GET",
+        url: `/api/tenants/${tenant.id}/establishments/${otherStore.id}/operations/${unknown.begin.operation_id}`,
+        headers: { cookie: "renave_session=opaque-session" },
+      });
+      expect(crossEstablishment.statusCode).toBe(404);
+      expect(crossEstablishment.json()).toEqual({
+        code: "TENANT_RESOURCE_NOT_FOUND",
+      });
+
+      for (const response of [pending, operationDetail]) {
+        expect(response.body).not.toContain(tenant.id);
+        expect(response.body).not.toContain(compositionStore.id);
+        expect(response.body).not.toMatch(
+          /cipher|digest|idempotency|lease|outbox|actorSubject/iu,
+        );
+        for (const sentinel of [
+          cpfSentinel,
+          plateSentinel,
+          renavamSentinel,
+          crvSentinel,
+          codeSentinel,
+        ]) {
+          expect(response.body).not.toContain(sentinel);
+        }
+      }
+    } finally {
+      await operationReaderApp.close();
+    }
+
     const schema = await adminPool.query<{ column_name: string }>(
       `select column_name from information_schema.columns
         where table_schema='renave'

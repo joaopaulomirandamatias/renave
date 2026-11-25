@@ -20,6 +20,7 @@ const apiRuntimeDbFiles = new Set(
     "credential-service-scopes",
     "establishments",
     "login-rate-limiter",
+    "operation-pending-reader",
     "operations",
     "platform-console-access",
     "platform-console-rate-limiter",
