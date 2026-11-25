@@ -10,22 +10,23 @@ function argumentsFrom(values: readonly string[]): {
   manifestPath: string;
   sourcePath: string;
 } {
+  const normalized = values[0] === "--" ? values.slice(1) : values;
   if (
-    values.length !== 7 ||
-    values[0] !== "verify" ||
-    values[1] !== "--manifest" ||
-    values[3] !== "--source" ||
-    values[5] !== "--expected-manifest-sha256" ||
-    !values[2] ||
-    !values[4] ||
-    !values[6]
+    normalized.length !== 7 ||
+    normalized[0] !== "verify" ||
+    normalized[1] !== "--manifest" ||
+    normalized[3] !== "--source" ||
+    normalized[5] !== "--expected-manifest-sha256" ||
+    !normalized[2] ||
+    !normalized[4] ||
+    !normalized[6]
   ) {
     throw new MunicipalityCatalogSnapshotInvalidError();
   }
   return {
-    expectedManifestSha256: values[6],
-    manifestPath: values[2],
-    sourcePath: values[4],
+    expectedManifestSha256: normalized[6],
+    manifestPath: normalized[2],
+    sourcePath: normalized[4],
   };
 }
 

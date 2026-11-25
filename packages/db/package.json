@@ -36,6 +36,7 @@
     "cli": "tsx src/cli.ts",
     "bootstrap": "tsx src/cli.ts bootstrap",
     "migrate": "tsx src/cli.ts migrate",
+    "municipality:catalog:publish": "tsx src/municipality-catalog-publish-cli.ts publish",
     "municipality:catalog:verify": "tsx src/municipality-catalog-cli.ts verify",
     "platform:grant": "tsx src/cli.ts platform-grant",
     "platform:revoke": "tsx src/cli.ts platform-revoke",

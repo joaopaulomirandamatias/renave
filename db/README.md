@@ -206,10 +206,34 @@ deve chegar por um canal de aprovação revisado e independente dos dois arquivo
 um hash guardado ao lado da própria captura não autentica sua procedência.
 
 Essa etapa prova integridade e consistência, não vigência nem publicação. A
-captura mTLS e sua aprovação/WORM pertencem à cerimônia externa. A publicação
-transacional ainda não está exposta por CLI, e não existe snapshot ativo. O
-futuro publicador deverá repetir a verificação completa, aplicar a política de
-frescor e usar diretamente o papel mínimo autorizado, sem `SET ROLE`.
+captura mTLS e sua aprovação/WORM pertencem à cerimônia externa.
+
+Depois da aprovação, a publicação transacional é explícita:
+
+```bash
+DATABASE_MIGRATOR_URL='postgresql://...' \
+DATABASE_MIGRATOR_TLS_CA_FILE=/run/secrets/database-ca.pem \
+pnpm municipality:catalog:publish -- \
+  --manifest /caminho/manifest.json \
+  --source /caminho/source.json \
+  --expected-manifest-sha256 <sha256-aprovado-por-canal-independente> \
+  --maximum-age-hours 24
+```
+
+O limite de frescor é obrigatório, inteiro e no máximo 24 horas; o relógio do
+PostgreSQL decide dentro da transação. O publicador repete toda a verificação,
+recusa regressão temporal, serializa concorrentes antes de ler o ativo, confere
+o contrato de migrations, compartilha o advisory lock do runner e relê origem,
+metadados, hashes, contagem e integridade antes do commit. A mesma versão ativa
+e idêntica é replay seguro; versão histórica ou divergente é recusada. Banco
+remoto exige CA explícita, e parâmetros TLS na URL são recusados.
+
+O processo conecta diretamente como `renave_migrator`, sem `SET ROLE`, e rejeita
+atributos elevados ou memberships. Limite residual: esse papel é dono dos
+objetos por desenho e também executa migrations; a separação é operacional, não
+uma fronteira de credencial. O comando não captura dados nem chama o SERPRO. Não
+existe snapshot ativo versionado no repositório; a execução depende da captura
+oficial aprovada fora dele.
 
 ## Proveniência
 
