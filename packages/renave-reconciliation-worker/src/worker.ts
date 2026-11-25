@@ -27,6 +27,8 @@ import {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const RECONCILIATION_HORIZON_MS = 60 * 60 * 1_000;
+const RECONCILIATION_FINAL_WINDOW_TOLERANCE_MS = 5 * 60 * 1_000;
+const RECONCILIATION_SCHEDULE_SECONDS = Object.freeze([60, 300, 900, 3_600]);
 const REMOTE_STATES = new Set<ReconciliationRemoteState>([
   "SOLICITADO",
   "TRANSFERIDO",
@@ -59,7 +61,7 @@ export interface ReconciliationDatabasePort {
     },
   ): Promise<OperationReconciliationCompletion | null>;
   release(
-    input: ReconciliationDatabaseFence & { retryDelaySeconds: number },
+    input: ReconciliationDatabaseFence & { retryAt: Date },
   ): Promise<boolean>;
   renew(input: ReconciliationDatabaseFence): Promise<boolean>;
 }
@@ -119,7 +121,6 @@ export interface ReconciliationWorkerConfig {
   integratorCnpj: string;
   leaseOwner: string;
   limiterBackoff: ReconciliationBackoffPolicy;
-  notObservedBackoff: ReconciliationBackoffPolicy;
   tenantAllowlist: readonly string[];
   transientBackoff: ReconciliationBackoffPolicy;
 }
@@ -151,7 +152,7 @@ type Decision =
       remoteState: ReconciliationRemoteState;
     }
   | { kind: "manual"; reason: ReconciliationManualReviewReason }
-  | { delaySeconds: number; kind: "release" }
+  | { kind: "release"; retryAt: Date }
   | { kind: "abort" };
 
 export class ReconciliationWorkerConfigurationError extends Error {
@@ -202,6 +203,61 @@ function deterministicBackoff(
 ): number {
   const exponent = Math.min(Math.max(attemptCount - 1, 0), 30);
   return Math.min(policy.maxSeconds, policy.baseSeconds * 2 ** exponent);
+}
+
+function elapsedMilliseconds(sentAt: Date, observedAt: Date): number | null {
+  const sentAtMilliseconds = sentAt.getTime();
+  const observedAtMilliseconds = observedAt.getTime();
+  if (
+    !Number.isFinite(sentAtMilliseconds) ||
+    !Number.isFinite(observedAtMilliseconds) ||
+    observedAtMilliseconds < sentAtMilliseconds
+  ) {
+    return null;
+  }
+  return observedAtMilliseconds - sentAtMilliseconds;
+}
+
+function windowExpiredDecision(): Decision {
+  return {
+    kind: "manual",
+    reason: "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
+  };
+}
+
+function boundedTechnicalRelease(
+  sentAt: Date,
+  observedAt: Date,
+  delaySeconds: number,
+): Decision {
+  const elapsed = elapsedMilliseconds(sentAt, observedAt);
+  if (elapsed === null || elapsed >= RECONCILIATION_HORIZON_MS) {
+    return windowExpiredDecision();
+  }
+  return {
+    kind: "release",
+    retryAt: new Date(
+      Math.min(
+        observedAt.getTime() + delaySeconds * 1_000,
+        sentAt.getTime() + RECONCILIATION_HORIZON_MS,
+      ),
+    ),
+  };
+}
+
+function notObservedDecision(sentAt: Date, observedAt: Date): Decision {
+  const elapsed = elapsedMilliseconds(sentAt, observedAt);
+  if (elapsed === null || elapsed >= RECONCILIATION_HORIZON_MS) {
+    return windowExpiredDecision();
+  }
+  const nextOffsetSeconds = RECONCILIATION_SCHEDULE_SECONDS.find(
+    (offsetSeconds) => offsetSeconds * 1_000 > elapsed,
+  );
+  if (nextOffsetSeconds === undefined) return windowExpiredDecision();
+  return {
+    kind: "release",
+    retryAt: new Date(sentAt.getTime() + nextOffsetSeconds * 1_000),
+  };
 }
 
 function emptySummary(): ReconciliationWorkerSummary {
@@ -366,7 +422,6 @@ export class ReconciliationWorker {
     let integratorCnpjInput: unknown;
     let leaseOwner: unknown;
     let limiterBackoff: ReconciliationBackoffPolicy;
-    let notObservedBackoff: ReconciliationBackoffPolicy;
     let tenantAllowlist: readonly string[];
     let transientBackoff: ReconciliationBackoffPolicy;
     let capturedPorts: WorkerState["ports"];
@@ -377,7 +432,6 @@ export class ReconciliationWorker {
       integratorCnpjInput = config.integratorCnpj;
       leaseOwner = config.leaseOwner;
       limiterBackoff = config.limiterBackoff;
-      notObservedBackoff = config.notObservedBackoff;
       tenantAllowlist = [...config.tenantAllowlist];
       transientBackoff = config.transientBackoff;
 
@@ -464,7 +518,6 @@ export class ReconciliationWorker {
         integratorCnpj,
         leaseOwner: leaseOwner.toLowerCase(),
         limiterBackoff: Object.freeze(normalizeBackoff(limiterBackoff)),
-        notObservedBackoff: Object.freeze(normalizeBackoff(notObservedBackoff)),
         transientBackoff: Object.freeze(normalizeBackoff(transientBackoff)),
       }),
       ports: capturedPorts,
@@ -614,13 +667,14 @@ export class ReconciliationWorker {
               )
             ) {
               keyUnavailable = true;
-              decision = {
-                delaySeconds: deterministicBackoff(
+              decision = boundedTechnicalRelease(
+                begun.sentAt,
+                state.ports.clockNow(),
+                deterministicBackoff(
                   state.config.transientBackoff,
                   claim.attemptCount,
                 ),
-                kind: "release",
-              };
+              );
             } else {
               envelope = envelopeFrom(begun);
               const binding = bindingFrom(tenantId, begun);
@@ -648,7 +702,9 @@ export class ReconciliationWorker {
           if (
             !(now instanceof Date) ||
             !Number.isFinite(now.getTime()) ||
-            now.getTime() - begun.sentAt.getTime() > RECONCILIATION_HORIZON_MS
+            now.getTime() - begun.sentAt.getTime() >
+              RECONCILIATION_HORIZON_MS +
+                RECONCILIATION_FINAL_WINDOW_TOLERANCE_MS
           ) {
             decision = {
               kind: "manual",
@@ -670,13 +726,14 @@ export class ReconciliationWorker {
             if (!permit) {
               decision = externalSignal.aborted
                 ? { kind: "abort" }
-                : {
-                    delaySeconds: deterministicBackoff(
+                : boundedTechnicalRelease(
+                    begun.sentAt,
+                    now,
+                    deterministicBackoff(
                       state.config.limiterBackoff,
                       claim.attemptCount,
                     ),
-                    kind: "release",
-                  };
+                  );
             } else {
               try {
                 const result = await readRenaveReconciliation(
@@ -693,19 +750,19 @@ export class ReconciliationWorker {
                 );
                 decision =
                   !(result.observedAt instanceof Date) ||
-                  !Number.isFinite(result.observedAt.getTime()) ||
-                  result.observedAt.getTime() - begun.sentAt.getTime() >
-                    RECONCILIATION_HORIZON_MS
+                  !Number.isFinite(result.observedAt.getTime())
                     ? {
                         kind: "manual",
-                        reason: "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
+                        reason: "RENAVE_RECONCILIATION_UNRECOVERABLE",
                       }
-                    : this.decisionFromResult(result, claim.attemptCount);
+                    : this.decisionFromResult(result, begun.sentAt);
               } catch (error) {
                 decision = this.decisionFromReadError(
                   error,
                   claim.attemptCount,
                   externalSignal,
+                  begun.sentAt,
+                  state.ports.clockNow(),
                 );
               }
             }
@@ -733,7 +790,7 @@ export class ReconciliationWorker {
       try {
         released = await state.ports.release({
           ...databaseFence,
-          retryDelaySeconds: 0,
+          retryAt: new Date(begun.sentAt),
         });
       } catch {
         // Resultado incerto do fence: falha fechada, sem propagar detalhe bruto.
@@ -749,7 +806,7 @@ export class ReconciliationWorker {
       try {
         released = await state.ports.release({
           ...databaseFence,
-          retryDelaySeconds: decision!.delaySeconds,
+          retryAt: decision!.retryAt,
         });
       } catch {
         // Resultado incerto do fence: falha fechada, sem propagar detalhe bruto.
@@ -799,9 +856,8 @@ export class ReconciliationWorker {
 
   private decisionFromResult(
     result: ReconciliationReadResult,
-    attemptCount: number,
+    sentAt: Date,
   ): Decision {
-    const state = workerState(this);
     if (result.outcome === "confirmed") {
       if (
         !Number.isSafeInteger(result.remoteRecordId) ||
@@ -831,41 +887,33 @@ export class ReconciliationWorker {
         reason: "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
       };
     }
-    return {
-      delaySeconds: deterministicBackoff(
-        state.config.notObservedBackoff,
-        attemptCount,
-      ),
-      kind: "release",
-    };
+    return notObservedDecision(sentAt, result.observedAt);
   }
 
   private decisionFromReadError(
     error: unknown,
     attemptCount: number,
     externalSignal: AbortSignal,
+    sentAt: Date,
+    observedAt: Date,
   ): Decision {
     const state = workerState(this);
     if (error instanceof RenaveReconciliationReadError) {
       if (error.category === "ABORTED") {
         return externalSignal.aborted
           ? { kind: "abort" }
-          : {
-              delaySeconds: deterministicBackoff(
-                state.config.transientBackoff,
-                attemptCount,
-              ),
-              kind: "release",
-            };
+          : boundedTechnicalRelease(
+              sentAt,
+              observedAt,
+              deterministicBackoff(state.config.transientBackoff, attemptCount),
+            );
       }
       if (error.category === "TRANSIENT") {
-        return {
-          delaySeconds: deterministicBackoff(
-            state.config.transientBackoff,
-            attemptCount,
-          ),
-          kind: "release",
-        };
+        return boundedTechnicalRelease(
+          sentAt,
+          observedAt,
+          deterministicBackoff(state.config.transientBackoff, attemptCount),
+        );
       }
     }
     return {

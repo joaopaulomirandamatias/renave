@@ -11,6 +11,7 @@ import {
   createOrReplayOperation,
   type CreateOperationInput,
 } from "../../src/operations.js";
+import { releaseOperationReconciliationLease } from "../../src/operation-reconciliation.js";
 import { createPool, withTenant } from "../../src/tenant-context.js";
 import { provisionTenant, type Tenant } from "../../src/tenants.js";
 import { bindHistoricalOperationForDispatch } from "../helpers/operation-authorization.js";
@@ -788,6 +789,115 @@ describe("operation reconciliation lease", () => {
         ),
     );
     expect(atBoundary.rows[0]!.value).toBe(false);
+  });
+
+  it("release absoluto não antecipa a janela sem contenção e preserva o fence", async () => {
+    const target = await createTarget("release-absolute");
+    const claimed = await claim(target);
+    const lease = claimed.rows[0]!;
+    const sentAt = await withTenant(
+      migratorPool,
+      target.tenant.id,
+      async (client) =>
+        (
+          await client.query<{ sent_at: Date }>(
+            "select sent_at from renave.operation where id=$1",
+            [target.operationId],
+          )
+        ).rows[0]!.sent_at,
+    );
+    const retryAt = new Date(sentAt.getTime() + 60 * 60 * 1_000);
+
+    const released = await withTenant(workerPool, target.tenant.id, (client) =>
+      releaseOperationReconciliationLease(client, {
+        leaseOwner: claimed.owner,
+        leaseToken: lease.lease_token,
+        operationVersion: lease.operation_version,
+        outboxId: target.outboxId,
+        retryAt,
+      }),
+    );
+    expect(released).toBe(true);
+    const availableAt = (await leaseState(target)).available_at;
+    expect(availableAt.getTime()).toBeGreaterThanOrEqual(retryAt.getTime());
+    expect(availableAt.getTime()).toBeLessThanOrEqual(
+      retryAt.getTime() + 1_500,
+    );
+
+    const staleTarget = await createTarget("release-absolute-stale");
+    const staleClaim = await claim(staleTarget);
+    const staleLease = staleClaim.rows[0]!;
+    const stale = await withTenant(
+      workerPool,
+      staleTarget.tenant.id,
+      (client) =>
+        releaseOperationReconciliationLease(client, {
+          leaseOwner: staleClaim.owner,
+          leaseToken: randomUUID(),
+          operationVersion: staleLease.operation_version,
+          outboxId: staleTarget.outboxId,
+          retryAt,
+        }),
+    );
+    expect(stale).toBe(false);
+    expect((await leaseState(staleTarget)).delivery_status).toBe("LEASED");
+  });
+
+  it("release absoluto pode atrasar sob lock sem antecipar o alvo", async () => {
+    const target = await createTarget("release-absolute-lock-wait");
+    const claimed = await claim(target);
+    const lease = claimed.rows[0]!;
+    const retryAt = (
+      await adminPool.query<{ retry_at: Date }>(
+        "select clock_timestamp()+interval '500 milliseconds' as retry_at",
+      )
+    ).rows[0]!.retry_at;
+    const blocker = await migratorPool.connect();
+    const worker = await workerPool.connect();
+    let blockerOpen = false;
+    let workerOpen = false;
+    try {
+      await setTenant(blocker, target.tenant.id);
+      blockerOpen = true;
+      const blockerPid = (
+        await blocker.query<{ pid: number }>("select pg_backend_pid() as pid")
+      ).rows[0]!.pid;
+      await blocker.query(
+        "select id from renave.operation where id=$1 for update",
+        [target.operationId],
+      );
+
+      await setTenant(worker, target.tenant.id);
+      workerOpen = true;
+      const workerPid = (
+        await worker.query<{ pid: number }>("select pg_backend_pid() as pid")
+      ).rows[0]!.pid;
+      const running = releaseOperationReconciliationLease(worker, {
+        leaseOwner: claimed.owner,
+        leaseToken: lease.lease_token,
+        operationVersion: lease.operation_version,
+        outboxId: target.outboxId,
+        retryAt,
+      });
+      await waitForBlock(blocker, workerPid, blockerPid);
+      const delayedPastTarget = new Date(retryAt.getTime() + 500);
+      await waitUntilDatabaseTime(delayedPastTarget);
+      await blocker.query("commit");
+      blockerOpen = false;
+      expect(await running).toBe(true);
+      await worker.query("commit");
+      workerOpen = false;
+
+      const availableAt = (await leaseState(target)).available_at;
+      expect(availableAt.getTime()).toBeGreaterThanOrEqual(
+        delayedPastTarget.getTime(),
+      );
+    } finally {
+      if (blockerOpen) await blocker.query("rollback");
+      if (workerOpen) await worker.query("rollback");
+      blocker.release();
+      worker.release();
+    }
   });
 
   it.each(["renew", "release"] as const)(

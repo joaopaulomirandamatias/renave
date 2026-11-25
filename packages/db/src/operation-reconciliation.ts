@@ -469,31 +469,31 @@ export async function renewOperationReconciliationLease(
 
 export async function releaseOperationReconciliationLease(
   client: TenantClient,
-  input: OperationReconciliationFence & { retryDelaySeconds: number },
+  input: OperationReconciliationFence & { retryAt: Date },
 ): Promise<boolean> {
   const fence = normalizeFence(input);
-  let retryDelaySeconds: unknown;
+  let retryAt: unknown;
   try {
-    retryDelaySeconds = input.retryDelaySeconds;
+    retryAt = input.retryAt;
   } catch {
     throw new OperationReconciliationInputError();
   }
-  if (
-    !Number.isInteger(retryDelaySeconds) ||
-    (retryDelaySeconds as number) < 0 ||
-    (retryDelaySeconds as number) > 86_400
-  ) {
+  if (!(retryAt instanceof Date) || !Number.isFinite(retryAt.getTime())) {
     throw new OperationReconciliationInputError();
   }
   return booleanFenceCall(
     client,
-    "select renave.release_operation_reconciliation_lease($1,$2,$3,$4,$5) as value",
+    `select renave.release_operation_reconciliation_lease(
+       $1,$2,$3,$4,
+       greatest(0, least(86400, ceil(extract(epoch from
+         $5::timestamptz - pg_catalog.clock_timestamp())))::integer)
+     ) as value`,
     [
       fence.outboxId,
       fence.leaseOwner,
       fence.leaseToken,
       fence.operationVersion,
-      retryDelaySeconds,
+      new Date(retryAt),
     ],
   );
 }

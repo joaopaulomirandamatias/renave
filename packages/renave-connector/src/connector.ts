@@ -465,6 +465,10 @@ export type ReconciliationReadResult =
   | { observedAt: Date; outcome: "not_observed" }
   | { observedAt: Date; outcome: "window_expired" };
 
+const RECONCILIATION_ELIGIBILITY_HORIZON_MS = 60 * 60 * 1_000;
+const RECONCILIATION_EXECUTION_TOLERANCE_MS = 5 * 60 * 1_000;
+const RECONCILIATION_CLOCK_SKEW_MS = 60 * 1_000;
+
 export interface RenaveReconciliationReaderOptions {
   now: () => Date;
   transport: RenaveReadOnlyTransport;
@@ -951,6 +955,27 @@ export async function readRenaveReconciliation(
     if (context.environment !== state.environment) {
       throw new RenaveEnvironmentMismatchError();
     }
+    const readStartedAt = state.now();
+    if (
+      !(readStartedAt instanceof Date) ||
+      !Number.isFinite(readStartedAt.getTime()) ||
+      !(window.sentAt instanceof Date) ||
+      !Number.isFinite(window.sentAt.getTime()) ||
+      readStartedAt.getTime() < window.sentAt.getTime()
+    ) {
+      throw new InvalidStockEntryReconciliationError("WINDOW");
+    }
+    const sentAtMilliseconds = window.sentAt.getTime();
+    if (
+      readStartedAt.getTime() - sentAtMilliseconds >
+      RECONCILIATION_ELIGIBILITY_HORIZON_MS +
+        RECONCILIATION_EXECUTION_TOLERANCE_MS
+    ) {
+      return {
+        observedAt: new Date(readStartedAt),
+        outcome: "window_expired",
+      };
+    }
     const headers: EstablishmentHeaders = Object.freeze({
       "CNPJ-Estabelecimento": normalizeCnpj(context.establishmentCnpj),
     });
@@ -968,18 +993,24 @@ export async function readRenaveReconciliation(
     if (
       !(observedAt instanceof Date) ||
       !Number.isFinite(observedAt.getTime()) ||
-      !(window.sentAt instanceof Date) ||
-      !Number.isFinite(window.sentAt.getTime()) ||
       observedAt.getTime() < window.sentAt.getTime()
     ) {
       throw new InvalidStockEntryReconciliationError("WINDOW");
     }
     const observedAtCopy = new Date(observedAt);
-    if (observedAt.getTime() - window.sentAt.getTime() > 60 * 60 * 1_000) {
-      return { observedAt: observedAtCopy, outcome: "window_expired" };
-    }
+    // A GET final pode começar dentro da tolerância operacional, mas a
+    // elegibilidade regulatória nunca avança além de sent_at + 60 minutos.
+    const comparisonObservedAt = new Date(
+      Math.min(
+        observedAt.getTime(),
+        sentAtMilliseconds +
+          RECONCILIATION_ELIGIBILITY_HORIZON_MS -
+          RECONCILIATION_CLOCK_SKEW_MS,
+      ),
+    );
     const result = reconcileStockEntryRecords(request, records, {
-      observedAt,
+      clockSkewMs: RECONCILIATION_CLOCK_SKEW_MS,
+      observedAt: comparisonObservedAt,
       sentAt: window.sentAt,
     });
     if (result.outcome === "confirmed") {

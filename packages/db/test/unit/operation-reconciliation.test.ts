@@ -259,7 +259,7 @@ describe("operation reconciliation repository", () => {
     await expect(
       releaseOperationReconciliationLease(tenantClient, {
         ...input,
-        retryDelaySeconds: 60,
+        retryAt: new Date("2026-11-24T12:01:00.000Z"),
       }),
     ).resolves.toBe(true);
     await expect(
@@ -269,6 +269,34 @@ describe("operation reconciliation repository", () => {
         remoteState: "CONFIRMADO",
       }),
     ).resolves.toBeNull();
+  });
+
+  it("converte o alvo absoluto no banco e preserva o contrato fenced", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ value: true }] });
+    const retryAt = new Date("2026-11-24T12:05:00.000Z");
+    const input = fence();
+
+    await expect(
+      releaseOperationReconciliationLease(client(query), {
+        ...input,
+        retryAt,
+      }),
+    ).resolves.toBe(true);
+    expect(query).toHaveBeenCalledWith(
+      `select renave.release_operation_reconciliation_lease(
+       $1,$2,$3,$4,
+       greatest(0, least(86400, ceil(extract(epoch from
+         $5::timestamptz - pg_catalog.clock_timestamp())))::integer)
+     ) as value`,
+      [
+        input.outboxId,
+        input.leaseOwner,
+        input.leaseToken,
+        input.operationVersion,
+        retryAt,
+      ],
+    );
+    expect(query.mock.calls[0]![1]![4]).not.toBe(retryAt);
   });
 
   it("valida inputs antes de consultar", async () => {
@@ -286,7 +314,7 @@ describe("operation reconciliation repository", () => {
     await expect(
       releaseOperationReconciliationLease(tenantClient, {
         ...fence(),
-        retryDelaySeconds: 86_401,
+        retryAt: new Date(Number.NaN),
       }),
     ).rejects.toBeInstanceOf(OperationReconciliationInputError);
     await expect(

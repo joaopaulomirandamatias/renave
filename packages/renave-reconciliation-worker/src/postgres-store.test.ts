@@ -127,7 +127,10 @@ describe("PostgresReconciliationDatabase", () => {
     });
     await adapter.begin(fence);
     await adapter.renew(fence);
-    await adapter.release({ ...fence, retryDelaySeconds: 5 });
+    await adapter.release({
+      ...fence,
+      retryAt: new Date("2026-11-24T10:01:00.000Z"),
+    });
     await adapter.completeConfirmed({
       ...fence,
       remoteRecordId: 7,

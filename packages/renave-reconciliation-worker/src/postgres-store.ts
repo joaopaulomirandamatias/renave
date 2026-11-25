@@ -95,7 +95,7 @@ export class PostgresReconciliationDatabase implements ReconciliationDatabasePor
     return withTenant(databasePool(this), input.tenantId, (client) =>
       releaseOperationReconciliationLease(client, {
         ...withoutTenant(input),
-        retryDelaySeconds: input.retryDelaySeconds,
+        retryAt: input.retryAt,
       }),
     );
   }

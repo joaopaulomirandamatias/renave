@@ -157,10 +157,57 @@ describe("RenaveReconciliationReader", () => {
     );
   });
 
-  it("captura janela expirada imediatamente após GET", async () => {
+  it("executa a janela final dentro da tolerância operacional", async () => {
     const fake = transport([]);
     const reader = new RenaveReconciliationReader({
-      now: () => new Date("2026-11-24T11:00:00.001Z"),
+      now: () => new Date("2026-11-24T11:00:30.000Z"),
+      transport: fake,
+    });
+    await expect(
+      reader.reconcileStockEntry(context, projection, {
+        sentAt: new Date("2026-11-24T10:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({ outcome: "not_observed" });
+    expect(fake.findStocksByPlate).toHaveBeenCalledOnce();
+  });
+
+  it("não amplia a elegibilidade de registros além de sessenta minutos", async () => {
+    const record = (dataHoraRegistro: string, id: number) => ({
+      codigoSegurancaCrv: "12345678901",
+      entradaEstoque: {
+        cpfOperadorResponsavel: "12345678901",
+        dataHoraRegistro,
+      },
+      estado: "CONFIRMADO",
+      id,
+      numeroCrv: "123456789012",
+      placa: "QTP4H82",
+      renavam: "12345678901",
+      tipoCrv: "DIGITAL",
+    });
+    const sentAt = new Date("2026-11-24T10:00:00.000Z");
+
+    const eligible = new RenaveReconciliationReader({
+      now: () => new Date("2026-11-24T11:00:30.000Z"),
+      transport: transport([record("2026-11-24T11:00:00.000Z", 7)]),
+    });
+    await expect(
+      eligible.reconcileStockEntry(context, projection, { sentAt }),
+    ).resolves.toMatchObject({ outcome: "confirmed", remoteRecordId: 7 });
+
+    const late = new RenaveReconciliationReader({
+      now: () => new Date("2026-11-24T11:00:30.000Z"),
+      transport: transport([record("2026-11-24T11:00:00.001Z", 8)]),
+    });
+    await expect(
+      late.reconcileStockEntry(context, projection, { sentAt }),
+    ).resolves.toMatchObject({ outcome: "not_observed" });
+  });
+
+  it("fecha a janela sem nova rede depois da tolerância do reader", async () => {
+    const fake = transport([]);
+    const reader = new RenaveReconciliationReader({
+      now: () => new Date("2026-11-24T11:05:00.001Z"),
       transport: fake,
     });
     await expect(
@@ -168,7 +215,8 @@ describe("RenaveReconciliationReader", () => {
         sentAt: new Date("2026-11-24T10:00:00.000Z"),
       }),
     ).resolves.toMatchObject({ outcome: "window_expired" });
-    expect(fake.findStocksByPlate).toHaveBeenCalledOnce();
+    expect(fake.getAuthenticatedClient).not.toHaveBeenCalled();
+    expect(fake.findStocksByPlate).not.toHaveBeenCalled();
   });
 
   it.each([

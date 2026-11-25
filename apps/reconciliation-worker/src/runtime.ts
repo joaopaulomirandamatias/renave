@@ -207,7 +207,6 @@ export async function createOperationalRuntime(
         integratorCnpj: config.integratorCnpj,
         leaseOwner: config.leaseOwner,
         limiterBackoff: { baseSeconds: 15, maxSeconds: 300 },
-        notObservedBackoff: { baseSeconds: 60, maxSeconds: 900 },
         tenantAllowlist,
         transientBackoff: { baseSeconds: 30, maxSeconds: 600 },
       },

@@ -159,7 +159,6 @@ function config(overrides: Partial<ReconciliationWorkerConfig> = {}) {
     integratorCnpj: "69.418.503/0001-88",
     leaseOwner: LEASE_OWNER,
     limiterBackoff: { baseSeconds: 2, maxSeconds: 60 },
-    notObservedBackoff: { baseSeconds: 5, maxSeconds: 60 },
     tenantAllowlist: [TENANT_ID],
     transientBackoff: { baseSeconds: 3, maxSeconds: 60 },
     ...overrides,
@@ -170,6 +169,7 @@ async function setup(
   result: ReconciliationReadResult | Error,
   options: {
     clock?: Date;
+    attemptCount?: number;
     limiter?: ReconciliationLimiterPort;
     logger?: { write(event: ReconciliationWorkerEvent): void };
     projectionCipher?: OperationReconciliationProjectionCipher;
@@ -177,6 +177,10 @@ async function setup(
   } = {},
 ) {
   const { begun, claim, projectionCipher } = await fixture();
+  if (options.attemptCount !== undefined) {
+    claim.attemptCount = options.attemptCount;
+    begun.attemptCount = options.attemptCount;
+  }
   const events: ReconciliationWorkerEvent[] = [];
   const permitRelease = vi.fn();
   const database: ReconciliationDatabasePort = {
@@ -327,7 +331,7 @@ describe("ReconciliationWorker", () => {
     [
       "window_expired",
       {
-        observedAt: new Date("2026-11-24T11:00:00.001Z"),
+        observedAt: new Date("2026-11-24T11:05:00.001Z"),
         outcome: "window_expired",
       },
       "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
@@ -346,14 +350,16 @@ describe("ReconciliationWorker", () => {
     },
   );
 
-  it("not_observed e transitório liberam com backoff determinístico por attempt", async () => {
+  it("not_observed usa agenda absoluta e transitório mantém backoff técnico", async () => {
     const notObserved = await setup({
       observedAt: new Date("2026-11-24T10:00:30.000Z"),
       outcome: "not_observed",
     });
     await notObserved.worker.runCycle();
     expect(notObserved.database.release).toHaveBeenCalledWith(
-      expect.objectContaining({ retryDelaySeconds: 20 }),
+      expect.objectContaining({
+        retryAt: new Date("2026-11-24T10:01:00.000Z"),
+      }),
     );
 
     const transient = await setup(
@@ -361,9 +367,107 @@ describe("ReconciliationWorker", () => {
     );
     await transient.worker.runCycle();
     expect(transient.database.release).toHaveBeenCalledWith(
-      expect.objectContaining({ retryDelaySeconds: 12 }),
+      expect.objectContaining({
+        retryAt: new Date("2026-11-24T10:00:32.000Z"),
+      }),
     );
     expect(transient.database.completeManual).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["primeira observação", "2026-11-24T10:01:00.000Z", "10:05:00.000"],
+    ["após a primeira janela", "2026-11-24T10:01:00.001Z", "10:05:00.000"],
+    [
+      "fração antes de cinco minutos",
+      "2026-11-24T10:04:59.001Z",
+      "10:05:00.000",
+    ],
+    ["cinco minutos", "2026-11-24T10:05:00.000Z", "10:15:00.000"],
+    [
+      "execução atrasada sete minutos",
+      "2026-11-24T10:07:00.000Z",
+      "10:15:00.000",
+    ],
+    ["quinze minutos", "2026-11-24T10:15:00.000Z", "11:00:00.000"],
+  ] as const)(
+    "agenda a próxima janela estritamente futura em %s",
+    async (_label, observedAt, retryTime) => {
+      const test = await setup(
+        { observedAt: new Date(observedAt), outcome: "not_observed" },
+        {
+          attemptCount: 99,
+          clock: new Date(new Date(observedAt).getTime() - 1),
+        },
+      );
+
+      await expect(test.worker.runCycle()).resolves.toMatchObject({
+        released: 1,
+      });
+      expect(test.database.release).toHaveBeenCalledWith(
+        expect.objectContaining({
+          retryAt: new Date(`2026-11-24T${retryTime}Z`),
+        }),
+      );
+      expect(test.database.completeManual).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserva confirmed e manual_review quando a leitura iniciada antes do limite conclui na borda", async () => {
+    const clock = new Date("2026-11-24T10:59:59.999Z");
+    const confirmed = await setup(
+      {
+        observedAt: new Date("2026-11-24T11:00:00.000Z"),
+        outcome: "confirmed",
+        remoteRecordId: 7,
+        remoteState: "CONFIRMADO",
+      },
+      { clock },
+    );
+    await expect(confirmed.worker.runCycle()).resolves.toMatchObject({
+      confirmed: 1,
+    });
+    expect(confirmed.transport.findStocksByPlate).toHaveBeenCalledOnce();
+
+    const ambiguous = await setup(
+      {
+        observedAt: new Date("2026-11-24T11:00:00.000Z"),
+        outcome: "manual_review",
+      },
+      { clock },
+    );
+    await expect(ambiguous.worker.runCycle()).resolves.toMatchObject({
+      manualReview: 1,
+    });
+    expect(ambiguous.database.completeManual).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "RENAVE_RECONCILIATION_AMBIGUOUS",
+      }),
+    );
+  });
+
+  it("persiste o alvo absoluto sem deriva até a janela final", async () => {
+    const rounded = await setup({
+      observedAt: new Date("2026-11-24T10:05:00.001Z"),
+      outcome: "not_observed",
+    });
+    await rounded.worker.runCycle();
+    expect(rounded.database.release).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retryAt: new Date("2026-11-24T10:15:00.000Z"),
+      }),
+    );
+
+    const noRepresentableDelay = await setup({
+      observedAt: new Date("2026-11-24T10:59:59.001Z"),
+      outcome: "not_observed",
+    });
+    await noRepresentableDelay.worker.runCycle();
+    expect(noRepresentableDelay.database.release).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retryAt: new Date("2026-11-24T11:00:00.000Z"),
+      }),
+    );
+    expect(noRepresentableDelay.database.completeManual).not.toHaveBeenCalled();
   });
 
   it("chave surgida após preflight libera com backoff e nunca vira manual", async () => {
@@ -380,7 +484,9 @@ describe("ReconciliationWorker", () => {
       released: 1,
     });
     expect(test.database.release).toHaveBeenCalledWith(
-      expect.objectContaining({ retryDelaySeconds: 12 }),
+      expect.objectContaining({
+        retryAt: new Date("2026-11-24T10:00:32.000Z"),
+      }),
     );
     expect(test.database.completeManual).not.toHaveBeenCalled();
     expect(test.database.completeConfirmed).not.toHaveBeenCalled();
@@ -392,7 +498,7 @@ describe("ReconciliationWorker", () => {
     ]);
   });
 
-  it("limiter indisponível libera antes de qualquer rede e >1h vira manual", async () => {
+  it("limiter indisponível libera antes de qualquer rede e horizonte vira manual", async () => {
     const noPermit: ReconciliationLimiterPort = {
       tryAcquire: vi.fn(async () => null),
     };
@@ -406,15 +512,17 @@ describe("ReconciliationWorker", () => {
     await limited.worker.runCycle();
     expect(limited.transport.findStocksByPlate).not.toHaveBeenCalled();
     expect(limited.database.release).toHaveBeenCalledWith(
-      expect.objectContaining({ retryDelaySeconds: 8 }),
+      expect.objectContaining({
+        retryAt: new Date("2026-11-24T10:00:28.000Z"),
+      }),
     );
 
     const expired = await setup(
       {
-        observedAt: new Date("2026-11-24T11:00:01.000Z"),
+        observedAt: new Date("2026-11-24T11:05:00.001Z"),
         outcome: "not_observed",
       },
-      { clock: new Date("2026-11-24T11:00:00.001Z") },
+      { clock: new Date("2026-11-24T11:05:00.001Z") },
     );
     await expired.worker.runCycle();
     expect(expired.limiter.tryAcquire).not.toHaveBeenCalled();
@@ -435,6 +543,93 @@ describe("ReconciliationWorker", () => {
     await boundary.worker.runCycle();
     expect(boundary.limiter.tryAcquire).toHaveBeenCalledOnce();
     expect(boundary.transport.findStocksByPlate).toHaveBeenCalledOnce();
+    expect(boundary.database.release).not.toHaveBeenCalled();
+    expect(boundary.database.completeManual).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
+      }),
+    );
+  });
+
+  it("fecha falha técnica e limiter na tentativa final sem quinta consulta", async () => {
+    const noPermit: ReconciliationLimiterPort = {
+      tryAcquire: vi.fn(async () => null),
+    };
+    const limited = await setup(
+      {
+        observedAt: new Date("2026-11-24T11:00:00.000Z"),
+        outcome: "not_observed",
+      },
+      {
+        clock: new Date("2026-11-24T11:00:00.000Z"),
+        limiter: noPermit,
+      },
+    );
+    await limited.worker.runCycle();
+    expect(limited.database.release).not.toHaveBeenCalled();
+    expect(limited.database.completeManual).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
+      }),
+    );
+    expect(limited.transport.findStocksByPlate).not.toHaveBeenCalled();
+
+    const transient = await setup(
+      new RenaveReconciliationReadError("TRANSIENT"),
+      { clock: new Date("2026-11-24T11:00:30.000Z") },
+    );
+    await transient.worker.runCycle();
+    expect(transient.database.release).not.toHaveBeenCalled();
+    expect(transient.database.completeManual).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
+      }),
+    );
+    expect(transient.transport.findStocksByPlate).toHaveBeenCalledOnce();
+
+    const keyUnavailable = await setup(
+      {
+        observedAt: new Date("2026-11-24T11:00:30.000Z"),
+        outcome: "not_observed",
+      },
+      { clock: new Date("2026-11-24T11:00:30.000Z") },
+    );
+    keyUnavailable.begun.projectionKeyId = "projection-key-unavailable";
+    await keyUnavailable.worker.runCycle();
+    expect(keyUnavailable.database.release).not.toHaveBeenCalled();
+    expect(keyUnavailable.database.completeManual).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "RENAVE_RECONCILIATION_WINDOW_EXPIRED",
+      }),
+    );
+    expect(keyUnavailable.limiter.tryAcquire).not.toHaveBeenCalled();
+    expect(keyUnavailable.transport.findStocksByPlate).not.toHaveBeenCalled();
+  });
+
+  it("limita backoff técnico anterior à tentativa final ao alvo de sessenta minutos", async () => {
+    const noPermit: ReconciliationLimiterPort = {
+      tryAcquire: vi.fn(async () => null),
+    };
+    const test = await setup(
+      {
+        observedAt: new Date("2026-11-24T10:59:55.000Z"),
+        outcome: "not_observed",
+      },
+      {
+        clock: new Date("2026-11-24T10:59:55.000Z"),
+        limiter: noPermit,
+      },
+    );
+
+    await expect(test.worker.runCycle()).resolves.toMatchObject({
+      released: 1,
+    });
+    expect(test.database.release).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retryAt: new Date("2026-11-24T11:00:00.000Z"),
+      }),
+    );
+    expect(test.transport.findStocksByPlate).not.toHaveBeenCalled();
   });
 
   it.each(["IDENTITY_MISMATCH", "PROTOCOL"] as const)(
