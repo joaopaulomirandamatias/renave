@@ -2,9 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 
 import type { IdentityService } from "@seu-renave/identity";
 import {
+  type DecryptedRenavePrincipal,
   EvidenceCipher,
   OperationReconciliationProjectionCipher,
   OperationRequestCipher,
+  type ProtectedRenavePrincipal,
+  type RenavePrincipalCrypto,
 } from "@seu-renave/protected-evidence";
 import {
   RenaveHttpError,
@@ -48,6 +51,11 @@ import { buildCreateOperationInput } from "../renave/operation-request-builder.j
 import { PostgresRenaveLinkPreflightUseCase } from "../renave/preflight-use-case.js";
 import { PostgresRenaveLinkStatusUseCase } from "../renave/link-status-use-case.js";
 import { PostgresStockQueryUseCase } from "../renave/stock-query-use-case.js";
+import {
+  PostgresHeldStockExitOperation,
+  type StockExitBusinessInput,
+} from "../renave/stock-exit-operations.js";
+import { RateLimitedStockExitPreflight } from "../renave/stock-exit-preflight.js";
 import { PostgresVehicleLookupUseCase } from "../renave/vehicle-lookup-use-case.js";
 import { createPostgresTenantDirectory } from "../tenant/directory.js";
 import { PostgresTenantEstablishmentAdministration } from "../tenant/postgres-administration.js";
@@ -652,6 +660,252 @@ function successfulStockDetailConnector(scenario: PreflightScenario) {
       tenantId: scenario.tenant.id,
     },
   }));
+}
+
+const STOCK_EXIT_SUBJECT = "oidc|stock-exit-composition";
+const STOCK_EXIT_NOW = new Date("2026-11-24T18:00:00.000Z");
+const stockExitBusiness: StockExitBusinessInput = {
+  comprador: {
+    email: "comprador@example.test",
+    endereco: {
+      bairro: "Centro",
+      cep: "66000000",
+      codigoMunicipio: 1501402,
+      logradouro: "Avenida Brasil",
+      numero: "100",
+    },
+    nome: "Comprador Exemplo",
+    numeroDocumento: "52998224725",
+    tipoDocumento: "CPF",
+  },
+  dataVenda: "2026-11-24",
+  stockId: 71,
+  valorVenda: 98_500.25,
+  veiculo: {
+    codigoSegurancaCrv: "12345678901",
+    numeroCrv: "123456789012",
+    placa: "ABC1D23",
+    renavam: "10987654321",
+  },
+};
+
+function stockExitDetailResult(
+  scenario: PreflightScenario,
+  restricted: boolean,
+) {
+  const restrictions = restricted
+    ? [{ codigoTipoRestricao: "01", tipoRestricao: "Administrativa" }]
+    : [];
+  return {
+    result: {
+      evidence: {
+        ...stockExitBusiness.veiculo,
+        estado: "CONFIRMADO" as const,
+        id: stockExitBusiness.stockId,
+        restricoesVeiculo: restrictions,
+        tipoCrv: "DIGITAL" as const,
+      },
+      publicResult: {
+        estado: "CONFIRMADO" as const,
+        id: stockExitBusiness.stockId,
+        placa: stockExitBusiness.veiculo.placa,
+        renavam: stockExitBusiness.veiculo.renavam,
+        restricoes: restrictions.map((item) => ({
+          codigoTipo: item.codigoTipoRestricao,
+          tipo: item.tipoRestricao,
+        })),
+        tipoCrv: "DIGITAL" as const,
+      },
+    },
+    verifiedIdentity: {
+      confirmedEstablishmentCnpj: scenario.store.cnpj,
+      confirmedIntegratorCnpj: INTEGRATOR_CNPJ,
+      environment: "homologation" as const,
+      establishmentId: scenario.store.id,
+      tenantId: scenario.tenant.id,
+    },
+  };
+}
+
+function protectedPrincipal(seed: number): ProtectedRenavePrincipal {
+  return {
+    aadSha256: Buffer.alloc(32, seed),
+    authTag: Buffer.alloc(16, seed),
+    ciphertext: Buffer.alloc(32, seed),
+    envelopeSchemaVersion: 1,
+    hmac: {
+      digest: Buffer.alloc(32, seed),
+      hmacKeyId: `composition-hmac-${seed}`,
+    },
+    keyId: `composition-envelope-${seed}`,
+    nonce: Buffer.alloc(12, seed),
+  };
+}
+
+async function stockExitCompositionHarness(
+  scenario: PreflightScenario,
+  label: string,
+  restricted: boolean,
+) {
+  await prepareCredentialLink(scenario, "enabled");
+  const principals = await withTenant(
+    migratorPool,
+    scenario.tenant.id,
+    (client) =>
+      seedVerifiedOperationPrincipalsForComposition(client, {
+        establishmentId: scenario.store.id,
+        label,
+        subject: STOCK_EXIT_SUBJECT,
+      }),
+  );
+  const getStockById = vi.fn(async () =>
+    stockExitDetailResult(scenario, restricted),
+  );
+  const getRecentStocks = vi.fn(async () => {
+    throw new Error("inventário não deve ser usado no preflight de saída");
+  });
+  const getStocksByPlate = vi.fn(async () => {
+    throw new Error("busca por placa não deve ser usada no preflight de saída");
+  });
+  const mutate = vi.fn(async () => {
+    throw new Error("mutação SERPRO não deve existir neste ensaio");
+  });
+  const readOnlyConnectorStub = {
+    getRecentStocks,
+    getStockById,
+    getStocksByPlate,
+    mutate,
+  };
+  const stockQuery = new PostgresStockQueryUseCase({
+    certificateThumbprintSha256: "b".repeat(64),
+    cipher: new EvidenceCipher({
+      activeKeyId: "stock-exit-preflight-integration-key",
+      keys: new Map([
+        ["stock-exit-preflight-integration-key", Buffer.alloc(32, 0x41)],
+      ]),
+    }),
+    connector: readOnlyConnectorStub,
+    integratorCnpj: INTEGRATOR_CNPJ,
+    pool: appPool,
+  });
+  const release = vi.fn(async () => undefined);
+  const acquire = vi.fn(async () => ({
+    allowed: true as const,
+    permit: { release },
+  }));
+  const releaseFailure = vi.fn(async () => undefined);
+  const preflight = new RateLimitedStockExitPreflight({
+    onPermitReleaseFailure: releaseFailure,
+    queryLimiter: { acquire },
+    stockQuery,
+  });
+  const resolver = {
+    resolve: vi.fn(async () => ({
+      establishment: {
+        binding: {
+          establishmentId: scenario.store.id,
+          profileId: principals.establishmentProfileId,
+          profileVersion: principals.establishmentProfileVersion,
+          purpose: "establishment-email" as const,
+          tenantId: scenario.tenant.id,
+        },
+        envelope: protectedPrincipal(2),
+      },
+      operator: {
+        binding: {
+          profileId: principals.operatorProfileId,
+          profileVersion: principals.operatorProfileVersion,
+          purpose: "operator-cpf" as const,
+          subject: STOCK_EXIT_SUBJECT,
+          tenantId: scenario.tenant.id,
+        },
+        envelope: protectedPrincipal(1),
+      },
+    })),
+  };
+  const principalCrypto = {
+    decrypt: vi.fn(
+      (_envelope: ProtectedRenavePrincipal, binding: { purpose: string }) => {
+        const value =
+          binding.purpose === "operator-cpf"
+            ? "52998224725"
+            : "estabelecimento@example.test";
+        return {
+          copyUtf8Bytes: () => Buffer.from(value, "utf8"),
+          destroy: vi.fn(),
+        } as unknown as DecryptedRenavePrincipal;
+      },
+    ),
+  } as unknown as RenavePrincipalCrypto;
+  const municipalityCatalog = { contains: vi.fn(async () => true) };
+  const operation = new PostgresHeldStockExitOperation({
+    digestKeys: {
+      actor: Buffer.alloc(32, 0x51),
+      idempotency: Buffer.alloc(32, 0x52),
+      vehicle: Buffer.alloc(32, 0x53),
+    },
+    environment: "homologation",
+    keyGeneration: {
+      fingerprint: Buffer.alloc(32, 0x54),
+      generationId: "stock-exit-composition-v1",
+    },
+    keyGenerationChecker: { assert: vi.fn(async () => undefined) },
+    municipalityCatalog,
+    preflight,
+    principalCrypto,
+    projectionCipher: new OperationReconciliationProjectionCipher({
+      activeKeyId: "stock-exit-composition-projection-key",
+      environment: "homologation",
+      masterKeys: new Map([
+        ["stock-exit-composition-projection-key", Buffer.alloc(32, 0x55)],
+      ]),
+    }),
+    requestCipher: new OperationRequestCipher({
+      activeKeyId: "stock-exit-composition-request-key",
+      environment: "homologation",
+      keys: new Map([
+        ["stock-exit-composition-request-key", Buffer.alloc(32, 0x56)],
+      ]),
+    }),
+    resolver,
+    runner: createTenantActionRunner(appPool),
+  });
+  return {
+    acquire,
+    getRecentStocks,
+    getStockById,
+    getStocksByPlate,
+    municipalityCatalog,
+    mutate,
+    operation,
+    release,
+    releaseFailure,
+    resolver,
+  };
+}
+
+async function stockExitOperationCounts(scenario: PreflightScenario) {
+  const { rows } = await adminPool.query<{
+    legacy_operations: number;
+    outbox_items: number;
+    stock_exit_operations: number;
+    stock_exit_statuses: string[];
+  }>(
+    `select
+       (select count(*)::integer from renave.operation where tenant_id=$1)
+         as legacy_operations,
+       (select count(*)::integer from renave.operation_outbox where tenant_id=$1)
+         as outbox_items,
+       (select count(*)::integer from renave_stock_exit.operation where tenant_id=$1)
+         as stock_exit_operations,
+       coalesce(
+         (select array_agg(status::text order by created_at)
+            from renave_stock_exit.operation where tenant_id=$1),
+         array[]::text[]
+       ) as stock_exit_statuses`,
+    [scenario.tenant.id],
+  );
+  return rows[0]!;
 }
 
 const VEHICLE_PLATE = "ABC1D23";
@@ -1957,6 +2211,157 @@ describe("composição PostgreSQL real da API", () => {
       "attempted",
       "succeeded",
     ]);
+  });
+
+  it("compõe preflight por ID e persiste somente a saída HELD_LOCAL", async () => {
+    const scenario = await createPreflightScenario(
+      "stock-exit-preflight-accepted",
+    );
+    const harness = await stockExitCompositionHarness(
+      scenario,
+      "stock-exit-preflight-accepted",
+      false,
+    );
+    try {
+      expect(await stockExitOperationCounts(scenario)).toEqual({
+        legacy_operations: 0,
+        outbox_items: 0,
+        stock_exit_operations: 0,
+        stock_exit_statuses: [],
+      });
+
+      await expect(
+        harness.operation.execute({
+          actorIp: "198.51.100.15",
+          business: stockExitBusiness,
+          establishmentId: scenario.store.id,
+          idempotencyKey: randomUUID(),
+          now: STOCK_EXIT_NOW,
+          session: {
+            expiresAt: Date.now() + 60_000,
+            issuer: "https://issuer.example.test",
+            mfaVerified: true,
+            roles: [],
+            subject: STOCK_EXIT_SUBJECT,
+          },
+          tenantId: scenario.tenant.id,
+          traceId: "stock-exit-preflight-accepted-trace",
+        }),
+      ).resolves.toMatchObject({ replayed: false, status: "HELD_LOCAL" });
+
+      expect(await stockExitOperationCounts(scenario)).toEqual({
+        legacy_operations: 0,
+        outbox_items: 0,
+        stock_exit_operations: 1,
+        stock_exit_statuses: ["HELD_LOCAL"],
+      });
+      expect(await stockEvidenceState(scenario)).toEqual([
+        {
+          failure_code: null,
+          request_clear_absent: true,
+          response_ciphertext_present: true,
+          response_clear_absent: true,
+          status: "completed",
+        },
+      ]);
+      expect(await stockAuditOutcomes(scenario)).toEqual([
+        "attempted",
+        "succeeded",
+      ]);
+      expect(harness.acquire).toHaveBeenCalledOnce();
+      expect(harness.release).toHaveBeenCalledOnce();
+      expect(harness.releaseFailure).not.toHaveBeenCalled();
+      expect(harness.getStockById).toHaveBeenCalledOnce();
+      expect(harness.getStockById).toHaveBeenCalledWith(
+        {
+          environment: "homologation",
+          establishmentCnpj: scenario.store.cnpj,
+          establishmentId: scenario.store.id,
+          integratorCnpj: INTEGRATOR_CNPJ,
+          tenantId: scenario.tenant.id,
+        },
+        stockExitBusiness.stockId,
+      );
+      expect(harness.getRecentStocks).not.toHaveBeenCalled();
+      expect(harness.getStocksByPlate).not.toHaveBeenCalled();
+      expect(harness.mutate).not.toHaveBeenCalled();
+      expect(harness.resolver.resolve).toHaveBeenCalledOnce();
+      expect(harness.municipalityCatalog.contains).toHaveBeenCalledOnce();
+    } finally {
+      harness.operation.destroy();
+    }
+  });
+
+  it("cifra a rejeição do preflight e não cria operação nem outbox", async () => {
+    const scenario = await createPreflightScenario(
+      "stock-exit-preflight-rejected",
+    );
+    const harness = await stockExitCompositionHarness(
+      scenario,
+      "stock-exit-preflight-rejected",
+      true,
+    );
+    try {
+      await expect(
+        harness.operation.execute({
+          actorIp: "198.51.100.16",
+          business: stockExitBusiness,
+          establishmentId: scenario.store.id,
+          idempotencyKey: randomUUID(),
+          now: STOCK_EXIT_NOW,
+          session: {
+            expiresAt: Date.now() + 60_000,
+            issuer: "https://issuer.example.test",
+            mfaVerified: true,
+            roles: [],
+            subject: STOCK_EXIT_SUBJECT,
+          },
+          tenantId: scenario.tenant.id,
+          traceId: "stock-exit-preflight-rejected-trace",
+        }),
+      ).rejects.toMatchObject({ code: "STOCK_EXIT_PREFLIGHT_REJECTED" });
+
+      expect(await stockExitOperationCounts(scenario)).toEqual({
+        legacy_operations: 0,
+        outbox_items: 0,
+        stock_exit_operations: 0,
+        stock_exit_statuses: [],
+      });
+      expect(await stockEvidenceState(scenario)).toEqual([
+        {
+          failure_code: null,
+          request_clear_absent: true,
+          response_ciphertext_present: true,
+          response_clear_absent: true,
+          status: "completed",
+        },
+      ]);
+      expect(await stockAuditOutcomes(scenario)).toEqual([
+        "attempted",
+        "succeeded",
+      ]);
+      expect(harness.acquire).toHaveBeenCalledOnce();
+      expect(harness.release).toHaveBeenCalledOnce();
+      expect(harness.releaseFailure).not.toHaveBeenCalled();
+      expect(harness.getStockById).toHaveBeenCalledOnce();
+      expect(harness.getStockById).toHaveBeenCalledWith(
+        {
+          environment: "homologation",
+          establishmentCnpj: scenario.store.cnpj,
+          establishmentId: scenario.store.id,
+          integratorCnpj: INTEGRATOR_CNPJ,
+          tenantId: scenario.tenant.id,
+        },
+        stockExitBusiness.stockId,
+      );
+      expect(harness.getRecentStocks).not.toHaveBeenCalled();
+      expect(harness.getStocksByPlate).not.toHaveBeenCalled();
+      expect(harness.mutate).not.toHaveBeenCalled();
+      expect(harness.resolver.resolve).not.toHaveBeenCalled();
+      expect(harness.municipalityCatalog.contains).not.toHaveBeenCalled();
+    } finally {
+      harness.operation.destroy();
+    }
   });
 
   it("finaliza evidência e auditoria como rejeitadas quando o conector falha", async () => {
