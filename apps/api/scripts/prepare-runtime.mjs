@@ -31,6 +31,7 @@ const apiRuntimeDbFiles = new Set(
     "session-store",
     "stock-entry-rate-limiter",
     "stock-exit-municipality-catalog",
+    "stock-exit-rate-limiter",
     "tenant-admin-rate-limiter",
     "tenant-administration",
     "tenant-context",
