@@ -196,6 +196,39 @@ export function validateFirstSlice(document) {
     "Restricao",
   );
 
+  const municipalityList = operation(document, "/api/municipios", "get");
+  requireValue(
+    municipalityList.security.every((item) =>
+      Object.hasOwn(item, "cnpjEstabelecimento"),
+    ),
+    "municipios deixou de exigir cnpjEstabelecimento em todos os modos",
+  );
+  const municipalityListParameters = new Map(
+    municipalityList.parameters?.map((parameter) => [
+      parameter.name,
+      parameter,
+    ]),
+  );
+  requireValue(
+    municipalityList.parameters?.length === 2 &&
+      municipalityListParameters.size === 2 &&
+      ["nome", "uf"].every((name) => {
+        const parameter = municipalityListParameters.get(name);
+        return (
+          parameter?.in === "query" &&
+          parameter.type === "string" &&
+          parameter.required !== true
+        );
+      }),
+    "municipios divergiu dos filtros opcionais nome/uf",
+  );
+  requireValue(
+    municipalityList.responses?.["200"]?.schema?.type === "array" &&
+      municipalityList.responses?.["200"]?.schema?.items?.$ref ===
+        "#/definitions/Municipio",
+    "municipios não retorna array de Municipio no HTTP 200",
+  );
+
   const municipality = operation(document, "/api/municipios/{id}", "get");
   requireValue(
     municipality.security.every((item) =>

@@ -27,6 +27,7 @@
     "dev": "pnpm --filter @seu-renave/db --filter @seu-renave/identity build && pnpm --parallel --filter @seu-renave/api --filter @seu-renave/web dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "municipality:catalog:verify": "pnpm --filter @seu-renave/db municipality:catalog:verify",
     "prehomologation:serpro": "pnpm --filter @seu-renave/renave-application... build && node --conditions=production scripts/run-serpro-prehomologation-matrix.mjs",
     "reconciliation-worker:start": "pnpm --filter @seu-renave/reconciliation-worker-app start",
     "release:guard:api": "node scripts/check-api-release.mjs",

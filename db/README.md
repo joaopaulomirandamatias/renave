@@ -186,6 +186,31 @@ verificador retorna `false`.
 some interrompe o runner; não há migration "down" (rollback documentado no
 cabeçalho de cada arquivo). Um advisory lock serializa runners concorrentes.
 
+## Catálogo municipal RENAVE — verificação offline
+
+Uma captura autorizada do `GET /api/municipios` pode ser verificada sem rede e
+sem acesso ao PostgreSQL:
+
+```bash
+pnpm municipality:catalog:verify -- \
+  --manifest /caminho/manifest.json \
+  --source /caminho/source.json \
+  --expected-manifest-sha256 <sha256-aprovado-por-canal-independente>
+```
+
+O verificador aceita somente arquivos regulares dentro dos limites definidos,
+UTF-8 e JSON estritos, o endpoint exato de homologação, timestamp UTC canônico,
+campos exatos, IDs/UF válidos, códigos únicos, sentinelas nacionais, contagem e
+os hashes do corpo bruto e do artefato canônico. O hash esperado do manifesto
+deve chegar por um canal de aprovação revisado e independente dos dois arquivos;
+um hash guardado ao lado da própria captura não autentica sua procedência.
+
+Essa etapa prova integridade e consistência, não vigência nem publicação. A
+captura mTLS e sua aprovação/WORM pertencem à cerimônia externa. A publicação
+transacional ainda não está exposta por CLI, e não existe snapshot ativo. O
+futuro publicador deverá repetir a verificação completa, aplicar a política de
+frescor e usar diretamente o papel mínimo autorizado, sem `SET ROLE`.
+
 ## Proveniência
 
 Padrões genéricos (tenant corrente via `set_config` transacional, FORCE RLS,

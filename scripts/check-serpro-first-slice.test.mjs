@@ -179,6 +179,32 @@ function compatibleDocument() {
           responses: { 200: { schema: { $ref: "#/definitions/Municipio" } } },
         }),
       },
+      "/api/municipios": {
+        get: secured({
+          parameters: [
+            {
+              in: "query",
+              name: "nome",
+              required: false,
+              type: "string",
+            },
+            {
+              in: "query",
+              name: "uf",
+              required: false,
+              type: "string",
+            },
+          ],
+          responses: {
+            200: {
+              schema: {
+                items: { $ref: "#/definitions/Municipio" },
+                type: "array",
+              },
+            },
+          },
+        }),
+      },
       "/api/solicitacoes-entrada-estoque": {
         post: secured({
           parameters: [
@@ -309,6 +335,43 @@ describe("contrato semântico da primeira fatia", () => {
       },
       (document) =>
         document.definitions.Municipio.properties.uf.enum.push("XX"),
+    ];
+
+    for (const mutate of mutations) {
+      const document = compatibleDocument();
+      mutate(document);
+      assert.throws(
+        () => validateFirstSlice(document),
+        /Contrato incompatível/,
+      );
+    }
+  });
+
+  it("recusa mudanças no contrato da lista de municípios", () => {
+    const municipalitiesPath = "/api/municipios";
+    const mutations = [
+      (document) => delete document.paths[municipalitiesPath],
+      (document) => document.paths[municipalitiesPath].get.security.push({}),
+      (document) => {
+        document.paths[municipalitiesPath].get.parameters[0].required = true;
+      },
+      (document) => {
+        document.paths[municipalitiesPath].get.parameters[1].name = "estado";
+      },
+      (document) => {
+        document.paths[municipalitiesPath].get.parameters.push({
+          ...document.paths[municipalitiesPath].get.parameters[0],
+        });
+      },
+      (document) => {
+        document.paths[municipalitiesPath].get.responses[200].schema.type =
+          "object";
+      },
+      (document) => {
+        document.paths[
+          municipalitiesPath
+        ].get.responses[200].schema.items.$ref = "#/definitions/Outro";
+      },
     ];
 
     for (const mutate of mutations) {
