@@ -22,7 +22,7 @@ export class PostgresStockExitMunicipalityCatalog {
         release_version: string | null;
       }>(
         `select state, present, release_version
-           from renave_reference.lookup_municipality($1::integer)`,
+           from renave_stock_exit_barriers.lookup_municipality($1::integer)`,
         [code],
       );
       const row = rows[0];

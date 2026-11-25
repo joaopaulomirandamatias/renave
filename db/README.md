@@ -235,6 +235,29 @@ uma fronteira de credencial. O comando não captura dados nem chama o SERPRO. N�
 existe snapshot ativo versionado no repositório; a execução depende da captura
 oficial aprovada fora dele.
 
+### Barreiras da saída de estoque
+
+A saída `HELD_LOCAL` usa um lookup fechado próprio. Em cada consulta, o banco
+repete a vigência da release ativa: origem `RENAVE_MUNICIPIOS`, URL oficial
+exata, integridade, quatro sentinelas, 5.000 a 10.000 linhas e `observed_at`
+entre o relógio PostgreSQL atual e as 24 horas anteriores. Release ausente,
+futura, vencida ou ativa inválida torna o catálogo indisponível; não existe
+fallback para uma release histórica. `renave_app` recebe somente `EXECUTE` nas
+funções fechadas e não lê as tabelas do catálogo.
+
+O limitador de mutação da saída é independente do limitador de entrada. Ele
+serializa os escopos global, tenant e sujeito nessa ordem, armazena apenas
+digests HMAC-SHA-256 de 32 bytes e falha fechado diante de entrada ou decisão
+inválida. O consumo deve ocorrer em uma transação curta/autocommit, antes da
+futura transação de negócio, para que um rollback da operação não devolva
+quota. A futura composição de runtime deverá usar segredo exclusivo da saída e
+vincular sua identidade ao fingerprint/pin do bundle aprovado; rotação não pode
+reiniciar quota silenciosamente.
+
+As migrations `0082` e `0083` não criam outbox, despacho, worker, promoter nem
+chamada HTTP. A capacidade permanece pré-runtime e inativa até uma entrega
+posterior compor explicitamente essas dependências e seus testes de segurança.
+
 ## Proveniência
 
 Padrões genéricos (tenant corrente via `set_config` transacional, FORCE RLS,

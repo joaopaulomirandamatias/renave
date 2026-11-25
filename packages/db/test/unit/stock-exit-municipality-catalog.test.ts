@@ -16,6 +16,21 @@ it("recusa códigos fora do intervalo int32 positivo antes de consultar", async 
   expect(query).not.toHaveBeenCalled();
 });
 
+it("consulta somente o lookup vigente da saída", async () => {
+  const query = vi.fn().mockResolvedValue({
+    rows: [{ state: "READY", present: true, release_version: "fixture" }],
+  });
+  await expect(
+    catalog.contains({ query } as unknown as TenantClient, 1_501_402),
+  ).resolves.toBe(true);
+  expect(String(query.mock.calls[0]?.[0])).toContain(
+    "renave_stock_exit_barriers.lookup_municipality",
+  );
+  expect(String(query.mock.calls[0]?.[0])).not.toContain(
+    "renave_reference.lookup_municipality",
+  );
+});
+
 it("distingue ausência na release de indisponibilidade e de resposta inválida", async () => {
   const query = vi.fn();
   const client = { query } as unknown as TenantClient;

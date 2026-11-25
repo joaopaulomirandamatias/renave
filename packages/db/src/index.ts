@@ -265,3 +265,10 @@ export {
   PostgresStockExitMunicipalityCatalog,
   StockExitMunicipalityCatalogUnavailableError,
 } from "./stock-exit-municipality-catalog.js";
+export {
+  decodeStockExitRateLimitHmacKeyBase64,
+  PostgresStockExitRateLimiter,
+  StockExitRateLimitInputError,
+  type StockExitRateLimitResult,
+  type StockExitRateLimitScope,
+} from "./stock-exit-rate-limiter.js";
